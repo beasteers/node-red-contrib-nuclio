@@ -1,0 +1,14 @@
+node_modules
+/data*
+public
+test
+config
+Dockerfile
+docker-compose.yml
+*.md
+.dockerignore
+
+
+
+/*
+!lib

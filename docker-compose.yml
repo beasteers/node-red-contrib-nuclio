@@ -1,0 +1,57 @@
+
+services:
+  nodered:
+    build: 
+      context: .
+    image: nodered-nuclio
+    container_name: nodered-nuclio
+    restart: unless-stopped
+    ports:
+      - 1882:1880
+    environment:
+      NUCLIO_ADDRESS: http://nuclio-dashboard:8070
+    volumes:
+      - ./data:/data
+      - ./config/settings.js:/data/settings.js
+      - .:/usr/src/node-red/node-red-contrib-ray-jobs
+
+  nuclio-dashboard:
+    image: quay.io/nuclio/dashboard:1.14.2-arm64
+    container_name: nuclio
+    ports:
+      - 8070:8070
+    environment:
+      NUCLIO_CHECK_FUNCTION_CONTAINERS_HEALTHINESS: "true"  # not sure if this is helping
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config/platform.yaml:/etc/nuclio/config/platform/platform.yaml  # for the network name
+
+  # # --------------------------------- Testing -------------------------------- #
+
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: nr-grafana
+  #   environment:
+  #     GF_SECURITY_ADMIN_USER: admin
+  #     GF_SECURITY_ADMIN_PASSWORD: admin
+  #     # GF_AUTH_DISABLE_LOGIN_FORM: "true"
+  #     GF_SECURITY_ALLOW_EMBEDDING: "true"
+  #     GF_AUTH_ANONYMOUS_ENABLED: "true"
+  #     GF_AUTH_ANONYMOUS_ORG_ROLE: "Editor"
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./data-grafana:/var/lib/grafana
+  #     - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
+  #     - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+
+  # postgres:
+  #   image: timescale/timescaledb-ha:pg16
+  #   container_name: postgres
+  #   environment:
+  #     POSTGRES_HOST_AUTH_METHOD: trust
+  #   volumes:
+  #     - ./config/init.sql:/docker-entrypoint-initdb.d/init.sql
+  #     - ./data-postgres:/home/postgres/pgdata
+  #   ports:
+  #     - "5432:5432"

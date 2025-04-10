@@ -1,0 +1,770 @@
+<style>
+    .node_label_monospace {
+        font-family: monospace;
+        font-size: 0.82em;
+        font-weight: 900;
+    }
+</style>
+
+
+<!-- ----------------------------------------------------------------------- -->
+<!--                              Nuclio Server                              -->
+<!-- ----------------------------------------------------------------------- -->
+
+
+<script type="text/javascript">
+    RED.nodes.registerType('nuclio-config', {
+        category: 'config',
+        icon: "nuclio-logo.svg",
+        defaults: {
+            address: { value: 'http://nuclio-dashboard:8070', required: true },
+            addressType: { value: 'str' },
+            publicAddress: { value: 'http://localhost:8070', required: false },
+            publicAddressType: { value: 'str' },
+        },
+        label: function () {
+            return this.publicAddress || this.address || 'Nuclio Server';
+        },
+        oneditprepare: function () {
+            $('#node-config-input-address').typedInput({
+				default: this.addressType,
+				types: ['str', 'global', 'env'],
+			});
+            $('#node-config-input-publicAddress').typedInput({
+				default: this.publicAddressType,
+				types: ['str', 'global', 'env'],
+			});
+        },
+    });
+</script>
+
+<script type="text/html" data-template-name="nuclio-config">
+    <div class="form-row">
+        <label for="node-config-input-address">
+            <span>Nuclio API Address (typically port 8070)</span>
+        </label>
+        <input type="text" id="node-config-input-address" placeholder="http://localhost:8070" />
+    </div>    
+    <div class="form-row">
+        <label for="node-config-input-publicAddress">
+            <span>Nuclio Public Dashboard Address (typically port 8070)</span>
+        </label>
+        <input type="text" id="node-config-input-publicAddress" placeholder="http://localhost:8070" />
+    </div>
+</script>
+
+
+<!-- ----------------------------------------------------------------------- -->
+<!--                             Nuclio Project                              -->
+<!-- ----------------------------------------------------------------------- -->
+
+<script type="text/javascript">
+    RED.nodes.registerType('nuclio-project', {
+        category: 'config',
+        icon: "nuclio-logo.svg",
+        defaults: {
+            name: { value: 'default' },
+            nameType: { value: 'str' },
+        },
+        label: function () {
+            return this.name || 'default';
+        },
+        oneditprepare: function () {
+            $('#node-project-input-name').typedInput({
+				default: this.nameType,
+				types: ['str', 'global', 'env'],
+			});
+        },
+    });
+</script>
+
+<script type="text/html" data-template-name="nuclio-project">
+    <div class="form-row">
+        <label for="node-project-input-name">
+            <span>Nuclio Project Name</span>
+        </label>
+        <input type="text" id="node-project-input-name" placeholder="default" />
+    </div>
+</script>
+
+
+<!-- ----------------------------------------------------------------------- -->
+<!--                             Nuclio Function                             -->
+<!-- ----------------------------------------------------------------------- -->
+
+<script type="text/javascript">
+    const sampleList = (list) => list[Math.floor(Math.random() * list.length)];
+    const randomEndpoint = () => {
+        const adjectives = ['adaptive', 'agile', 'airy', 'amber', 'amplified', 'blazing', 'blissful', 'boundless', 'breezy', 'bright', 'buoyant', 'calm', 'caressing', 'cascading', 'celestial', 'cloudy', 'cocooned', 'cosmic', 'crystalline', 'dappled', 'dazzling', 'dewlit', 'digital', 'dreamy', 'drifting', 'dynamic', 'elastic', 'electric', 'elegant', 'endless', 'ethereal', 'evolving', 'feathered', 'fluent', 'futuristic', 'gentle', 'gentlehearted', 'glassy', 'global', 'glowing', 'gossamer', 'graceful', 'gravitational', 'harmonic', 'harmonious', 'hazy', 'hushed', 'hyper', 'infinite', 'innovative', 'interstellar', 'iridescent', 'joyful', 'kindred', 'kinetic', 'lavender', 'lilac', 'lilting', 'lucent', 'luminous', 'lunar', 'magnetic', 'mellow', 'melodic', 'mighty', 'misty', 'modular', 'moonlit', 'nanotech', 'nebula', 'neural', 'oblique', 'omniscient', 'opalescent', 'orbital', 'orbiting', 'pastel', 'peachy', 'pearl', 'perennial', 'petal', 'plasma', 'plush', 'pulsating', 'quantum', 'radiant', 'reactive', 'revolutionary', 'rippling', 'roselight', 'rosy', 'seamless', 'serene', 'shimmering', 'shiny', 'silken', 'silver', 'silvery', 'smooth', 'soaring', 'soft', 'solar', 'sonic', 'soothing', 'sparkling', 'spectral', 'spun', 'stellar', 'sunny', 'supercharged', 'sweet', 'swift', 'tranquil', 'transcendent', 'turbo', 'twinkling', 'ultra', 'unified', 'velvet', 'velvety', 'vibrant', 'virtual', 'volatile', 'warm', 'wavy', 'weightless', 'whimsical', 'wistful', 'zealous', 'zippy'];
+        const nouns = ['accelerator', 'api', 'array', 'aura', 'backbone', 'band', 'beacon', 'bloom', 'breeze', 'bubble', 'cartridge', 'channel', 'chip', 'circuit', 'cluster', 'cocoon', 'conduit', 'core', 'dawn', 'domain', 'dream', 'drift', 'dusk', 'echo', 'endpoint', 'engine', 'fabric', 'feather', 'flame', 'flow', 'flux', 'gateway', 'gleam', 'glean', 'glimmer', 'glow', 'grid', 'halo', 'harmony', 'haze', 'hive', 'horizon', 'hub', 'interface', 'kernel', 'lattice', 'light', 'link', 'logic', 'lotus', 'lull', 'matrix', 'mesh', 'mist', 'module', 'murmur', 'muse', 'nest', 'net', 'nexus', 'node', 'note', 'opal', 'orb', 'oscillator', 'path', 'pathway', 'petal', 'pipeline', 'plane', 'point', 'portal', 'processor', 'protocol', 'pulse', 'radar', 'reactor', 'relay', 'ribbon', 'ripple', 'rose', 'route', 'scaffold', 'scent', 'segment', 'sequence', 'service', 'shade', 'shell', 'shimmer', 'sky', 'song', 'spark', 'spectrum', 'sphere', 'stream', 'switch', 'system', 'terrain', 'thread', 'tide', 'token', 'tone', 'topology', 'trace', 'trail', 'twilight', 'vector', 'veil', 'vertex', 'vibe', 'warp', 'wave', 'wavelength', 'web', 'webbing', 'whisper', 'wind', 'wing', 'wire', 'wisp', 'zephyr', 'zone'];
+        return `${sampleList(adjectives)}-${sampleList(nouns)}`;
+    }
+
+
+const configCode = `
+apiVersion: "nuclio.io/v1"
+kind: NuclioFunction
+metadata:
+  labels: {}
+  annotations: {}
+spec:
+  build:
+    commands: []
+    # - pip install msgpack  # currently required for python fns on Mac
+    # - pip install requests numpy pandas
+
+  # minReplicas: 1
+  # maxReplicas: 1
+
+  env: []
+  #   - name: SOME_ENV
+  #     value: abc
+  #   - name: SOME_OTHER_ENV
+  #     valueFrom:
+  #       configMapKeyRef:
+  #         name: my-config
+  #         key: some-key
+  #   - name: SECRET_PASSWORD_ENV_VAR
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: my-secret
+  #         key: password
+  volumes: []
+  #   - volume:
+  #       hostPath:
+  #         path: "/var/run/docker.sock"
+  #     volumeMount:
+  #       mountPath: "/var/run/docker.sock"
+  
+  resources: {}
+  #   # Kubernetes Limits & Requests for the function's CPU and memory usage.
+  #   requests:
+  #     cpu: 1
+  #     memory: 128M
+  #   limits:
+  #     cpu: 2
+  #     memory: 256M
+  #     nvidia.com/gpu: 1
+`.trim();
+
+
+
+const SAMPLES = {
+    python: {
+        config: configCode,
+        entrypoint: 'handler',
+        code: `
+import nuclio_sdk
+
+async def handler(context: nuclio_sdk.Context, event: nuclio_sdk.Event):
+    # reverse the input, return JSON
+    return {
+        "some-output": event.body[::-1],
+        "hi": "Hello, from Nuclio :]",
+    }
+    `.trim()
+    },
+    golang: {
+        config: configCode,
+        entrypoint: 'Handler',
+        code: `
+package main
+
+import (
+	"github.com/nuclio/nuclio-sdk-go"
+)
+
+func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
+	context.Logger.Info("This is an unstructured %s", "log")
+
+	return nuclio.Response{
+		StatusCode:  200,
+		ContentType: "application/text",
+		Body:        []byte("Hello, from Nuclio :]"),
+	}, nil
+}
+    `.trim()
+    },
+    nodejs: {
+        config: configCode,
+        entrypoint: 'handler',
+        code: `
+exports.handler = function(context, event) {
+    var body = event.body.toString();
+    context.logger.info('reversing: ' + body);
+    context.callback(body.split('').reverse().join(''));
+};
+        `.trim()
+    },
+    shell: {
+        config: configCode,
+        code: `
+#!/bin/sh
+
+# reverse the input
+rev /dev/stdin
+        `.trim()
+    },
+}
+
+    const getUniqueValues = (node, key) => {
+        let endpoints = {};
+        RED.nodes.eachNode(n => {
+            if(n.type !== "nuclio" || !n.server || n.server !== node.server || n.id === node.id) return;
+            endpoints[key(n)] = n.id;
+        })
+        return endpoints;
+    }
+
+    const cleanRouteName = (route_prefix) => route_prefix.replace(/^\//g, '').replace(/\//g, ' ');
+    const nodeName = (n) => n.name || cleanRouteName(n.route_prefix);
+
+    class Poller {
+        constructor(fn, interval) {
+            this.fn = fn;
+            this.interval = interval;
+            this.pollInterval = null;
+        }
+
+        start() {
+            this.fn();
+            this.pollInterval = setInterval(this.fn, this.interval);
+        }
+
+        stop() {
+            clearInterval(this.pollInterval);
+        }
+    }
+
+    const fmt = (obj) => Object.entries(obj).map(([k,v]) => {
+        if (typeof v === 'string' && v.includes('\n')) {
+            return `<b>${k}</b>: <div style="padding-left: 12px;">${v}</div>`;
+        }
+        return `<b>${k}</b>: ${JSON.stringify(v)}`
+    }).join('\n');
+    // const yamlFmt = (obj) => Object.entries(obj).map(([k,v]) => `<b>${k}</b>: ${yamlFmt(v)}`).join('\n');
+
+    RED.nodes.registerType('nuclio', {
+        category: 'function',
+        color: '#65a9fc',
+        inputs: 1,
+        outputs: 2,
+        outputLabels: ['result', 'error/backpressure'],
+        icon: "nuclio.io.ico",
+        defaults: {
+            server: {
+				type: 'nuclio-config',
+				required: false,
+			},
+            project: {
+                type: 'nuclio-project',
+                required: false,
+            },
+            name: { value: '', validate: function(v) {
+                if(!v) {
+                    v = randomEndpoint();
+                    while (getUniqueValues(this, n=>n.name)[v]) {
+                        v = randomEndpoint();
+                    }
+                    this.name = v;
+                }
+                return !getUniqueValues(this, n=>n.name)[v];
+            } },            
+            runtime: { value: 'python:3.11' },
+            code: { value: SAMPLES.python.code },
+            configCode: { value: SAMPLES.python.config },
+        },
+        label: function () {
+            return this.name || 'nuclio fn';
+        },
+        oneditprepare: function() {
+            let node = this;
+
+
+            // <!-- ----------------------------------------------------------------------- -->
+            // <!--                             Buttons / Links                             -->
+            // <!-- ----------------------------------------------------------------------- -->
+
+            // $("#nuclio-dashboard-link").on('click', function() {
+            //     let name = $('#node-input-name').val();
+            //     let project = 'default';
+            //     let server = RED.nodes.node(node.server);
+            //     console.log(server);
+            //     let url = server?.publicAddress || server?.address || 'http://localhost:8070';
+            //     console.log(`${url}/projects/${project}/functions/${name}/code`);
+            //     let popup = window.open(`${url}/projects/${project}/functions/${name}/code`, '_blank')
+            //     if (popup) {
+            //         popup.focus();
+            //     } else {
+            //         alert(`popup blocked: ${url}/projects/${project}/functions/${name}/code`);
+            //     }
+            // });
+            $("#nuclio-dashboard-link").on('pointerdown', function () {
+                let name = $('#node-input-name').val();
+                if (!name) return;
+
+                let project = 'default';
+                let server = RED.nodes.node(node.server);
+                let url = server?.publicAddress || server?.address || 'http://localhost:8070';
+                let fullUrl = `${url}/projects/${project}/functions/${name}/code`;
+
+                this.href = fullUrl;
+            });
+            $('#nuclio-redeploy').on('click', function() {
+                $.post(`/nuclio/api/functions/deploy?id=${node.id}`, function(data) {
+                    console.log(data);
+                }).fail((e) => {
+                    alert('Error redeploying: ' + JSON.stringify(e));
+                });
+            })
+
+            // <!-- ----------------------------------------------------------------------- -->
+            // <!--                              Code Editors                               -->
+            // <!-- ----------------------------------------------------------------------- -->
+
+            const runtime = node.runtime || 'python:3.11';
+            const [runtimeBase, runtimeVersion] = runtime.split(':');
+
+            const lang = {
+                python: 'python',
+                golang: 'go',
+                nodejs: 'javascript',
+                shell: 'shell',
+            }[runtimeBase];
+
+            this.editor = RED.editor.createEditor({
+                id: 'node-input-nuclio-editor',
+                mode: `ace/mode/${lang}`,
+                value: this.code || "",
+                // height: '700px',
+                // stateId: stateId,
+                focus: true,
+                // extraLibs: extraLibs
+            });
+
+            this.configeditor = RED.editor.createEditor({
+                id: 'node-input-nuclio-config-editor',
+                mode: `ace/mode/yaml`,
+                value: this.configCode || "",
+                // height: '700px',
+                // stateId: stateId,
+                focus: true,
+                // extraLibs: extraLibs
+            });
+
+            $('#node-input-runtime').on('change', function() {
+                const runtime = $(this).val();
+                
+                const [runtimeBase, runtimeVersion] = runtime.split(':');
+                const lang = {
+                    python: 'python',
+                    golang: 'go',
+                    nodejs: 'javascript',
+                    shell: 'shell',
+                }[runtimeBase];
+                console.log("Changing runtime & language", runtime, lang);
+
+                let code = node.editor.getValue();
+                let configCode = node.configeditor.getValue();
+                const codes = Object.values(SAMPLES).map(v => v.code);
+                const configCodes = Object.values(SAMPLES).map(v => v.config);
+                if(code.trim() === '' || codes.includes(code)) {
+                    code = SAMPLES[runtimeBase].code;
+                    node.editor.setValue(code);
+                }
+                if(configCode.trim() === '' || configCodes.includes(configCode)) {
+                    node.configeditor.setValue(SAMPLES[runtimeBase].config);
+                }
+                node.editor.setMode(`ace/mode/${lang}`);
+            });
+
+
+            // <!-- ----------------------------------------------------------------------- -->
+            // <!--                               Status Page                               -->
+            // <!-- ----------------------------------------------------------------------- -->
+
+            this.statusPoller = new Poller(() => {
+                $.getJSON(`/nuclio/api/functions?id=${this.id}`, function (data) {
+                    const { status, metadata, spec } = data;
+                    const { logs, ...statusMeta } = status;
+                    const state = status.state;
+
+                    $('#nuclio-status').html(fmt(statusMeta));
+                    $('#nuclio-deploy-logs').html(logs?.map(({ level, message, time, name, requestID, ...log }) => //builderKind, versionInfo, 
+                        `<div><b>${level}</b> ${message} ${Object.keys(log).length ? `\n<div style="padding-left: 12px;">${fmt(log)}</div>` : ''}</div>`).join('\n'));
+                    $('#nuclio-spec').text(JSON.stringify({ metadata, spec }, null, 2));
+                    $('.red-ui-tab-label[href="#nuclio-tab-status"]').html(`Status: <span style="color: ${state === 'ready' ? 'green' : (state||'').includes('waiting') ? 'yellow' : 'red'}">${state}</span>`);
+                }).fail((e) => {
+                    $('#nuclio-status').text(JSON.stringify(e, null, 2));
+                });
+                $.getJSON(`/nuclio/api/functions/logs?id=${this.id}`, function (data) {
+                    // $('#nuclio-logs').text(JSON.stringify(data, null, 2));
+                    $('#nuclio-logs').html(Object.entries(data||{}).map(([replica, log]) => //builderKind, versionInfo, 
+                        `<div><b>${replica}</b> \n<div style='padding-left: 12px'>${log || '-- no logs --'}</div></div>`).join('\n'));
+                }).fail((e) => {
+                    $('#nuclio-logs').text(JSON.stringify(e, null, 2));
+                });
+            }, 2400);
+            this.statusPoller.start();
+
+
+            // <!-- ----------------------------------------------------------------------- -->
+            // <!--                                  Tabs                                   -->
+            // <!-- ----------------------------------------------------------------------- -->
+
+            var tabs = RED.tabs.create({
+                id: "nuclio-tabs",
+                onchange: function(tab) {
+                    $("#nuclio-tabs-content").children().hide();
+                    $("#" + tab.id).show();
+                }
+            });
+            tabs.addTab({
+                id: "nuclio-tab-app",
+                label: "Application"
+            });
+            tabs.addTab({
+                id: "nuclio-tab-deps",
+                label: "Config"
+            });
+            tabs.addTab({
+                id: "nuclio-tab-status",
+                label: "Status"
+            });
+
+            tabs.activateTab("nuclio-tab-app");
+        },
+        oneditsave: function() {
+            let node = this;
+            this.code = this.editor.getValue();
+            this.editor.destroy();
+            delete this.editor;
+            this.configCode = this.configeditor.getValue();
+            this.configeditor.destroy();
+            delete this.configeditor;
+            this.statusPoller.stop();
+            delete this.statusPoller;
+        },
+        oneditcancel: function() {
+            this.editor.destroy();
+            delete this.editor;
+            this.configeditor.destroy();
+            delete this.configeditor;
+            this.statusPoller.stop();
+            delete this.statusPoller;
+        },
+    });
+</script>
+
+
+<!-- 
+
+-----------------------------------------------------------------------
+                            Form UI                                  
+-----------------------------------------------------------------------
+
+-->
+
+
+
+<script type="text/html" data-template-name="nuclio">
+    <style>
+        #nuclio-tabs-content {
+            height: 100%;
+            min-height: 350px;
+            max-height: calc(100% - 95px);
+        }
+        #nuclio-tabs-content > * {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: stretch;
+        }
+
+        #nuclio-tabs-content .node-text-editor {
+            flex-grow: 1;
+        }
+
+        /* #nuclio-tabs-content .red-ui-editableList-container {
+            padding: 0px;
+            border: 0;
+        }
+        #nuclio-tabs-content .red-ui-editableList-container li {
+            padding:0px;
+        }
+        #nuclio-tabs-content .red-ui-editableList-item-remove {
+            right: 5px;
+        }
+
+        #nuclio-tabs-content .node-input-list-row > label {
+            font-size: 1em;
+            font-weight: 700;
+            margin: 0 0 0 4px;
+        }
+        #nuclio-tabs-content .node-input-list-row .red-ui-editableList-container input {
+            border-radius: 0;
+        }
+        #nuclio-tabs-content .red-ui-editableList-container .red-ui-editableList-list li:not(:first-child) input {
+            border-top: 0;
+        }
+
+        #nuclio-tabs-content .red-ui-editableList-container li {
+            border-bottom: 0px;
+        }
+
+        #nuclio-tabs-content .red-ui-editableList-item-content {
+            display: flex;
+            justify-content: stretch;
+        }
+        #nuclio-tabs-content .red-ui-editableList-item-content > * {
+            flex-grow: 1;
+        }
+        #node-input-env_vars-x .red-ui-typedInput-container {
+            border-radius: 0;
+        }
+        #nuclio-tabs-content .red-ui-editableList-container input {
+            width: auto;
+        }
+
+        #nuclio-tabs-content .red-ui-editableList-container input.node-input-name {
+            flex-basis: 100px;
+            flex-grow: 0;
+        }
+        #node-input-env_vars-x input.node-input-key {
+            width: auto;
+        }
+
+        #node-input-route_prefix {
+            font-family: monospace;
+            font-weight: 900;
+            font-size: 1.2em;
+            width: 100%;
+        } */
+        .name-error {
+            font-weight: 900;
+            color: red;
+            display: none;
+        }
+        #node-input-name.input-error + .name-error {
+            display: block;
+        }
+
+        /* #nuclio-tabs-content a {
+            color: #65a9fc;
+        } */
+
+        
+        /* #nuclio-tab-status pre {
+            white-space: pre;
+            overflow-x: auto;
+        } */
+        /* #nuclio-tab-status pre code {
+            white-space: pre;
+            overflow-x: auto;
+            display: block;
+        } */
+    </style>
+    
+    <div class="form-row nuclio-tabs-row">
+        <ul style="min-width: 600px; margin-bottom: 20px;" id="nuclio-tabs"></ul>
+    </div>
+    <div id="nuclio-tabs-content" style="min-height: calc(100% - 95px);">
+        <div id="nuclio-tab-app" style="display:none">
+            
+
+            <div class="form-row">
+                <h2>
+                    <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/function-configuration-reference.html" title="">Nuclio Reference</a>
+                </h2>
+                <p>
+                    <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/python/python-reference.html">Python</a> &nbsp;&nbsp;
+                    <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/golang/golang-reference.html">Go</a> &nbsp;&nbsp;
+                    <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/nodejs/nodejs-reference.html">NodeJS</a> &nbsp;&nbsp;
+                    <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/shell/shell-reference.html">Shell</a> &nbsp;&nbsp;
+                    <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/batching.html" title="Request batching to handle multiple requests at once.">Python Batching</a> &nbsp;&nbsp;
+                </p>
+            </div>
+
+            <div class="form-row">
+                <div>
+                    <input type="text" id="node-input-name" placeholder="What should the URL endpoint be?" title="This is the URL that nodered will call to run this function." />
+                    <small class="name-error">Endpoint must be unique.</small>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div>
+                    <select id="node-input-runtime" class="form-control">
+                        <!-- <option value="python:3.12">python:3.12</option> -->
+                        <option value="python:3.11">python:3.11</option>
+                        <option value="python:3.10">python:3.10</option>
+                        <option value="python:3.9">python:3.9</option>
+                        <option value="golang">golang</option>
+                        <option value="nodejs">nodejs</option>
+                        <option value="shell">shell</option>
+                        <!-- <option value="ruby">Ruby</option> -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- height: 900px;  -->
+            <div style="min-height:150px;" class="node-text-editor" id="node-input-nuclio-editor" ></div>
+            <!-- <div id="func-tab-body">
+                <div class="form-row node-text-editor-row" style="position:relative">
+                </div>
+            </div> -->
+        </div>
+
+        <div id="nuclio-tab-deps" style="display:none">
+
+            <div class="form-row">
+                <h2>General:</h2>
+            </div>
+
+            <div class="form-row">
+                <label for="node-input-server">
+                    <!-- <span>Server</span> -->
+                    <!-- <button id="nuclio-dashboard-link">URL</button> -->
+                    URL
+                </label>
+                <input type="text" id="node-input-server" />
+                <div>
+                    <small>What Nuclio Server should this deploy to?</small>
+                </div>
+            </div>
+            <div class="form-row">
+                <label for="node-input-project">
+                    <span>Project</span>
+                </label>
+                <input type="text" id="node-input-project" placeholder="default" />
+            </div>
+            <!-- <div class="form-row">
+                <p>Function handler name: (e.g. <code>def <b>handler</b>(context, event):</code>)</p>
+                <input type="text" placeholder='e.g. app' id="node-input-func_name" />
+                <div>
+                    <small>So that Nuclio knows which function to call.</small>
+                </div>
+            </div> -->
+            <div class="form-row">
+                <h2>Function Config:</h2>
+                <p>
+                </p>
+            </div>
+            <div style="min-height:150px;" class="node-text-editor" id="node-input-nuclio-config-editor" ></div>
+            <!-- <div class="form-row node-input-list-row">
+                <label for="node-input-commands-x">
+                    <span>Commands</span>
+                    <small>[<a target="_blank" href="https://docs.ray.io/en/latest/ray-core/handling-dependencies.html#using-conda-or-pip-packages">docs</a>]</small>
+                </label>
+                <ol id="node-input-commands-x"></ol>
+            </div>
+            <div class="form-row node-input-list-row">
+                <label for="node-input-dependencies-x">
+                    <span>Python Dependencies</span>
+                    <small>[<a target="_blank" href="https://docs.ray.io/en/latest/ray-core/handling-dependencies.html#using-conda-or-pip-packages">docs</a>]</small>
+                </label>
+                <ol id="node-input-dependencies-x"></ol>
+            </div>
+            <div class="form-row node-input-list-row">
+                <label for="node-input-env_vars-x">
+                    <span>Environment Variables</span>
+                </label>
+                <p>
+                    You can specify environment variables that will be available to your application at runtime. 
+                </p>
+                <ol id="node-input-env_vars-x"></ol>
+            </div> -->
+
+            <!-- <h2>Settings:</h2>
+            <div class="form-row">
+                <label for="node-input-name">
+                    <span>Max Concurrent Requests</span>
+                </label>
+                <input type="text" id="node-input-maxConcurrent" placeholder="20" />
+                <div>
+                    <small>How many requests can be processed at once before we start adding messages to the backlog?</small>
+                </div>
+            </div>
+            <div class="form-row">
+                <label for="node-input-name">
+                    <span>Max Backlog Length</span>
+                </label>
+                <input type="text" id="node-input-maxBacklogOverflow" placeholder="1000" />
+                <div>
+                    <small>How many messages can be queued up before we start rejecting new messages? Rejected messages will be sent via the second output with a <code>backpressure=true</code> flag.</small>
+                </div>
+            </div> -->
+        </div>
+        <div id="nuclio-tab-status" style="display:none">
+            
+            <p>Status: <a id="nuclio-dashboard-link" href="about:blank" target="_blank" rel="noopener noreferrer">Dashboard</a> <button id="nuclio-redeploy">Redeploy</button></p><pre><code id="nuclio-status"></code></pre>
+            <p>Run Logs:</p><pre><code id="nuclio-logs"></code></pre>
+            <p>Build Logs:</p><pre><code id="nuclio-deploy-logs"></code></pre>
+            <p>Spec:</p><pre><code id="nuclio-spec"></code></pre>
+        </div>
+    </div>
+    
+</script>
+
+
+
+<!-- 
+
+-----------------------------------------------------------------------
+                                 Docs                                  
+-----------------------------------------------------------------------
+
+-->
+
+
+
+<script type="text/html" data-help-name="nuclio">
+
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>payload
+            <span class="property-type">any</span>
+        </dt>
+        <dd> the input to your endpoint.</dd>
+        <!-- <dt class="optional">topic <span class="property-type">string</span></dt> -->
+        <!-- <dd> the MQTT topic to publish to.</dd> -->
+    </dl>
+
+    <h3>Outputs</h3>
+
+     <ol class="node-ports">
+         <li>Response
+            <dl class="message-properties">
+                <dt>payload <span class="property-type">any</span></dt>
+                <dd>the output of your function.</dd>
+                <dt>...COMMON</dt>
+            </dl>
+         </li>
+         <!-- <li>Overflow
+            <dl class="message-properties">
+                <dt>...COMMON</dt>
+            </dl>
+         </li> -->
+     </ol>
+
+     <h4>Errors:</h4>
+     <ol class="node-ports">
+        <dl class="message-properties">
+            <dt>error.response <span class="property-type">axios.Response</span></dt>
+            <dd>the axios error.</dd>
+            <dt>error.response.status <span class="property-type">integer</span></dt>
+            <dd>the error status code (e.g. 500).</dd>
+            <dt>...COMMON</dt>
+        </dl>
+    </ol>
+
+    <h3>
+        <code>
+            <a href="https://docs.ray.io/en/latest/serve/advanced-guides/advanced-autoscaling.html#optional-define-how-the-system-reacts-to-changing-traffic" target="_blank">
+                [Docs]
+            </a>
+            <pre>autoscaling_config</pre></code>
+    </h3>
+
+</script>

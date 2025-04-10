@@ -1,0 +1,2 @@
+local:
+  defaultFunctionContainerNetworkName: node-red-contrib-nuclio_default
