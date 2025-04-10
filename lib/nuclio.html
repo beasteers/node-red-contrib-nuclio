@@ -285,20 +285,6 @@ rev /dev/stdin
             // <!--                             Buttons / Links                             -->
             // <!-- ----------------------------------------------------------------------- -->
 
-            // $("#nuclio-dashboard-link").on('click', function() {
-            //     let name = $('#node-input-name').val();
-            //     let project = 'default';
-            //     let server = RED.nodes.node(node.server);
-            //     console.log(server);
-            //     let url = server?.publicAddress || server?.address || 'http://localhost:8070';
-            //     console.log(`${url}/projects/${project}/functions/${name}/code`);
-            //     let popup = window.open(`${url}/projects/${project}/functions/${name}/code`, '_blank')
-            //     if (popup) {
-            //         popup.focus();
-            //     } else {
-            //         alert(`popup blocked: ${url}/projects/${project}/functions/${name}/code`);
-            //     }
-            // });
             $("#nuclio-dashboard-link").on('pointerdown', function () {
                 let name = $('#node-input-name').val();
                 if (!name) return;
@@ -548,21 +534,6 @@ rev /dev/stdin
         #node-input-name.input-error + .name-error {
             display: block;
         }
-
-        /* #nuclio-tabs-content a {
-            color: #65a9fc;
-        } */
-
-        
-        /* #nuclio-tab-status pre {
-            white-space: pre;
-            overflow-x: auto;
-        } */
-        /* #nuclio-tab-status pre code {
-            white-space: pre;
-            overflow-x: auto;
-            display: block;
-        } */
     </style>
     
     <div class="form-row nuclio-tabs-row">
@@ -606,13 +577,7 @@ rev /dev/stdin
                     </select>
                 </div>
             </div>
-
-            <!-- height: 900px;  -->
             <div style="min-height:150px;" class="node-text-editor" id="node-input-nuclio-editor" ></div>
-            <!-- <div id="func-tab-body">
-                <div class="form-row node-text-editor-row" style="position:relative">
-                </div>
-            </div> -->
         </div>
 
         <div id="nuclio-tab-deps" style="display:none">
@@ -622,11 +587,7 @@ rev /dev/stdin
             </div>
 
             <div class="form-row">
-                <label for="node-input-server">
-                    <!-- <span>Server</span> -->
-                    <!-- <button id="nuclio-dashboard-link">URL</button> -->
-                    URL
-                </label>
+                <label for="node-input-server">URL</label>
                 <input type="text" id="node-input-server" />
                 <div>
                     <small>What Nuclio Server should this deploy to?</small>
@@ -638,33 +599,13 @@ rev /dev/stdin
                 </label>
                 <input type="text" id="node-input-project" placeholder="default" />
             </div>
-            <!-- <div class="form-row">
-                <p>Function handler name: (e.g. <code>def <b>handler</b>(context, event):</code>)</p>
-                <input type="text" placeholder='e.g. app' id="node-input-func_name" />
-                <div>
-                    <small>So that Nuclio knows which function to call.</small>
-                </div>
-            </div> -->
             <div class="form-row">
                 <h2>Function Config:</h2>
                 <p>
                 </p>
             </div>
             <div style="min-height:150px;" class="node-text-editor" id="node-input-nuclio-config-editor" ></div>
-            <!-- <div class="form-row node-input-list-row">
-                <label for="node-input-commands-x">
-                    <span>Commands</span>
-                    <small>[<a target="_blank" href="https://docs.ray.io/en/latest/ray-core/handling-dependencies.html#using-conda-or-pip-packages">docs</a>]</small>
-                </label>
-                <ol id="node-input-commands-x"></ol>
-            </div>
-            <div class="form-row node-input-list-row">
-                <label for="node-input-dependencies-x">
-                    <span>Python Dependencies</span>
-                    <small>[<a target="_blank" href="https://docs.ray.io/en/latest/ray-core/handling-dependencies.html#using-conda-or-pip-packages">docs</a>]</small>
-                </label>
-                <ol id="node-input-dependencies-x"></ol>
-            </div>
+            <!-- 
             <div class="form-row node-input-list-row">
                 <label for="node-input-env_vars-x">
                     <span>Environment Variables</span>
@@ -673,26 +614,6 @@ rev /dev/stdin
                     You can specify environment variables that will be available to your application at runtime. 
                 </p>
                 <ol id="node-input-env_vars-x"></ol>
-            </div> -->
-
-            <!-- <h2>Settings:</h2>
-            <div class="form-row">
-                <label for="node-input-name">
-                    <span>Max Concurrent Requests</span>
-                </label>
-                <input type="text" id="node-input-maxConcurrent" placeholder="20" />
-                <div>
-                    <small>How many requests can be processed at once before we start adding messages to the backlog?</small>
-                </div>
-            </div>
-            <div class="form-row">
-                <label for="node-input-name">
-                    <span>Max Backlog Length</span>
-                </label>
-                <input type="text" id="node-input-maxBacklogOverflow" placeholder="1000" />
-                <div>
-                    <small>How many messages can be queued up before we start rejecting new messages? Rejected messages will be sent via the second output with a <code>backpressure=true</code> flag.</small>
-                </div>
             </div> -->
         </div>
         <div id="nuclio-tab-status" style="display:none">
@@ -707,64 +628,6 @@ rev /dev/stdin
 </script>
 
 
-
-<!-- 
-
------------------------------------------------------------------------
-                                 Docs                                  
------------------------------------------------------------------------
-
--->
-
-
-
 <script type="text/html" data-help-name="nuclio">
-
-
-    <h3>Inputs</h3>
-    <dl class="message-properties">
-        <dt>payload
-            <span class="property-type">any</span>
-        </dt>
-        <dd> the input to your endpoint.</dd>
-        <!-- <dt class="optional">topic <span class="property-type">string</span></dt> -->
-        <!-- <dd> the MQTT topic to publish to.</dd> -->
-    </dl>
-
-    <h3>Outputs</h3>
-
-     <ol class="node-ports">
-         <li>Response
-            <dl class="message-properties">
-                <dt>payload <span class="property-type">any</span></dt>
-                <dd>the output of your function.</dd>
-                <dt>...COMMON</dt>
-            </dl>
-         </li>
-         <!-- <li>Overflow
-            <dl class="message-properties">
-                <dt>...COMMON</dt>
-            </dl>
-         </li> -->
-     </ol>
-
-     <h4>Errors:</h4>
-     <ol class="node-ports">
-        <dl class="message-properties">
-            <dt>error.response <span class="property-type">axios.Response</span></dt>
-            <dd>the axios error.</dd>
-            <dt>error.response.status <span class="property-type">integer</span></dt>
-            <dd>the error status code (e.g. 500).</dd>
-            <dt>...COMMON</dt>
-        </dl>
-    </ol>
-
-    <h3>
-        <code>
-            <a href="https://docs.ray.io/en/latest/serve/advanced-guides/advanced-autoscaling.html#optional-define-how-the-system-reacts-to-changing-traffic" target="_blank">
-                [Docs]
-            </a>
-            <pre>autoscaling_config</pre></code>
-    </h3>
 
 </script>

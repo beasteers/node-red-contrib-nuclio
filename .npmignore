@@ -8,7 +8,7 @@ docker-compose.yml
 *.md
 .dockerignore
 
-
+shhh*
 
 /*
 !lib
