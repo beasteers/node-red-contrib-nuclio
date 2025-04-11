@@ -1,6 +1,6 @@
 {
   "name": "@bea.steers/node-red-contrib-nuclio",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Deploy Nuclio functions from Node-RED",
   "main": "lib/nuclio.js",
   "scripts": {},
