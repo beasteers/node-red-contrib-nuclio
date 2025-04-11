@@ -486,12 +486,9 @@ rev /dev/stdin
 
             node.secret_vars = [];
             $("#node-input-secret_vars-x").editableList('items').each(function(i) {
-                console.log($(this).find(".node-input-key"));
-                console.log($(this).find(".node-input-key").val());
                 let name = $(this).find(".node-input-key").val();
                 let type = $(this).find(".node-input-value").typedInput('type');
                 let value = $(this).find(".node-input-value").typedInput('value');
-                console.log(name, type, value);
                 name && node.secret_vars.push({ name, type, value });
             })
             delete this.secretList;
