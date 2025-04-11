@@ -18,6 +18,7 @@ services:
   nuclio-dashboard:
     image: quay.io/nuclio/dashboard:1.14.2-arm64
     container_name: nuclio
+    restart: unless-stopped
     ports:
       - 8070:8070
     environment:

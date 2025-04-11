@@ -17,8 +17,8 @@
         category: 'config',
         icon: "nuclio-logo.svg",
         defaults: {
-            address: { value: 'http://nuclio-dashboard:8070', required: true },
-            addressType: { value: 'str' },
+            address: { value: 'NUCLIO_ADDRESS', required: true },
+            addressType: { value: 'env' },
             publicAddress: { value: 'http://localhost:8070', required: false },
             publicAddressType: { value: 'str' },
         },
@@ -41,15 +41,21 @@
 <script type="text/html" data-template-name="nuclio-config">
     <div class="form-row">
         <label for="node-config-input-address">
-            <span>Nuclio API Address (typically port 8070)</span>
+            <span>Nuclio Dashboard URL:</span>
         </label>
         <input type="text" id="node-config-input-address" placeholder="http://localhost:8070" />
+        <div>
+            <small>The address that node-red can reach nuclio at. (typically port 8070)</small>
+        </div>
     </div>    
     <div class="form-row">
         <label for="node-config-input-publicAddress">
-            <span>Nuclio Public Dashboard Address (typically port 8070)</span>
+            <span>Public Nuclio Dashboard URL (optional)</span>
         </label>
         <input type="text" id="node-config-input-publicAddress" placeholder="http://localhost:8070" />
+        <div>
+            <small>The address that YOU (and your browser) can reach nuclio by. This is just used for links to the nuclio dashboard and is not critical to operation. This could just be your local port forward address for simplicity.</small>
+        </div>
     </div>
 </script>
 
@@ -112,31 +118,24 @@ spec:
     commands: []
     # - pip install msgpack  # currently required for python fns on Mac
     # - pip install requests numpy pandas
+    
+  # # add multiple workers:
+  # triggers:
+  #   mh:
+  #     kind: http
+  #     numWorkers: 4
+      
+  #############
+  # Kubernetes:
+  
+  # env: []
+  # envFrom: []
+  # volumes: []
 
+  # # Pod replica auto-scaling:
   # minReplicas: 1
   # maxReplicas: 1
-
-  env: []
-  #   - name: SOME_ENV
-  #     value: abc
-  #   - name: SOME_OTHER_ENV
-  #     valueFrom:
-  #       configMapKeyRef:
-  #         name: my-config
-  #         key: some-key
-  #   - name: SECRET_PASSWORD_ENV_VAR
-  #     valueFrom:
-  #       secretKeyRef:
-  #         name: my-secret
-  #         key: password
-  volumes: []
-  #   - volume:
-  #       hostPath:
-  #         path: "/var/run/docker.sock"
-  #     volumeMount:
-  #       mountPath: "/var/run/docker.sock"
-  
-  resources: {}
+  # resources: {}
   #   # Kubernetes Limits & Requests for the function's CPU and memory usage.
   #   requests:
   #     cpu: 1
@@ -210,7 +209,7 @@ rev /dev/stdin
     const getUniqueValues = (node, key) => {
         let endpoints = {};
         RED.nodes.eachNode(n => {
-            if(n.type !== "nuclio" || !n.server || n.server !== node.server || n.id === node.id) return;
+            if(n.type !== "nuclio" || !n.server || n.server !== node.server || n.project !== node.project || n.id === node.id) return;
             endpoints[key(n)] = n.id;
         })
         return endpoints;
@@ -263,7 +262,8 @@ rev /dev/stdin
             name: { value: '', validate: function(v) {
                 if(!v) {
                     v = randomEndpoint();
-                    while (getUniqueValues(this, n=>n.name)[v]) {
+                    let existing = getUniqueValues(this, n=>n.name);
+                    while (existing[v]) {
                         v = randomEndpoint();
                     }
                     this.name = v;
@@ -273,13 +273,15 @@ rev /dev/stdin
             runtime: { value: 'python:3.11' },
             code: { value: SAMPLES.python.code },
             configCode: { value: SAMPLES.python.config },
+            env_vars: { value: [] },
+            secret_vars: { value: [] },
         },
         label: function () {
             return this.name || 'nuclio fn';
         },
         oneditprepare: function() {
             let node = this;
-
+            node.originalName = node.name;
 
             // <!-- ----------------------------------------------------------------------- -->
             // <!--                             Buttons / Links                             -->
@@ -303,6 +305,14 @@ rev /dev/stdin
                     alert('Error redeploying: ' + JSON.stringify(e));
                 });
             })
+            $('#nuclio-generate-name').on('click', function() {
+                let name = randomEndpoint();
+                let existing = getUniqueValues(node, n=>n.name);
+                while (existing[name]) {
+                    name = randomEndpoint();
+                }
+                $('#node-input-name').val(name);
+            });
 
             // <!-- ----------------------------------------------------------------------- -->
             // <!--                              Code Editors                               -->
@@ -364,6 +374,40 @@ rev /dev/stdin
                 node.editor.setMode(`ace/mode/${lang}`);
             });
 
+            // <!-- ----------------------------------------------------------------------- -->
+            // <!--                                Settings                                 -->
+            // <!-- ----------------------------------------------------------------------- -->
+
+            this.envList = $("#node-input-env_vars-x").editableList({
+                addItem: function(row, index, data) {
+                    $(`<input class='node-input-key' type="text" placeholder="VAR_NAME" />`).appendTo(row).val(data.name)
+                    $(`<input class='node-input-value' placeholder="value" />`).appendTo(row).attr('value', data.value).typedInput({
+                        defaultType: data.type || 'str',
+                        types: ['str','num','json','env','cred'],
+                    });
+                },
+                removable: true,
+            });
+            for(let data of this.env_vars || []) {
+                this.envList.editableList('addItem', data)
+            }
+
+            // TODO: add secrets/overrides support e.g. with `build.codeEntryType: "github"`
+            //       build.codeEntryAttributes.headers.Authorization: "my-GitHub-access-token" (typedInput: cred/env)
+            this.secretList = $("#node-input-secret_vars-x").editableList({
+                addItem: function(row, index, data) {
+                    $(`<input class='node-input-key' type="text" placeholder="VAR_NAME" />`).appendTo(row).val(data.name)
+                    $(`<input class='node-input-value' placeholder="value" />`).appendTo(row).attr('value', data.value).typedInput({
+                        defaultType: data.type || 'cred',
+                        types: ['env','cred'],
+                    });
+                },
+                removable: true,
+            });
+            for(let data of this.secret_vars || []) {
+                this.secretList.editableList('addItem', data)
+            }
+
 
             // <!-- ----------------------------------------------------------------------- -->
             // <!--                               Status Page                               -->
@@ -407,7 +451,7 @@ rev /dev/stdin
             });
             tabs.addTab({
                 id: "nuclio-tab-app",
-                label: "Application"
+                label: "Code"
             });
             tabs.addTab({
                 id: "nuclio-tab-deps",
@@ -430,6 +474,27 @@ rev /dev/stdin
             delete this.configeditor;
             this.statusPoller.stop();
             delete this.statusPoller;
+
+            node.env_vars = [];
+            $("#node-input-env_vars-x").editableList('items').each(function(i) {
+                let name = $(this).find(".node-input-key").val();
+                let type = $(this).find(".node-input-value").typedInput('type');
+                let value = $(this).find(".node-input-value").typedInput('value');
+                name && node.env_vars.push({ name, type, value });
+            })
+            delete this.envList;
+
+            node.secret_vars = [];
+            $("#node-input-secret_vars-x").editableList('items').each(function(i) {
+                console.log($(this).find(".node-input-key"));
+                console.log($(this).find(".node-input-key").val());
+                let name = $(this).find(".node-input-key").val();
+                let type = $(this).find(".node-input-value").typedInput('type');
+                let value = $(this).find(".node-input-value").typedInput('value');
+                console.log(name, type, value);
+                name && node.secret_vars.push({ name, type, value });
+            })
+            delete this.secretList;
         },
         oneditcancel: function() {
             this.editor.destroy();
@@ -438,6 +503,9 @@ rev /dev/stdin
             delete this.configeditor;
             this.statusPoller.stop();
             delete this.statusPoller;
+            this.name = this.originalName;
+            delete this.envList;
+            delete this.secretList;
         },
     });
 </script>
@@ -471,31 +539,14 @@ rev /dev/stdin
             flex-grow: 1;
         }
 
-        /* #nuclio-tabs-content .red-ui-editableList-container {
-            padding: 0px;
-            border: 0;
-        }
-        #nuclio-tabs-content .red-ui-editableList-container li {
-            padding:0px;
-        }
-        #nuclio-tabs-content .red-ui-editableList-item-remove {
-            right: 5px;
-        }
+
+        /* Editable List */
 
         #nuclio-tabs-content .node-input-list-row > label {
-            font-size: 1em;
-            font-weight: 700;
-            margin: 0 0 0 4px;
-        }
-        #nuclio-tabs-content .node-input-list-row .red-ui-editableList-container input {
-            border-radius: 0;
-        }
-        #nuclio-tabs-content .red-ui-editableList-container .red-ui-editableList-list li:not(:first-child) input {
-            border-top: 0;
-        }
-
-        #nuclio-tabs-content .red-ui-editableList-container li {
-            border-bottom: 0px;
+            /* font-size: 1em; */
+            /* font-weight: 700; */
+            margin: 12px 0 0 4px;
+            width: 100%;
         }
 
         #nuclio-tabs-content .red-ui-editableList-item-content {
@@ -505,74 +556,67 @@ rev /dev/stdin
         #nuclio-tabs-content .red-ui-editableList-item-content > * {
             flex-grow: 1;
         }
-        #node-input-env_vars-x .red-ui-typedInput-container {
+        #nuclio-tabs-content .red-ui-editableList-container input.node-input-key {
+            flex-basis: 100px;
+            flex-grow: 0;
+        }
+
+        #node-input-env_vars-x .red-ui-typedInput-container,
+        #nuclio-tabs-content .node-input-list-row .red-ui-editableList-container input {
             border-radius: 0;
         }
         #nuclio-tabs-content .red-ui-editableList-container input {
             width: auto;
-        }
-
-        #nuclio-tabs-content .red-ui-editableList-container input.node-input-name {
-            flex-basis: 100px;
-            flex-grow: 0;
-        }
-        #node-input-env_vars-x input.node-input-key {
-            width: auto;
-        }
-
-        #node-input-route_prefix {
-            font-family: monospace;
-            font-weight: 900;
-            font-size: 1.2em;
-            width: 100%;
-        } */
-        .name-error {
-            font-weight: 900;
-            color: red;
-            display: none;
-        }
-        #node-input-name.input-error + .name-error {
-            display: block;
         }
     </style>
     
     <div class="form-row nuclio-tabs-row">
         <ul style="min-width: 600px; margin-bottom: 20px;" id="nuclio-tabs"></ul>
     </div>
-    <div id="nuclio-tabs-content" style="min-height: calc(100% - 95px);">
+    <div id="nuclio-tabs-content" style="min-height: calc(100% - 25px);">
         <div id="nuclio-tab-app" style="display:none">
             
 
             <div class="form-row">
-                <h2>
-                    <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/function-configuration-reference.html" title="">Nuclio Reference</a>
-                </h2>
                 <p>
+                    <h2 style="display: inline-block;">
+                        <a target="_blank" href="https://docs.nuclio.io/en/stable/index.html" title="">Nuclio</a> &nbsp;&nbsp;
+                    </h2>
                     <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/python/python-reference.html">Python</a> &nbsp;&nbsp;
                     <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/golang/golang-reference.html">Go</a> &nbsp;&nbsp;
                     <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/nodejs/nodejs-reference.html">NodeJS</a> &nbsp;&nbsp;
                     <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/shell/shell-reference.html">Shell</a> &nbsp;&nbsp;
-                    <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/batching.html" title="Request batching to handle multiple requests at once.">Python Batching</a> &nbsp;&nbsp;
+                    <a target="_blank" href="https://docs.nuclio.io/en/stable/examples/README.html">Examples</a> &nbsp;&nbsp;
+                    <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/batching.html" title="Request batching to handle multiple requests at once.">Batching</a> &nbsp;&nbsp;
+                    <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/function-configuration-reference.html" title="">Ref.</a> &nbsp;&nbsp;
+                    
                 </p>
             </div>
 
             <div class="form-row">
                 <div>
+                    <label for="node-input-name">
+                        <span>Function Name</span>
+                    </label>
                     <input type="text" id="node-input-name" placeholder="What should the URL endpoint be?" title="This is the URL that nodered will call to run this function." />
-                    <small class="name-error">Endpoint must be unique.</small>
+                    <!-- <small class="name-error">Name must be unique.</small> -->
+                     <button id="nuclio-generate-name" class="btn btn-default" title="Generate a random name">🔀</button>
                 </div>
             </div>
 
             <div class="form-row">
                 <div>
+                    <label for="node-input-runtime">
+                        <span>Runtime [<a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/index.html" title="">docs</a>]:</span></span>
+                    </label>
                     <select id="node-input-runtime" class="form-control">
                         <!-- <option value="python:3.12">python:3.12</option> -->
-                        <option value="python:3.11">python:3.11</option>
-                        <option value="python:3.10">python:3.10</option>
-                        <option value="python:3.9">python:3.9</option>
-                        <option value="golang">golang</option>
-                        <option value="nodejs">nodejs</option>
-                        <option value="shell">shell</option>
+                        <option value="python:3.11">python:3.11 (entrypoint: handler)</option>
+                        <option value="python:3.10">python:3.10 (entrypoint: handler)</option>
+                        <option value="python:3.9">python:3.9 (entrypoint: handler)</option>
+                        <option value="golang">golang (entrypoint: Handler)</option>
+                        <option value="nodejs">nodejs (entrypoint: handler)</option>
+                        <option value="shell">shell (stdin/stdout)</option>
                         <!-- <option value="ruby">Ruby</option> -->
                     </select>
                 </div>
@@ -583,15 +627,11 @@ rev /dev/stdin
         <div id="nuclio-tab-deps" style="display:none">
 
             <div class="form-row">
-                <h2>General:</h2>
-            </div>
-
-            <div class="form-row">
-                <label for="node-input-server">URL</label>
+                <label for="node-input-server">Server</label>
                 <input type="text" id="node-input-server" />
-                <div>
+                <!-- <div>
                     <small>What Nuclio Server should this deploy to?</small>
-                </div>
+                </div> -->
             </div>
             <div class="form-row">
                 <label for="node-input-project">
@@ -600,21 +640,31 @@ rev /dev/stdin
                 <input type="text" id="node-input-project" placeholder="default" />
             </div>
             <div class="form-row">
-                <h2>Function Config:</h2>
+                <h2>Function Config [<a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/function-configuration-reference.html" title="">docs</a>]:</h2>
                 <p>
                 </p>
             </div>
             <div style="min-height:150px;" class="node-text-editor" id="node-input-nuclio-config-editor" ></div>
-            <!-- 
+
             <div class="form-row node-input-list-row">
                 <label for="node-input-env_vars-x">
-                    <span>Environment Variables</span>
+                    Environment Variables
                 </label>
                 <p>
-                    You can specify environment variables that will be available to your application at runtime. 
+                    <small>You can specify environment variables that will be available to your application at runtime.</small>
                 </p>
                 <ol id="node-input-env_vars-x"></ol>
-            </div> -->
+            </div>
+
+            <div class="form-row node-input-list-row">
+                <label for="node-input-secret_vars-x">
+                    Secret Overrides
+                </label>
+                <p>
+                    <small>You can specify secret variables (e.g. build.codeEntryAttributes.s3SecretAccessKey: my-53cr3t-@cce55-k3y)</small>
+                </p>
+                <ol id="node-input-secret_vars-x"></ol>
+            </div>
         </div>
         <div id="nuclio-tab-status" style="display:none">
             
