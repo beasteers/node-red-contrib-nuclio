@@ -226,22 +226,76 @@ rev /dev/stdin
         }
 
         start() {
+            if (this.pollInterval) return;
             this.fn();
             this.pollInterval = setInterval(this.fn, this.interval);
         }
 
         stop() {
+            if (!this.pollInterval) return;
             clearInterval(this.pollInterval);
+            this.pollInterval = null;
         }
     }
 
     const fmt = (obj) => Object.entries(obj).map(([k,v]) => {
         if (typeof v === 'string' && v.includes('\n')) {
-            return `<b>${k}</b>: <div style="padding-left: 12px;">${v}</div>`;
+            return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${k}</span><span class="nuclio-kv-value nuclio-kv-multiline">${v}</span></div>`;
         }
-        return `<b>${k}</b>: ${JSON.stringify(v)}`
-    }).join('\n');
+        return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${k}</span><span class="nuclio-kv-value">${JSON.stringify(v)}</span></div>`;
+    }).join('');
     // const yamlFmt = (obj) => Object.entries(obj).map(([k,v]) => `<b>${k}</b>: ${yamlFmt(v)}`).join('\n');
+
+    const statusTone = (state) => {
+        if (!state) return 'unknown';
+        if (state === 'ready') return 'ok';
+        if (state === 'error' || state === 'unhealthy') return 'error';
+        if (state === 'scaledToZero') return 'idle';
+        if (state.includes('waiting') || state === 'building' || state === 'configuringResources') return 'working';
+        return 'warn';
+    };
+
+    const splitByDotWithEscape = (str) => str.split(/(?<!\\)\./).map(part => part.replace(/\\\./g, '.'));
+
+    const redactSecrets = (obj, secretVars) => {
+        if (!obj) return obj;
+        const redacted = JSON.parse(JSON.stringify(obj));
+        for (const secret of secretVars || []) {
+            if (!secret?.name) continue;
+            const keys = splitByDotWithEscape(secret.name);
+            const lastKey = keys.pop();
+            let c = redacted;
+            for (const key of keys) {
+                if (!c || typeof c !== 'object') {
+                    c = null;
+                    break;
+                }
+                c = c[key];
+            }
+            if (c && Object.prototype.hasOwnProperty.call(c, lastKey)) {
+                c[lastKey] = '[redacted]';
+            }
+        }
+        return redacted;
+    };
+
+    const getAuthHeaders = () => {
+        const headers = {};
+        if (!RED.settings || typeof RED.settings.get !== 'function') return headers;
+        const authTokens = RED.settings.get("auth-tokens") || {};
+        const token = authTokens.access_token || authTokens.token;
+        if (token) headers.Authorization = `Bearer ${token}`;
+        return headers;
+    };
+
+    const ajaxJson = (options) => $.ajax({
+        dataType: 'json',
+        ...options,
+        headers: {
+            ...getAuthHeaders(),
+            ...(options.headers || {}),
+        },
+    });
 
     RED.nodes.registerType('nuclio', {
         category: 'function',
@@ -287,19 +341,34 @@ rev /dev/stdin
             // <!--                             Buttons / Links                             -->
             // <!-- ----------------------------------------------------------------------- -->
 
+            const updateDashboardLink = () => {
+                const name = $('#node-input-name').val();
+                const project = RED.nodes.node(node.project)?.name || 'default';
+                const server = RED.nodes.node(node.server);
+                const url = server?.publicAddress || server?.address || '';
+                const fullUrl = url && name ? `${url}/projects/${project}/functions/${name}/code` : '';
+                if (fullUrl) {
+                    $('#nuclio-dashboard-link').attr('href', fullUrl).removeClass('nuclio-hidden');
+                } else {
+                    $('#nuclio-dashboard-link').addClass('nuclio-hidden');
+                }
+            };
+
+            updateDashboardLink();
+
             $("#nuclio-dashboard-link").on('pointerdown', function () {
                 let name = $('#node-input-name').val();
                 if (!name) return;
 
-                let project = 'default';
-                let server = RED.nodes.node(node.server);
-                let url = server?.publicAddress || server?.address || 'http://localhost:8070';
-                let fullUrl = `${url}/projects/${project}/functions/${name}/code`;
-
-                this.href = fullUrl;
+                updateDashboardLink();
             });
+            $('#node-input-name').on('input', updateDashboardLink);
+            $('#node-input-project, #node-input-server').on('change', updateDashboardLink);
             $('#nuclio-redeploy').on('click', function() {
-                $.post(`/nuclio/api/functions/deploy?id=${node.id}`, function(data) {
+                ajaxJson({
+                    url: `/nuclio/api/functions/deploy?id=${node.id}`,
+                    method: 'POST',
+                }).done(function(data) {
                     console.log(data);
                 }).fail((e) => {
                     alert('Error redeploying: ' + JSON.stringify(e));
@@ -414,30 +483,42 @@ rev /dev/stdin
             // <!-- ----------------------------------------------------------------------- -->
 
             this.statusPoller = new Poller(() => {
-                $.getJSON(`/nuclio/api/functions?id=${this.id}`, function (data) {
+                ajaxJson({
+                    url: `/nuclio/api/functions?id=${this.id}`,
+                    method: 'GET',
+                }).done(function (data) {
                     const { status, metadata, spec } = data;
                     const { logs, ...statusMeta } = status;
                     const state = status.state;
+                    const safeSpec = redactSecrets(spec, node.secret_vars);
+                    const tone = statusTone(state);
 
                     $('#nuclio-status').html(fmt(statusMeta));
+                    $('#nuclio-status-state').text(state || 'unknown');
+                    $('#nuclio-status-chip').attr('data-tone', tone);
+                    $('#nuclio-status-updated').text(`Updated ${new Date().toLocaleTimeString()}`);
                     $('#nuclio-deploy-logs').html(logs?.map(({ level, message, time, name, requestID, ...log }) => //builderKind, versionInfo, 
                         `<div><b>${level}</b> ${message} ${Object.keys(log).length ? `\n<div style="padding-left: 12px;">${fmt(log)}</div>` : ''}</div>`).join('\n'));
-                    $('#nuclio-spec').text(JSON.stringify({ metadata, spec }, null, 2));
-                    $('.red-ui-tab-label[href="#nuclio-tab-status"]').html(`Status: <span style="color: ${state === 'ready' ? 'green' : (state||'').includes('waiting') ? 'yellow' : 'red'}">${state}</span>`);
+                    $('#nuclio-spec').text(JSON.stringify({ metadata, spec: safeSpec }, null, 2));
                 }).fail((e) => {
                     $('#nuclio-status').text(JSON.stringify(e, null, 2));
+                    $('#nuclio-status-state').text('error');
+                    $('#nuclio-status-chip').attr('data-tone', 'error');
                 });
-                $.getJSON(`/nuclio/api/functions/logs?id=${this.id}`, function (data) {
+                ajaxJson({
+                    url: `/nuclio/api/functions/logs?id=${this.id}`,
+                    method: 'GET',
+                }).done(function (data) {
                     // $('#nuclio-logs').text(JSON.stringify(data, null, 2));
-                    $('#nuclio-logs').html(Object.entries(data||{}).map(([replica, log]) => //builderKind, versionInfo, 
-                        `<div><b>${replica}</b> \n<div style='padding-left: 12px'>${log || '-- no logs --'}</div></div>`).join('\n'));
+                    const logHtml = Object.entries(data||{}).map(([replica, log]) => //builderKind, versionInfo, 
+                        `<div><b>${replica}</b> \n<div style='padding-left: 12px'>${log || '-- no logs --'}</div></div>`).join('\n');
+                    $('#nuclio-logs').html(logHtml);
+                    $('#nuclio-logs').closest('.nuclio-logbox').toggleClass('nuclio-hidden', !logHtml.trim());
                 }).fail((e) => {
                     $('#nuclio-logs').text(JSON.stringify(e, null, 2));
+                    $('#nuclio-logs').closest('.nuclio-logbox').removeClass('nuclio-hidden');
                 });
             }, 2400);
-            this.statusPoller.start();
-
-
             // <!-- ----------------------------------------------------------------------- -->
             // <!--                                  Tabs                                   -->
             // <!-- ----------------------------------------------------------------------- -->
@@ -447,6 +528,11 @@ rev /dev/stdin
                 onchange: function(tab) {
                     $("#nuclio-tabs-content").children().hide();
                     $("#" + tab.id).show();
+                    if (tab.id === "nuclio-tab-status") {
+                        node.statusPoller.start();
+                    } else {
+                        node.statusPoller.stop();
+                    }
                 }
             });
             tabs.addTab({
@@ -565,6 +651,178 @@ rev /dev/stdin
         #nuclio-tabs-content .red-ui-editableList-container input {
             width: auto;
         }
+
+        /* Status tab */
+        #nuclio-tab-status {
+            font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", sans-serif;
+            color: #1d2a33;
+        }
+        .nuclio-status-shell {
+            border-radius: 12px;
+            padding: 16px;
+            background: linear-gradient(135deg, #f7f9fb, #eef2f6);
+            border: 1px solid #e0e6ee;
+        }
+        .nuclio-status-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .nuclio-status-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .nuclio-status-label {
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #6b7a86;
+        }
+        .nuclio-status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-weight: 600;
+            background: #e8eef3;
+            border: 1px solid #d3dde6;
+        }
+        .nuclio-status-chip[data-tone="ok"] {
+            background: #e7f7ee;
+            border-color: #b9e7cd;
+            color: #147a42;
+        }
+        .nuclio-status-chip[data-tone="working"] {
+            background: #fff3da;
+            border-color: #f0d29b;
+            color: #9a6b15;
+        }
+        .nuclio-status-chip[data-tone="warn"] {
+            background: #fff0e6;
+            border-color: #f2c7aa;
+            color: #a34811;
+        }
+        .nuclio-status-chip[data-tone="error"] {
+            background: #ffe6e6;
+            border-color: #f3b2b2;
+            color: #b21c1c;
+        }
+        .nuclio-status-chip[data-tone="idle"] {
+            background: #eef1f4;
+            border-color: #d7dde4;
+            color: #4b5b66;
+        }
+        .nuclio-status-chip[data-tone="unknown"] {
+            background: #f3f4f6;
+            border-color: #dfe3e8;
+            color: #6b7a86;
+        }
+        .nuclio-status-meta {
+            font-size: 12px;
+            color: #6b7a86;
+        }
+        .nuclio-status-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .nuclio-status-actions a,
+        .nuclio-status-actions button {
+            border-radius: 8px;
+            padding: 6px 12px;
+            border: 1px solid #d3dde6;
+            background: #ffffff;
+            color: #1d2a33;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .nuclio-status-actions button {
+            background: #1d2a33;
+            color: #ffffff;
+            border-color: #1d2a33;
+        }
+        .nuclio-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+        }
+        .nuclio-card {
+            background: #ffffff;
+            border: 1px solid #e0e6ee;
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .nuclio-card.compact {
+            padding: 10px 12px;
+        }
+        .nuclio-card-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #6b7a86;
+        }
+        .nuclio-card.full {
+            grid-column: 1 / -1;
+        }
+        .nuclio-kv {
+            display: grid;
+            gap: 6px;
+        }
+        .nuclio-kv-row {
+            display: grid;
+            grid-template-columns: 180px 1fr;
+            gap: 8px;
+            align-items: start;
+            font-size: 12px;
+        }
+        .nuclio-kv-key {
+            color: #51606b;
+            text-transform: lowercase;
+            letter-spacing: 0.02em;
+        }
+        .nuclio-kv-value {
+            color: #1d2a33;
+            word-break: break-word;
+        }
+        .nuclio-kv-multiline {
+            white-space: pre-wrap;
+        }
+        .nuclio-logbox {
+            margin: 0;
+            background: #f7f9fb;
+            border-radius: 8px;
+            padding: 10px;
+            overflow: auto;
+            overflow-x: auto;
+            max-height: 240px;
+            min-height: 60px;
+            border: 1px solid #e6ecf2;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+        .nuclio-hidden {
+            display: none;
+        }
+        .red-ui-editor pre.nuclio-logbox code {
+            white-space: pre;
+        }
+        #nuclio-logs, #nuclio-deploy-logs, #nuclio-status, #nuclio-spec {
+            font-family: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+            font-size: 12px;
+        }
+        #nuclio-spec {
+            max-height: 320px;
+        }
     </style>
     
     <div class="form-row nuclio-tabs-row">
@@ -607,7 +865,7 @@ rev /dev/stdin
                         <span>Runtime [<a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/index.html" title="">docs</a>]:</span></span>
                     </label>
                     <select id="node-input-runtime" class="form-control">
-                        <!-- <option value="python:3.12">python:3.12</option> -->
+                        <option value="python:3.12">python:3.12 (entrypoint: handler)</option>
                         <option value="python:3.11">python:3.11 (entrypoint: handler)</option>
                         <option value="python:3.10">python:3.10 (entrypoint: handler)</option>
                         <option value="python:3.9">python:3.9 (entrypoint: handler)</option>
@@ -658,17 +916,45 @@ rev /dev/stdin
                     Secret Overrides
                 </label>
                 <p>
-                    <small>You can specify secret variables (e.g. build.codeEntryAttributes.s3SecretAccessKey: my-53cr3t-@cce55-k3y)</small>
+                    <small>You can specify secret variables (e.g. build.codeEntryAttributes.s3SecretAccessKey: my-secret-@ccess-k3y)</small>
                 </p>
                 <ol id="node-input-secret_vars-x"></ol>
             </div>
         </div>
         <div id="nuclio-tab-status" style="display:none">
-            
-            <p>Status: <a id="nuclio-dashboard-link" href="about:blank" target="_blank" rel="noopener noreferrer">Dashboard</a> <button id="nuclio-redeploy">Redeploy</button></p><pre><code id="nuclio-status"></code></pre>
-            <p>Run Logs:</p><pre><code id="nuclio-logs"></code></pre>
-            <p>Build Logs:</p><pre><code id="nuclio-deploy-logs"></code></pre>
-            <p>Spec:</p><pre><code id="nuclio-spec"></code></pre>
+            <div class="nuclio-status-shell">
+                <div class="nuclio-status-header">
+                    <div class="nuclio-status-left">
+                        <div class="nuclio-status-label">Status</div>
+                        <div class="nuclio-status-chip" id="nuclio-status-chip" data-tone="unknown">
+                            <span id="nuclio-status-state">unknown</span>
+                        </div>
+                        <div class="nuclio-status-meta" id="nuclio-status-updated">Updated —</div>
+                    </div>
+                    <div class="nuclio-status-actions">
+                        <a id="nuclio-dashboard-link" href="about:blank" target="_blank" rel="noopener noreferrer">Dashboard</a>
+                        <button id="nuclio-redeploy">Redeploy</button>
+                    </div>
+                </div>
+                <div class="nuclio-status-grid">
+                    <section class="nuclio-card compact full">
+                        <div class="nuclio-card-title">Runtime Status</div>
+                        <div class="nuclio-kv" id="nuclio-status"></div>
+                    </section>
+                    <section class="nuclio-card full">
+                        <div class="nuclio-card-title">Run Logs</div>
+                        <pre class="nuclio-logbox"><code id="nuclio-logs"></code></pre>
+                    </section>
+                    <section class="nuclio-card full">
+                        <div class="nuclio-card-title">Build Logs</div>
+                        <pre class="nuclio-logbox"><code id="nuclio-deploy-logs"></code></pre>
+                    </section>
+                    <section class="nuclio-card full">
+                        <div class="nuclio-card-title">Spec</div>
+                        <pre class="nuclio-logbox"><code id="nuclio-spec"></code></pre>
+                    </section>
+                </div>
+            </div>
         </div>
     </div>
     

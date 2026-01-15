@@ -16,13 +16,15 @@ services:
       - .:/usr/src/node-red/node-red-contrib-ray-jobs
 
   nuclio-dashboard:
-    image: quay.io/nuclio/dashboard:1.14.2-arm64
+    image: quay.io/nuclio/dashboard:1.15.12-arm64
     container_name: nuclio
     restart: unless-stopped
     ports:
       - 8070:8070
     environment:
       NUCLIO_CHECK_FUNCTION_CONTAINERS_HEALTHINESS: "true"  # not sure if this is helping
+      DOCKER_BUILDKIT: "1"
+      NUCLIO_ARCH: "arm64"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config/platform.yaml:/etc/nuclio/config/platform/platform.yaml  # for the network name
