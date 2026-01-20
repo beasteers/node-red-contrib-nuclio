@@ -345,8 +345,9 @@ rev /dev/stdin
                 const name = $('#node-input-name').val();
                 const project = RED.nodes.node(node.project)?.name || 'default';
                 const server = RED.nodes.node(node.server);
-                const url = server?.publicAddress || server?.address || '';
-                const fullUrl = url && name ? `${url}/projects/${project}/functions/${name}/code` : '';
+                const url = server?.address || '';
+                const proxyPath = `/nuclio/dashboard/projects/${project}/functions/${name}/code?id=${node.id}`;
+                const fullUrl = url && name ? proxyPath : '';
                 if (fullUrl) {
                     $('#nuclio-dashboard-link').attr('href', fullUrl).removeClass('nuclio-hidden');
                 } else {
