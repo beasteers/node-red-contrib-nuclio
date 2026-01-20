@@ -36,6 +36,57 @@
 			});
         },
     });
+
+    RED.nodes.registerType('nuclio', {
+        category: 'function',
+        color: '#65a9fc',
+        inputs: 1,
+        outputs: 2,
+        outputLabels: ['result', 'fallback'],
+        icon: "nuclio.io.ico",
+        defaults: {
+            function: {
+                type: 'nuclio-function',
+                required: true,
+            },
+            timeoutMs: { value: '' },
+            maxInFlight: { value: '' },
+            headers: { value: [] },
+        },
+        label: function () {
+            const fn = RED.nodes.node(this.function);
+            return fn?.name || 'nuclio invoke';
+        },
+        oneditprepare: function() {
+            this.headersList = $("#node-input-headers").editableList({
+                addItem: function(row, index, data) {
+                    $(`<input class='node-input-key' type="text" placeholder="Header" />`).appendTo(row).val(data.name)
+                    $(`<input class='node-input-value' placeholder="value" />`).appendTo(row).attr('value', data.value).typedInput({
+                        defaultType: data.type || 'str',
+                        types: ['str','num','json','env','cred'],
+                    });
+                },
+                removable: true,
+            });
+            for (let data of this.headers || []) {
+                this.headersList.editableList('addItem', data);
+            }
+        },
+        oneditsave: function() {
+            let node = this;
+            node.headers = [];
+            $("#node-input-headers").editableList('items').each(function(i) {
+                let name = $(this).find(".node-input-key").val();
+                let type = $(this).find(".node-input-value").typedInput('type');
+                let value = $(this).find(".node-input-value").typedInput('value');
+                name && node.headers.push({ name, type, value });
+            });
+            delete this.headersList;
+        },
+        oneditcancel: function() {
+            delete this.headersList;
+        },
+    });
 </script>
 
 <script type="text/html" data-template-name="nuclio-config">
@@ -208,12 +259,12 @@ rev /dev/stdin
 
     const getUniqueValues = (node, key) => {
         let endpoints = {};
-        RED.nodes.eachNode(n => {
-            if(n.type !== "nuclio" || !n.server || n.server !== node.server || n.project !== node.project || n.id === node.id) return;
+        RED.nodes.eachConfig(n => {
+            if (n.type !== "nuclio-function" || n.server !== node.server || n.project !== node.project || n.id === node.id) return;
             endpoints[key(n)] = n.id;
-        })
+        });
         return endpoints;
-    }
+    };
 
     const cleanRouteName = (route_prefix) => route_prefix.replace(/^\//g, '').replace(/\//g, ' ');
     const nodeName = (n) => n.name || cleanRouteName(n.route_prefix);
@@ -243,6 +294,11 @@ rev /dev/stdin
             return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${k}</span><span class="nuclio-kv-value nuclio-kv-multiline">${v}</span></div>`;
         }
         return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${k}</span><span class="nuclio-kv-value">${JSON.stringify(v)}</span></div>`;
+    }).join('');
+
+    const statusChips = (obj) => Object.entries(obj || {}).map(([k,v]) => {
+        const value = typeof v === 'string' ? v : JSON.stringify(v);
+        return `<span class="nuclio-chip"><span class="nuclio-chip-key">${k}</span><span class="nuclio-chip-value">${value}</span></span>`;
     }).join('');
     // const yamlFmt = (obj) => Object.entries(obj).map(([k,v]) => `<b>${k}</b>: ${yamlFmt(v)}`).join('\n');
 
@@ -297,12 +353,8 @@ rev /dev/stdin
         },
     });
 
-    RED.nodes.registerType('nuclio', {
-        category: 'function',
-        color: '#65a9fc',
-        inputs: 1,
-        outputs: 2,
-        outputLabels: ['result', 'error/backpressure'],
+    RED.nodes.registerType('nuclio-function', {
+        category: 'config',
         icon: "nuclio.io.ico",
         defaults: {
             server: {
@@ -342,7 +394,7 @@ rev /dev/stdin
             // <!-- ----------------------------------------------------------------------- -->
 
             const updateDashboardLink = () => {
-                const name = $('#node-input-name').val();
+                const name = $('#node-config-input-name').val();
                 const project = RED.nodes.node(node.project)?.name || 'default';
                 const server = RED.nodes.node(node.server);
                 const url = server?.address || '';
@@ -358,13 +410,13 @@ rev /dev/stdin
             updateDashboardLink();
 
             $("#nuclio-dashboard-link").on('pointerdown', function () {
-                let name = $('#node-input-name').val();
+                let name = $('#node-config-input-name').val();
                 if (!name) return;
 
                 updateDashboardLink();
             });
-            $('#node-input-name').on('input', updateDashboardLink);
-            $('#node-input-project, #node-input-server').on('change', updateDashboardLink);
+            $('#node-config-input-name').on('input', updateDashboardLink);
+            $('#node-config-input-project, #node-config-input-server').on('change', updateDashboardLink);
             $('#nuclio-redeploy').on('click', function() {
                 ajaxJson({
                     url: `/nuclio/api/functions/deploy?id=${node.id}`,
@@ -381,7 +433,7 @@ rev /dev/stdin
                 while (existing[name]) {
                     name = randomEndpoint();
                 }
-                $('#node-input-name').val(name);
+                $('#node-config-input-name').val(name);
             });
 
             // <!-- ----------------------------------------------------------------------- -->
@@ -399,7 +451,7 @@ rev /dev/stdin
             }[runtimeBase];
 
             this.editor = RED.editor.createEditor({
-                id: 'node-input-nuclio-editor',
+                id: 'node-config-input-nuclio-editor',
                 mode: `ace/mode/${lang}`,
                 value: this.code || "",
                 // height: '700px',
@@ -409,7 +461,7 @@ rev /dev/stdin
             });
 
             this.configeditor = RED.editor.createEditor({
-                id: 'node-input-nuclio-config-editor',
+                id: 'node-config-input-nuclio-config-editor',
                 mode: `ace/mode/yaml`,
                 value: this.configCode || "",
                 // height: '700px',
@@ -418,7 +470,7 @@ rev /dev/stdin
                 // extraLibs: extraLibs
             });
 
-            $('#node-input-runtime').on('change', function() {
+            $('#node-config-input-runtime').on('change', function() {
                 const runtime = $(this).val();
                 
                 const [runtimeBase, runtimeVersion] = runtime.split(':');
@@ -448,7 +500,7 @@ rev /dev/stdin
             // <!--                                Settings                                 -->
             // <!-- ----------------------------------------------------------------------- -->
 
-            this.envList = $("#node-input-env_vars-x").editableList({
+            this.envList = $("#node-config-input-env_vars-x").editableList({
                 addItem: function(row, index, data) {
                     $(`<input class='node-input-key' type="text" placeholder="VAR_NAME" />`).appendTo(row).val(data.name)
                     $(`<input class='node-input-value' placeholder="value" />`).appendTo(row).attr('value', data.value).typedInput({
@@ -464,7 +516,7 @@ rev /dev/stdin
 
             // TODO: add secrets/overrides support e.g. with `build.codeEntryType: "github"`
             //       build.codeEntryAttributes.headers.Authorization: "my-GitHub-access-token" (typedInput: cred/env)
-            this.secretList = $("#node-input-secret_vars-x").editableList({
+            this.secretList = $("#node-config-input-secret_vars-x").editableList({
                 addItem: function(row, index, data) {
                     $(`<input class='node-input-key' type="text" placeholder="VAR_NAME" />`).appendTo(row).val(data.name)
                     $(`<input class='node-input-value' placeholder="value" />`).appendTo(row).attr('value', data.value).typedInput({
@@ -494,7 +546,7 @@ rev /dev/stdin
                     const safeSpec = redactSecrets(spec, node.secret_vars);
                     const tone = statusTone(state);
 
-                    $('#nuclio-status').html(fmt(statusMeta));
+                    $('#nuclio-status').html(statusChips(statusMeta));
                     $('#nuclio-status-state').text(state || 'unknown');
                     $('#nuclio-status-chip').attr('data-tone', tone);
                     $('#nuclio-status-updated').text(`Updated ${new Date().toLocaleTimeString()}`);
@@ -502,7 +554,7 @@ rev /dev/stdin
                         `<div><b>${level}</b> ${message} ${Object.keys(log).length ? `\n<div style="padding-left: 12px;">${fmt(log)}</div>` : ''}</div>`).join('\n'));
                     $('#nuclio-spec').text(JSON.stringify({ metadata, spec: safeSpec }, null, 2));
                 }).fail((e) => {
-                    $('#nuclio-status').text(JSON.stringify(e, null, 2));
+                    $('#nuclio-status').html(statusChips({ error: e?.statusText || 'error' }));
                     $('#nuclio-status-state').text('error');
                     $('#nuclio-status-chip').attr('data-tone', 'error');
                 });
@@ -563,7 +615,7 @@ rev /dev/stdin
             delete this.statusPoller;
 
             node.env_vars = [];
-            $("#node-input-env_vars-x").editableList('items').each(function(i) {
+            $("#node-config-input-env_vars-x").editableList('items').each(function(i) {
                 let name = $(this).find(".node-input-key").val();
                 let type = $(this).find(".node-input-value").typedInput('type');
                 let value = $(this).find(".node-input-value").typedInput('value');
@@ -572,7 +624,7 @@ rev /dev/stdin
             delete this.envList;
 
             node.secret_vars = [];
-            $("#node-input-secret_vars-x").editableList('items').each(function(i) {
+            $("#node-config-input-secret_vars-x").editableList('items').each(function(i) {
                 let name = $(this).find(".node-input-key").val();
                 let type = $(this).find(".node-input-value").typedInput('type');
                 let value = $(this).find(".node-input-value").typedInput('value');
@@ -605,7 +657,7 @@ rev /dev/stdin
 
 
 
-<script type="text/html" data-template-name="nuclio">
+<script type="text/html" data-template-name="nuclio-function">
     <style>
         #nuclio-tabs-content {
             height: 100%;
@@ -645,7 +697,7 @@ rev /dev/stdin
             flex-grow: 0;
         }
 
-        #node-input-env_vars-x .red-ui-typedInput-container,
+        #node-config-input-env_vars-x .red-ui-typedInput-container,
         #nuclio-tabs-content .node-input-list-row .red-ui-editableList-container input {
             border-radius: 0;
         }
@@ -655,14 +707,16 @@ rev /dev/stdin
 
         /* Status tab */
         #nuclio-tab-status {
-            font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", sans-serif;
+            font-family: "Optima", "Segoe UI", "Trebuchet MS", sans-serif;
             color: #1d2a33;
+            line-height: 1.4;
         }
         .nuclio-status-shell {
             border-radius: 12px;
             padding: 16px;
             background: linear-gradient(135deg, #f7f9fb, #eef2f6);
             border: 1px solid #e0e6ee;
+            letter-spacing: 0.01em;
         }
         .nuclio-status-header {
             display: flex;
@@ -774,6 +828,31 @@ rev /dev/stdin
         .nuclio-card.full {
             grid-column: 1 / -1;
         }
+        .nuclio-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .nuclio-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #f3f6f9;
+            border: 1px solid #e0e6ee;
+            font-size: 12px;
+            color: #1d2a33;
+        }
+        .nuclio-chip-key {
+            text-transform: lowercase;
+            letter-spacing: 0.02em;
+            color: #5a6a76;
+        }
+        .nuclio-chip-value {
+            font-family: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+            font-weight: 600;
+        }
         .nuclio-kv {
             display: grid;
             gap: 6px;
@@ -820,6 +899,7 @@ rev /dev/stdin
         #nuclio-logs, #nuclio-deploy-logs, #nuclio-status, #nuclio-spec {
             font-family: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
             font-size: 12px;
+            line-height: 1.5;
         }
         #nuclio-spec {
             max-height: 320px;
@@ -851,10 +931,10 @@ rev /dev/stdin
 
             <div class="form-row">
                 <div>
-                    <label for="node-input-name">
+                    <label for="node-config-input-name">
                         <span>Function Name</span>
                     </label>
-                    <input type="text" id="node-input-name" placeholder="What should the URL endpoint be?" title="This is the URL that nodered will call to run this function." />
+                    <input type="text" id="node-config-input-name" placeholder="What should the URL endpoint be?" title="This is the URL that nodered will call to run this function." />
                     <!-- <small class="name-error">Name must be unique.</small> -->
                      <button id="nuclio-generate-name" class="btn btn-default" title="Generate a random name">🔀</button>
                 </div>
@@ -862,10 +942,10 @@ rev /dev/stdin
 
             <div class="form-row">
                 <div>
-                    <label for="node-input-runtime">
+                    <label for="node-config-input-runtime">
                         <span>Runtime [<a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/index.html" title="">docs</a>]:</span></span>
                     </label>
-                    <select id="node-input-runtime" class="form-control">
+                    <select id="node-config-input-runtime" class="form-control">
                         <option value="python:3.12">python:3.12 (entrypoint: handler)</option>
                         <option value="python:3.11">python:3.11 (entrypoint: handler)</option>
                         <option value="python:3.10">python:3.10 (entrypoint: handler)</option>
@@ -877,49 +957,49 @@ rev /dev/stdin
                     </select>
                 </div>
             </div>
-            <div style="min-height:150px;" class="node-text-editor" id="node-input-nuclio-editor" ></div>
+            <div style="min-height:150px;" class="node-text-editor" id="node-config-input-nuclio-editor" ></div>
         </div>
 
         <div id="nuclio-tab-deps" style="display:none">
 
             <div class="form-row">
-                <label for="node-input-server">Server</label>
-                <input type="text" id="node-input-server" />
+                <label for="node-config-input-server">Server</label>
+                <input type="text" id="node-config-input-server" />
                 <!-- <div>
                     <small>What Nuclio Server should this deploy to?</small>
                 </div> -->
             </div>
             <div class="form-row">
-                <label for="node-input-project">
+                <label for="node-config-input-project">
                     <span>Project</span>
                 </label>
-                <input type="text" id="node-input-project" placeholder="default" />
+                <input type="text" id="node-config-input-project" placeholder="default" />
             </div>
             <div class="form-row">
                 <h2>Function Config [<a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/function-configuration-reference.html" title="">docs</a>]:</h2>
                 <p>
                 </p>
             </div>
-            <div style="min-height:150px;" class="node-text-editor" id="node-input-nuclio-config-editor" ></div>
+            <div style="min-height:150px;" class="node-text-editor" id="node-config-input-nuclio-config-editor" ></div>
 
             <div class="form-row node-input-list-row">
-                <label for="node-input-env_vars-x">
+                <label for="node-config-input-env_vars-x">
                     Environment Variables
                 </label>
                 <p>
                     <small>You can specify environment variables that will be available to your application at runtime.</small>
                 </p>
-                <ol id="node-input-env_vars-x"></ol>
+                <ol id="node-config-input-env_vars-x"></ol>
             </div>
 
             <div class="form-row node-input-list-row">
-                <label for="node-input-secret_vars-x">
+                <label for="node-config-input-secret_vars-x">
                     Secret Overrides
                 </label>
                 <p>
                     <small>You can specify secret variables (e.g. build.codeEntryAttributes.s3SecretAccessKey: my-secret-@ccess-k3y)</small>
                 </p>
-                <ol id="node-input-secret_vars-x"></ol>
+                <ol id="node-config-input-secret_vars-x"></ol>
             </div>
         </div>
         <div id="nuclio-tab-status" style="display:none">
@@ -940,7 +1020,7 @@ rev /dev/stdin
                 <div class="nuclio-status-grid">
                     <section class="nuclio-card compact full">
                         <div class="nuclio-card-title">Runtime Status</div>
-                        <div class="nuclio-kv" id="nuclio-status"></div>
+                        <div class="nuclio-chips" id="nuclio-status"></div>
                     </section>
                     <section class="nuclio-card full">
                         <div class="nuclio-card-title">Run Logs</div>
@@ -961,7 +1041,136 @@ rev /dev/stdin
     
 </script>
 
+<script type="text/html" data-template-name="nuclio">
+    <style>
+        #node-input-headers .red-ui-editableList-item-content {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #node-input-headers .red-ui-editableList-item-content > input.node-input-key {
+            flex: 0 0 40%;
+        }
+        #node-input-headers .red-ui-editableList-item-content > .red-ui-typedInput-container {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        #node-input-headers .red-ui-editableList-item-content > input.node-input-value {
+            width: 100%;
+        }
+    </style>
+    <div class="form-row">
+        <label for="node-input-function">
+            <span>Function</span>
+        </label>
+        <input type="text" id="node-input-function" />
+        <div>
+            <small>Invoke a shared Nuclio function configuration.</small>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-input-timeoutMs">
+            <span>Timeout (ms)</span>
+        </label>
+        <input type="text" id="node-input-timeoutMs" placeholder="30000" />
+        <div>
+            <small>Function call timeout in milliseconds.</small>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-input-maxInFlight">
+            <span>Concurrency Cap</span>
+        </label>
+        <input type="text" id="node-input-maxInFlight" placeholder="0 = unlimited" />
+        <div>
+            <small>Limits in-flight requests; excess messages go to the fallback output.</small>
+        </div>
+    </div>
+    <div class="form-row node-input-list-row">
+        <label for="node-input-headers">
+            Request Headers
+        </label>
+        <div>
+            <small>Optional headers to include with each invocation.</small>
+        </div>
+        <ol id="node-input-headers"></ol>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="nuclio-function">
+    <p>Deploys and reconciles a Nuclio function from Node-RED.</p>
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>Code</dt>
+        <dd>Function source code stored in this config node.</dd>
+        <dt>Config</dt>
+        <dd>YAML function configuration applied on deploy.</dd>
+        <dt>Environment Variables</dt>
+        <dd>Key/value pairs injected into the function environment.</dd>
+        <dt>Secret Overrides</dt>
+        <dd>Typed values written into the config at the specified paths.</dd>
+    </dl>
+    <h3>Details</h3>
+    <p>This config node owns deployment and reconciliation. It creates or updates the
+    Nuclio function in the selected project and keeps status refreshed while open.</p>
+    <p>Use a separate <b>Nuclio Invoke</b> node to call the function at runtime.</p>
+</script>
 
 <script type="text/html" data-help-name="nuclio">
+    <p>Invokes a shared Nuclio function configuration.</p>
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>payload</dt>
+        <dd>Request body sent to the function.</dd>
+    </dl>
+    <h3>Outputs</h3>
+    <ol class="node-ports">
+        <li>Result
+            <dl class="message-properties">
+                <dt>payload</dt>
+                <dd>Response body from the function.</dd>
+                <dt>statusCode</dt>
+                <dd>HTTP status code returned by the function.</dd>
+                <dt>statusText</dt>
+                <dd>HTTP status text.</dd>
+                <dt>headers</dt>
+                <dd>Response headers.</dd>
+                <dt>response</dt>
+                <dd>Raw axios response object.</dd>
+                <dt>requestTime</dt>
+                <dd>Elapsed time in ms for the request.</dd>
+            </dl>
+        </li>
+        <li>Fallback
+            <dl class="message-properties">
+                <dt>payload</dt>
+                <dd>Error payload if the function is unavailable.</dd>
+                <dt>error</dt>
+                <dd>Error object when present.</dd>
+            </dl>
+        </li>
+    </ol>
+    <h3>Details</h3>
+    <p>Select a <b>Nuclio Function</b> config node to invoke. Optional headers,
+    timeout, and concurrency cap apply per node instance.</p>
+</script>
 
+<script type="text/html" data-help-name="nuclio-config">
+    <p>Defines the Nuclio dashboard address used by Node-RED.</p>
+    <h3>Fields</h3>
+    <dl class="message-properties">
+        <dt>Nuclio Dashboard URL</dt>
+        <dd>Address reachable by Node-RED (typically <code>http://host:8070</code>).</dd>
+        <dt>Public Nuclio Dashboard URL</dt>
+        <dd>Optional public address used for links in the editor.</dd>
+    </dl>
+</script>
+
+<script type="text/html" data-help-name="nuclio-project">
+    <p>Defines the Nuclio project name used for deployment.</p>
+    <h3>Fields</h3>
+    <dl class="message-properties">
+        <dt>Nuclio Project Name</dt>
+        <dd>Project to create or update functions within. Defaults to <code>default</code>.</dd>
+    </dl>
 </script>
