@@ -167,7 +167,6 @@ metadata:
 spec:
   build:
     commands: []
-    # - pip install msgpack  # currently required for python fns on Mac
     # - pip install requests numpy pandas
     
   # # add multiple workers:
@@ -302,6 +301,15 @@ rev /dev/stdin
     }).join('');
     // const yamlFmt = (obj) => Object.entries(obj).map(([k,v]) => `<b>${k}</b>: ${yamlFmt(v)}`).join('\n');
 
+    const canUpdateElement = (element) => {
+        if (!element) return true;
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) return true;
+        if (!selection.rangeCount) return true;
+        const range = selection.getRangeAt(0);
+        return !element.contains(range.commonAncestorContainer);
+    };
+
     const statusTone = (state) => {
         if (!state) return 'unknown';
         if (state === 'ready') return 'ok';
@@ -397,9 +405,11 @@ rev /dev/stdin
                 const name = $('#node-config-input-name').val();
                 const project = RED.nodes.node(node.project)?.name || 'default';
                 const server = RED.nodes.node(node.server);
-                const url = server?.address || '';
-                const proxyPath = `/nuclio/dashboard/projects/${project}/functions/${name}/code?id=${node.id}`;
-                const fullUrl = url && name ? proxyPath : '';
+                // const url = server?.address || '';
+                // const proxyPath = `/nuclio/dashboard/projects/${project}/functions/${name}/code?id=${node.id}`;
+                // const fullUrl = url && name ? proxyPath : '';
+                const publicAddress = server?.publicAddress || '';
+                const fullUrl = publicAddress && name ? `${publicAddress.replace(/\/$/,'')}/projects/${project}/functions/${name}/code` : '';
                 if (fullUrl) {
                     $('#nuclio-dashboard-link').attr('href', fullUrl).removeClass('nuclio-hidden');
                 } else {
@@ -546,15 +556,24 @@ rev /dev/stdin
                     const safeSpec = redactSecrets(spec, node.secret_vars);
                     const tone = statusTone(state);
 
-                    $('#nuclio-status').html(statusChips(statusMeta));
+                    if (canUpdateElement(document.getElementById('nuclio-status'))) {
+                        $('#nuclio-status').html(statusChips(statusMeta));
+                    }
                     $('#nuclio-status-state').text(state || 'unknown');
                     $('#nuclio-status-chip').attr('data-tone', tone);
                     $('#nuclio-status-updated').text(`Updated ${new Date().toLocaleTimeString()}`);
-                    $('#nuclio-deploy-logs').html(logs?.map(({ level, message, time, name, requestID, ...log }) => //builderKind, versionInfo, 
-                        `<div><b>${level}</b> ${message} ${Object.keys(log).length ? `\n<div style="padding-left: 12px;">${fmt(log)}</div>` : ''}</div>`).join('\n'));
-                    $('#nuclio-spec').text(JSON.stringify({ metadata, spec: safeSpec }, null, 2));
+                    if (canUpdateElement(document.getElementById('nuclio-deploy-logs'))) {
+                        $('#nuclio-deploy-logs').html(logs?.map(({ level, message, time, name, requestID, ...log }) => //builderKind, versionInfo, 
+                            `<div><b>${level}</b> ${message} ${Object.keys(log).length ? `\n<div style="padding-left: 12px;">${fmt(log)}</div>` : ''}</div>`).join('\n'));
+                    }
+                    if (canUpdateElement(document.getElementById('nuclio-spec'))) {
+                        $('#nuclio-spec').text(JSON.stringify({ metadata, spec: safeSpec }, null, 2));
+                    }
                 }).fail((e) => {
-                    $('#nuclio-status').html(statusChips({ error: e?.statusText || 'error' }));
+                    const message = e?.responseJSON?.error || e?.statusText || 'error';
+                    if (canUpdateElement(document.getElementById('nuclio-status'))) {
+                        $('#nuclio-status').html(statusChips({ error: message }));
+                    }
                     $('#nuclio-status-state').text('error');
                     $('#nuclio-status-chip').attr('data-tone', 'error');
                 });
@@ -565,10 +584,15 @@ rev /dev/stdin
                     // $('#nuclio-logs').text(JSON.stringify(data, null, 2));
                     const logHtml = Object.entries(data||{}).map(([replica, log]) => //builderKind, versionInfo, 
                         `<div><b>${replica}</b> \n<div style='padding-left: 12px'>${log || '-- no logs --'}</div></div>`).join('\n');
-                    $('#nuclio-logs').html(logHtml);
+                    if (canUpdateElement(document.getElementById('nuclio-logs'))) {
+                        $('#nuclio-logs').html(logHtml);
+                    }
                     $('#nuclio-logs').closest('.nuclio-logbox').toggleClass('nuclio-hidden', !logHtml.trim());
                 }).fail((e) => {
-                    $('#nuclio-logs').text(JSON.stringify(e, null, 2));
+                    const message = e?.responseJSON?.error || e?.statusText || 'error';
+                    if (canUpdateElement(document.getElementById('nuclio-logs'))) {
+                        $('#nuclio-logs').text(message);
+                    }
                     $('#nuclio-logs').closest('.nuclio-logbox').removeClass('nuclio-hidden');
                 });
             }, 2400);
@@ -703,6 +727,11 @@ rev /dev/stdin
         }
         #nuclio-tabs-content .red-ui-editableList-container input {
             width: auto;
+        }
+
+        #nuclio-tabs-content a {
+            text-decoration: underline;
+            color: inherit;
         }
 
         /* Status tab */

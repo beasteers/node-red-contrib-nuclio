@@ -26,3 +26,9 @@ docker-compose up -d --build
 You can access: 
  * Node-Red dashboard [here](http://localhost:1881). 
  * The Nuclio dashboard can be found [here](http://localhost:8070).
+
+## Hacks
+[bug](https://github.com/nuclio/nuclio/issues/3968)
+```bash
+docker exec nuclio apk add --no-cache docker-cli-buildx
+```
