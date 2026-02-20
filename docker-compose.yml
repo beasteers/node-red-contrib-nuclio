@@ -20,10 +20,10 @@ services:
     container_name: nuclio
     restart: unless-stopped
     ports:
-      - 8070:8070
+      - 8072:8070
     environment:
       NUCLIO_CHECK_FUNCTION_CONTAINERS_HEALTHINESS: "true"  # not sure if this is helping
-      DOCKER_BUILDKIT: "1"
+      # DOCKER_BUILDKIT: "1"
       NUCLIO_ARCH: "arm64"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

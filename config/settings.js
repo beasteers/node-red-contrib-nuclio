@@ -4,15 +4,15 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin"; // raw password
 const ADMIN_PASSHASH = bcrypt.hashSync(ADMIN_PASSWORD, 10);
 
 module.exports = {
-    // httpAdminRoot: "/",
-    adminAuth: {
-        type: "credentials",
-        users: [{
-            username: ADMIN_USERNAME,
-            password: ADMIN_PASSHASH,
-            permissions: ["*"]
-        }]
-    },
+    // // httpAdminRoot: "/",
+    // adminAuth: {
+    //     type: "credentials",
+    //     users: [{
+    //         username: ADMIN_USERNAME,
+    //         password: ADMIN_PASSHASH,
+    //         permissions: ["*"]
+    //     }]
+    // },
 
     logging: {
         console: {
