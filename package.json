@@ -3,7 +3,13 @@
   "version": "1.1.0",
   "description": "Deploy Nuclio functions from Node-RED",
   "main": "lib/nuclio.js",
-  "scripts": {},
+  "files": [
+    "lib"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "lint": "eslint"
+  },
   "node-red": {
     "version": ">=3.0.0",
     "nodes": {
@@ -18,7 +24,7 @@
     "node-red",
     "nuclio",
     "function",
-    "enpoint",
+    "endpoint",
     "python",
     "remote",
     "horizontal",
@@ -41,6 +47,9 @@
     "lodash": "^4.17.21"
   },
   "devDependencies": {
-    "bcrypt": "^6.0.0"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.1",
+    "node-red": "^5.0.0",
+    "node-red-node-test-helper": "^0.3.6"
   }
 }

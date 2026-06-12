@@ -15,7 +15,7 @@
 <script type="text/javascript">
     RED.nodes.registerType('nuclio-config', {
         category: 'config',
-        icon: "nuclio-logo.svg",
+        icon: "nuclio.io.ico",
         defaults: {
             address: { value: 'NUCLIO_ADDRESS', required: true },
             addressType: { value: 'env' },
@@ -118,7 +118,7 @@
 <script type="text/javascript">
     RED.nodes.registerType('nuclio-project', {
         category: 'config',
-        icon: "nuclio-logo.svg",
+        icon: "nuclio.io.ico",
         defaults: {
             name: { value: 'default' },
             nameType: { value: 'str' },
@@ -288,18 +288,20 @@ rev /dev/stdin
         }
     }
 
+    // escape anything API/log-derived before it goes into innerHTML
+    const esc = (s) => `${s}`.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
     const fmt = (obj) => Object.entries(obj).map(([k,v]) => {
         if (typeof v === 'string' && v.includes('\n')) {
-            return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${k}</span><span class="nuclio-kv-value nuclio-kv-multiline">${v}</span></div>`;
+            return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${esc(k)}</span><span class="nuclio-kv-value nuclio-kv-multiline">${esc(v)}</span></div>`;
         }
-        return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${k}</span><span class="nuclio-kv-value">${JSON.stringify(v)}</span></div>`;
+        return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${esc(k)}</span><span class="nuclio-kv-value">${esc(JSON.stringify(v))}</span></div>`;
     }).join('');
 
     const statusChips = (obj) => Object.entries(obj || {}).map(([k,v]) => {
         const value = typeof v === 'string' ? v : JSON.stringify(v);
-        return `<span class="nuclio-chip"><span class="nuclio-chip-key">${k}</span><span class="nuclio-chip-value">${value}</span></span>`;
+        return `<span class="nuclio-chip"><span class="nuclio-chip-key">${esc(k)}</span><span class="nuclio-chip-value">${esc(value)}</span></span>`;
     }).join('');
-    // const yamlFmt = (obj) => Object.entries(obj).map(([k,v]) => `<b>${k}</b>: ${yamlFmt(v)}`).join('\n');
 
     const canUpdateElement = (element) => {
         if (!element) return true;
@@ -384,11 +386,15 @@ rev /dev/stdin
                 }
                 return !getUniqueValues(this, n=>n.name)[v];
             } },            
-            runtime: { value: 'python:3.11' },
+            runtime: { value: 'python:3.12' },
             code: { value: SAMPLES.python.code },
             configCode: { value: SAMPLES.python.config },
             env_vars: { value: [] },
+            // legacy plaintext secrets - migrated into credentials on save
             secret_vars: { value: [] },
+        },
+        credentials: {
+            secret_vars: { type: "text" },  // JSON list of { name, type, value }
         },
         label: function () {
             return this.name || 'nuclio fn';
@@ -450,7 +456,7 @@ rev /dev/stdin
             // <!--                              Code Editors                               -->
             // <!-- ----------------------------------------------------------------------- -->
 
-            const runtime = node.runtime || 'python:3.11';
+            const runtime = node.runtime || 'python:3.12';
             const [runtimeBase, runtimeVersion] = runtime.split(':');
 
             const lang = {
@@ -524,8 +530,16 @@ rev /dev/stdin
                 this.envList.editableList('addItem', data)
             }
 
-            // TODO: add secrets/overrides support e.g. with `build.codeEntryType: "github"`
-            //       build.codeEntryAttributes.headers.Authorization: "my-GitHub-access-token" (typedInput: cred/env)
+            // Secrets are stored in Node-RED's encrypted credential store as a
+            // JSON list; fall back to the legacy plaintext property for flows
+            // saved before 1.2 (migrated into credentials on save).
+            let secretVars = [];
+            try {
+                secretVars = JSON.parse(this.credentials?.secret_vars || '[]') || [];
+            } catch (e) { /* ignore, fall back to legacy */ }
+            if (!secretVars.length) secretVars = this.secret_vars || [];
+            node.resolvedSecretVars = secretVars;
+
             this.secretList = $("#node-config-input-secret_vars-x").editableList({
                 addItem: function(row, index, data) {
                     $(`<input class='node-input-key' type="text" placeholder="VAR_NAME" />`).appendTo(row).val(data.name)
@@ -536,7 +550,7 @@ rev /dev/stdin
                 },
                 removable: true,
             });
-            for(let data of this.secret_vars || []) {
+            for(let data of secretVars) {
                 this.secretList.editableList('addItem', data)
             }
 
@@ -553,7 +567,7 @@ rev /dev/stdin
                     const { status, metadata, spec } = data;
                     const { logs, ...statusMeta } = status;
                     const state = status.state;
-                    const safeSpec = redactSecrets(spec, node.secret_vars);
+                    const safeSpec = redactSecrets(spec, node.resolvedSecretVars);
                     const tone = statusTone(state);
 
                     if (canUpdateElement(document.getElementById('nuclio-status'))) {
@@ -563,8 +577,8 @@ rev /dev/stdin
                     $('#nuclio-status-chip').attr('data-tone', tone);
                     $('#nuclio-status-updated').text(`Updated ${new Date().toLocaleTimeString()}`);
                     if (canUpdateElement(document.getElementById('nuclio-deploy-logs'))) {
-                        $('#nuclio-deploy-logs').html(logs?.map(({ level, message, time, name, requestID, ...log }) => //builderKind, versionInfo, 
-                            `<div><b>${level}</b> ${message} ${Object.keys(log).length ? `\n<div style="padding-left: 12px;">${fmt(log)}</div>` : ''}</div>`).join('\n'));
+                        $('#nuclio-deploy-logs').html(logs?.map(({ level, message, time, name, requestID, ...log }) => //builderKind, versionInfo,
+                            `<div><b>${esc(level)}</b> ${esc(message)} ${Object.keys(log).length ? `\n<div style="padding-left: 12px;">${fmt(log)}</div>` : ''}</div>`).join('\n'));
                     }
                     if (canUpdateElement(document.getElementById('nuclio-spec'))) {
                         $('#nuclio-spec').text(JSON.stringify({ metadata, spec: safeSpec }, null, 2));
@@ -581,9 +595,10 @@ rev /dev/stdin
                     url: `/nuclio/api/functions/logs?id=${this.id}`,
                     method: 'GET',
                 }).done(function (data) {
-                    // $('#nuclio-logs').text(JSON.stringify(data, null, 2));
-                    const logHtml = Object.entries(data||{}).map(([replica, log]) => //builderKind, versionInfo, 
-                        `<div><b>${replica}</b> \n<div style='padding-left: 12px'>${log || '-- no logs --'}</div></div>`).join('\n');
+                    const logHtml = Object.entries(data||{}).map(([replica, log]) => {
+                        log = typeof log === 'string' ? log : JSON.stringify(log);
+                        return `<div><b>${esc(replica)}</b> \n<div style='padding-left: 12px'>${esc(log || '-- no logs --')}</div></div>`;
+                    }).join('\n');
                     if (canUpdateElement(document.getElementById('nuclio-logs'))) {
                         $('#nuclio-logs').html(logHtml);
                     }
@@ -647,14 +662,20 @@ rev /dev/stdin
             })
             delete this.envList;
 
-            node.secret_vars = [];
+            // Secrets go to the encrypted credential store; clear the legacy
+            // plaintext property so it drops out of flows.json on this save.
+            let secretVars = [];
             $("#node-config-input-secret_vars-x").editableList('items').each(function(i) {
                 let name = $(this).find(".node-input-key").val();
                 let type = $(this).find(".node-input-value").typedInput('type');
                 let value = $(this).find(".node-input-value").typedInput('value');
-                name && node.secret_vars.push({ name, type, value });
+                name && secretVars.push({ name, type, value });
             })
+            node.credentials = node.credentials || {};
+            node.credentials.secret_vars = JSON.stringify(secretVars);
+            node.secret_vars = [];
             delete this.secretList;
+            delete this.resolvedSecretVars;
         },
         oneditcancel: function() {
             this.editor.destroy();
@@ -666,6 +687,7 @@ rev /dev/stdin
             this.name = this.originalName;
             delete this.envList;
             delete this.secretList;
+            delete this.resolvedSecretVars;
         },
     });
 </script>
@@ -1135,9 +1157,12 @@ rev /dev/stdin
         <dt>Config</dt>
         <dd>YAML function configuration applied on deploy.</dd>
         <dt>Environment Variables</dt>
-        <dd>Key/value pairs injected into the function environment.</dd>
+        <dd>Key/value pairs injected into the function environment. Values are
+        stored with the flow - put sensitive values in <b>Secret Overrides</b>
+        (e.g. <code>spec.env.0.value</code>) or use the <code>env</code> type.</dd>
         <dt>Secret Overrides</dt>
-        <dd>Typed values written into the config at the specified paths.</dd>
+        <dd>Typed values written into the config at the specified paths.
+        Stored in Node-RED's encrypted credential store, not in the flow file.</dd>
     </dl>
     <h3>Details</h3>
     <p>This config node owns deployment and reconciliation. It creates or updates the
@@ -1166,7 +1191,7 @@ rev /dev/stdin
                 <dd>Response headers.</dd>
                 <dt>response</dt>
                 <dd>Raw axios response object.</dd>
-                <dt>requestTime</dt>
+                <dt>requestDurationMs</dt>
                 <dd>Elapsed time in ms for the request.</dd>
             </dl>
         </li>
@@ -1182,6 +1207,9 @@ rev /dev/stdin
     <h3>Details</h3>
     <p>Select a <b>Nuclio Function</b> config node to invoke. Optional headers,
     timeout, and concurrency cap apply per node instance.</p>
+    <p><b>Note:</b> header values are stored with the flow (the credential type
+    only masks the input). For sensitive headers, use the <code>env</code> type
+    and provide the value via an environment variable.</p>
 </script>
 
 <script type="text/html" data-help-name="nuclio-config">

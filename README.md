@@ -11,7 +11,7 @@ The "nuclio" node acts essentially like a function node, giving you a code edito
 > This is a prototype - I look forward to hearing your experience, feedback, and ideas for improvements.
 
 ```bash
-npm i node-red-contrib-nuclio
+npm i @bea.steers/node-red-contrib-nuclio
 ```
 
 In order to use this node, you must have the Nuclio dashboard running. It doesn't need to be public, it just needs to be accessible by Node-Red.
@@ -22,6 +22,11 @@ Using the docker-compose test install below will give you a fully functioning sy
 To test/develop
 ```bash
 docker-compose up -d --build
+```
+Unit tests and lint:
+```bash
+npm test
+npm run lint
 ```
 You can access: 
  * Node-Red dashboard [here](http://localhost:1881). 

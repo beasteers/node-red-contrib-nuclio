@@ -1,0 +1,85 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign } = require('../lib/util');
+
+
+/* ----------------------------------- diff ---------------------------------- */
+
+test('diff detects string changes', () => {
+    assert.deepEqual(diff({ spec: { handler: 'a' } }, { spec: { handler: 'b' } }), { spec: { handler: 'a' } });
+});
+
+test('diff detects numeric changes', () => {
+    // regression: _.isEmpty(2) === true used to swallow scalar changes
+    assert.deepEqual(diff({ spec: { minReplicas: 2 } }, { spec: { minReplicas: 1 } }), { spec: { minReplicas: 2 } });
+});
+
+test('diff detects boolean changes', () => {
+    assert.deepEqual(diff({ spec: { disabled: true } }, { spec: { disabled: false } }), { spec: { disabled: true } });
+});
+
+test('diff detects new keys', () => {
+    assert.deepEqual(diff({ a: 1, b: 2 }, { a: 1 }), { b: 2 });
+});
+
+test('diff returns empty for identical objects', () => {
+    assert.deepEqual(diff({ a: 1, b: { c: 'x' } }, { a: 1, b: { c: 'x' } }), {});
+});
+
+test('diff treats empty containers and missing values as equal', () => {
+    assert.deepEqual(diff({ a: {}, b: [], c: '' }, {}), {});
+    assert.deepEqual(diff({ a: { b: {} } }, { a: undefined }), {});
+});
+
+test('diff recurses into nested objects', () => {
+    assert.deepEqual(
+        diff({ spec: { build: { commands: ['pip install x'] } } }, { spec: { build: { commands: [] } } }),
+        { spec: { build: { commands: { 0: 'pip install x' } } } },
+    );
+});
+
+test('diff handles nullish b', () => {
+    assert.deepEqual(diff({ a: 1 }, undefined), { a: 1 });
+    assert.deepEqual(diff({ a: 1 }, null), { a: 1 });
+});
+
+/* ---------------------------------- merge ---------------------------------- */
+
+test('merge replaces arrays instead of merging by index', () => {
+    assert.deepEqual(merge({}, { env: [{ name: 'A' }, { name: 'B' }] }, { env: [{ name: 'C' }] }), { env: [{ name: 'C' }] });
+});
+
+test('merge deep-merges plain objects', () => {
+    assert.deepEqual(merge({}, { a: { b: 1 } }, { a: { c: 2 } }), { a: { b: 1, c: 2 } });
+});
+
+/* ------------------------------ small helpers ------------------------------ */
+
+test('parseIntFallback parses ints and falls back', () => {
+    assert.equal(parseIntFallback('5000', 1), 5000);
+    assert.equal(parseIntFallback(undefined, 1), 1);
+    assert.equal(parseIntFallback('abc', 1), 1);
+});
+
+test('asString stringifies non-strings', () => {
+    assert.equal(asString('x'), 'x');
+    assert.equal(asString(5), '5');
+    assert.equal(asString({ a: 1 }), '{"a":1}');
+});
+
+test('splitByDotWithEscape splits on dots, honors escapes', () => {
+    assert.deepEqual(splitByDotWithEscape('a.b.c'), ['a', 'b', 'c']);
+    assert.deepEqual(splitByDotWithEscape('metadata.annotations.nuclio\\.io/x'), ['metadata', 'annotations', 'nuclio.io/x']);
+});
+
+test('nestedAssign sets deep paths, creating objects as needed', () => {
+    const obj = { spec: { existing: 1 } };
+    nestedAssign(obj, 'spec.build.codeEntryAttributes.s3SecretAccessKey', 'shh');
+    assert.deepEqual(obj, { spec: { existing: 1, build: { codeEntryAttributes: { s3SecretAccessKey: 'shh' } } } });
+});
+
+test('nestedAssign honors escaped dots in keys', () => {
+    const obj = {};
+    nestedAssign(obj, 'metadata.annotations.nuclio\\.io/x', 'v');
+    assert.deepEqual(obj, { metadata: { annotations: { 'nuclio.io/x': 'v' } } });
+});
