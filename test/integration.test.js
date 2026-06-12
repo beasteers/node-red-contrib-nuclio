@@ -333,3 +333,51 @@ test('unknown node ids return 404', async () => {
     await load(baseFlow(mock));
     await helper.request().get('/nuclio/api/functions?id=nope').expect(404);
 });
+
+/* -------------------------------------------------------------------------- */
+/*                             Tuning via Config                              */
+/* -------------------------------------------------------------------------- */
+
+test('server cadence + function recovery resolve from node config', async () => {
+    mock = await startMockNuclio();
+    const flow = baseFlow(mock);
+    Object.assign(flow[0], { pollMs: '250', backoffMs: '750', requestTimeoutMs: '4000' });  // server node
+    Object.assign(flow[1], { maxSelfHealAttempts: '9', redeployDeadlineMs: '30000', autoRedeployOnError: 'true', autoRedeployOnErrorType: 'bool' });  // function node
+    await load(flow);
+
+    const srv = helper.getNode('srv');
+    assert.equal(srv.pollMs, 250);
+    assert.equal(srv.backoffMs, 750);
+    assert.equal(srv.requestTimeoutMs, 4000);
+
+    const fn = helper.getNode('fn');
+    assert.equal(fn.maxSelfHealAttempts, 9);
+    assert.equal(fn.redeployDeadlineMs, 30000);
+    assert.equal(fn.autoRedeployOnError, true);
+});
+
+test('blank config fields fall back to NUCLIO_* env, then default', async () => {
+    process.env.NUCLIO_POLL_MS = '1234';  // env fallback for a blank field
+    try {
+        mock = await startMockNuclio();
+        await load(baseFlow(mock));  // no tuning fields set on the flow
+        const srv = helper.getNode('srv');
+        assert.equal(srv.pollMs, 1234);        // from env
+        assert.equal(srv.readyPollMs, 5000);   // hardcoded default (no env, no config)
+    } finally {
+        delete process.env.NUCLIO_POLL_MS;
+    }
+});
+
+test('an env-typed config field reads the named env var at deploy time', async () => {
+    process.env.MY_BACKOFF = '4321';
+    try {
+        mock = await startMockNuclio();
+        const flow = baseFlow(mock);
+        Object.assign(flow[0], { backoffMs: 'MY_BACKOFF', backoffMsType: 'env' });
+        await load(flow);
+        assert.equal(helper.getNode('srv').backoffMs, 4321);
+    } finally {
+        delete process.env.MY_BACKOFF;
+    }
+});

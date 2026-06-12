@@ -34,19 +34,38 @@ You can access:
 
 ## Tuning
 
-All cadence and self-healing behavior is controlled by environment variables (sane defaults shown):
+Cadence and self-healing behavior is configurable **in the node editor** — connection
+and polling cadence on the **Nuclio Server** config node (a "Tuning" section), recovery
+policy on the **Nuclio Function** node (a "Recovery" section). Each field resolves:
 
-| Variable | Default | Purpose |
+> node config (numeric literal, or set the field type to `env` to reference a variable)
+> → the `NUCLIO_*` environment variable below → the built-in default.
+
+Editing a field takes effect on the next **Deploy** — no Node-RED restart. Leaving every
+field blank reproduces the old env-only behavior, so existing deployments are unaffected.
+
+**Server node (per dashboard):**
+
+| Field / Variable | Default | Purpose |
 | --- | --- | --- |
-| `NUCLIO_POLL_MS` | `1000` | Poll interval while a function is building/transitioning. |
-| `NUCLIO_READY_POLL_MS` | `5000` | Poll interval once a function is healthy. |
-| `NUCLIO_BACKOFF_MS` | `5000` | First retry delay after a dashboard error (doubles each failure). |
-| `NUCLIO_BACKOFF_MAX_MS` | `60000` | Cap on the exponential backoff. |
-| `NUCLIO_START_STAGGER_MS` | `2000` | Window to spread first-deploys across on startup. |
-| `NUCLIO_MAX_SELF_HEAL_ATTEMPTS` | `5` | Auto-redeploys of an unhealthy function before giving up. |
-| `NUCLIO_AUTO_REDEPLOY_ON_ERROR` | `false` | Also auto-redeploy functions in Nuclio's `error` state. |
-| `NUCLIO_REDEPLOY_DEADLINE_MS` | `120000` | How long a redeploy may run before it's treated as failed. |
-| `NUCLIO_*_TIMEOUT_MS` | varies | Request/deploy/invocation HTTP timeouts. |
+| Poll interval / `NUCLIO_POLL_MS` | `1000` | Poll interval while a function is building/transitioning. |
+| Ready poll / `NUCLIO_READY_POLL_MS` | `5000` | Poll interval once a function is healthy. |
+| Backoff / `NUCLIO_BACKOFF_MS` | `5000` | First retry delay after a dashboard error (doubles each failure). |
+| Backoff max / `NUCLIO_BACKOFF_MAX_MS` | `60000` | Cap on the exponential backoff. |
+| Start stagger / `NUCLIO_START_STAGGER_MS` | `2000` | Window to spread first-deploys across on startup. |
+| Request timeout / `NUCLIO_REQUEST_TIMEOUT_MS` | `10000` | Status/admin HTTP timeout. |
+| Deploy timeout / `NUCLIO_DEPLOY_TIMEOUT_MS` | `60000` | Create/update HTTP timeout. |
+
+**Function node (per function):**
+
+| Field / Variable | Default | Purpose |
+| --- | --- | --- |
+| Self-heal attempts / `NUCLIO_MAX_SELF_HEAL_ATTEMPTS` | `5` | Auto-redeploys of an unhealthy function before giving up. |
+| Redeploy deadline / `NUCLIO_REDEPLOY_DEADLINE_MS` | `120000` | How long a redeploy may run before it's treated as failed. |
+| Auto-redeploy on error / `NUCLIO_AUTO_REDEPLOY_ON_ERROR` | `false` | Also auto-redeploy functions in Nuclio's `error` state. |
+
+The invoke node's per-call **Timeout** and **Concurrency Cap** are set on the `nuclio`
+node itself (`NUCLIO_INVOCATION_TIMEOUT_MS` is the timeout fallback default).
 
 ## Hacks
 [bug](https://github.com/nuclio/nuclio/issues/3968)

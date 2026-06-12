@@ -1,12 +1,3 @@
-// Deterministic, fast cadence (read at module load; node --test isolates files per process)
-process.env.NUCLIO_BACKOFF_MS = '100';
-process.env.NUCLIO_BACKOFF_MAX_MS = '400';
-process.env.NUCLIO_READY_POLL_MS = '5000';
-process.env.NUCLIO_POLL_MS = '1000';
-process.env.NUCLIO_MAX_SELF_HEAL_ATTEMPTS = '3';
-process.env.NUCLIO_REDEPLOY_DEADLINE_MS = '50';
-process.env.NUCLIO_START_STAGGER_MS = '0';
-
 const { test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { reconcileStep } = require('../lib/nuclio-reconcile');
@@ -15,15 +6,26 @@ const { startMockNuclio } = require('./helpers/mock-nuclio');
 
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
+// Deterministic, fast tuning - now read off the node (server cadence + function
+// recovery policy) rather than module-load env, so set them on the stub directly.
+const SERVER = {
+    requestTimeoutMs: 10000, deployTimeoutMs: 60000,
+    pollMs: 1000, readyPollMs: 5000,
+    backoffMs: 100, backoffMaxMs: 400, startStaggerMs: 0,
+};
+
 // Minimal node stand-in - reconcileStep/deployFunction only need these.
 const makeNode = (address, overrides = {}) => ({
     name: 'fn',
     closed: false,
     redeploying: false,
     selfHealAttempts: 0,
+    maxSelfHealAttempts: 3,
+    redeployDeadlineMs: 50,
+    autoRedeployOnError: false,
     fnInvocationStatus: -1,
     counter: 0,
-    server: { address },
+    server: { address, ...SERVER },
     project: { name: 'default' },
     fnConfigSpec: { name: 'fn', runtime: 'python:3.12', code: 'x = 1', config: {}, address },
     statuses: [],
@@ -64,9 +66,9 @@ test('connectivity failures back off exponentially and cap', async () => {
 
 test('backoff resets the moment the dashboard answers again', async () => {
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'ready' });
-    const node = makeNode(mock.url, { backoffMs: 400 });  // pretend mid-backoff
+    const node = makeNode(mock.url, { _backoff: 400 });  // pretend mid-backoff
     const ms = await reconcileStep(node);
-    assert.equal(node.backoffMs, null);
+    assert.equal(node._backoff, null);
     assert.equal(ms, 5000);  // ready + never-invoked -> POLL_MS.ready
 });
 
