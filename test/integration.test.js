@@ -1,3 +1,8 @@
+// Fast, deterministic cadence (read at module load; node --test isolates files per process)
+process.env.NUCLIO_START_STAGGER_MS = '0';
+process.env.NUCLIO_BACKOFF_MS = '150';
+process.env.NUCLIO_BACKOFF_MAX_MS = '400';
+
 const { test, before, after, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const helper = require('node-red-node-test-helper');
@@ -202,6 +207,24 @@ test('function errors route to the fallback output with response details', async
     helper.getNode('inv').receive({ payload: 'hi' });
     const msg = await reply;
     assert.equal(msg.statusCode, 500);
+    assert.equal(msg.error.message, 'Request failed with status code 500');
+});
+
+test('invoke shows a Redeploying status while the function is redeploying', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    const fn = helper.getNode('fn');
+    await waitReady(fn);
+
+    fn.redeploying = true;  // simulate a redeploy in flight
+    const inv = helper.getNode('inv');
+    const reply = nextMsg(helper.getNode('out2'));
+    inv.receive({ payload: 'hi' });
+    await reply;  // message drops to fallback...
+    await waitUntil(
+        () => inv.status.getCalls().some(c => c.args[0]?.text === 'Redeploying'),
+        { msg: 'Redeploying status on invoke node' },
+    );
 });
 
 test('custom request headers are sent with invocations', async () => {

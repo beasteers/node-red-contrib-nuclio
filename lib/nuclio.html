@@ -1198,9 +1198,14 @@ rev /dev/stdin
         <li>Fallback
             <dl class="message-properties">
                 <dt>payload</dt>
-                <dd>Error payload if the function is unavailable.</dd>
+                <dd>Unchanged input payload when the function is unavailable, or the
+                error response body when the function returned an error status.</dd>
                 <dt>error</dt>
-                <dd>Error object when present.</dd>
+                <dd><code>{ message, code }</code> describing the failure (set on every
+                fallback caused by an error).</dd>
+                <dt>statusCode</dt>
+                <dd>HTTP status when the function responded with an error; otherwise the
+                connection error code (e.g. <code>ECONNREFUSED</code>).</dd>
             </dl>
         </li>
     </ol>
