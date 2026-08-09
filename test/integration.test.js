@@ -80,8 +80,8 @@ test('deploys a new function: project + full spec', async () => {
     assert.equal(req.body.metadata.annotations['nuclio.io/generated-by'], 'node-red');
     assert.equal(req.body.metadata.annotations['nuclio.io/node-red-node-id'], 'fn');
     assert.deepEqual(req.body.spec.env, [{ name: 'MY_VAR', value: 'hello' }]);
-    // project was created first
-    assert.ok(mock.requests.some(r => r.method === 'POST' && r.url === '/api/projects'));
+    // the default project pre-exists in the mock (real nuclio always has one)
+    assert.ok(!mock.requests.some(r => r.method === 'POST' && r.url === '/api/projects'));
     // and the function settles to ready
     await waitReady(helper.getNode('fn'));
 });
@@ -590,4 +590,168 @@ test('an env-typed config field reads the named env var at deploy time', async (
     } finally {
         delete process.env.MY_BACKOFF;
     }
+});
+
+/* -------------------------------------------------------------------------- */
+/*                           State-Machine Scenarios                          */
+/* -------------------------------------------------------------------------- */
+
+test('full lifecycle: new function transitions through building → ready', async () => {
+    mock = await startMockNuclio();
+    mock.nextFnStates[FN] = ['building', 'configuringResources', 'waitingForResourceConfiguration', 'ready'];
+    await load(baseFlow(mock));
+
+    const post = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(post.body.metadata.name, FN);
+    assert.equal(post.body.spec.runtime, 'python:3.12');
+
+    const fn = helper.getNode('fn');
+    // poll through the transition chain; once ready, invocationUrl is populated
+    await waitReady(fn, { timeout: 10000 });
+    assert.equal(fn.fnState, 'ready');
+    assert.ok(fn.invocationUrl);
+    assert.equal(fn.redeploying, false);
+
+    // building/transition requests hit the mock
+    assert.ok(mock.requests.some(r => r.method === 'GET' && r.url === `/api/functions/${FN}`));
+    assert.equal(mock.functionStates[FN], 'ready');
+});
+
+test('building function blocks deploy update', async () => {
+    mock = await startMockNuclio();
+    mock.nextFnStates[FN] = ['building'];  // stay building forever
+    await load(baseFlow(mock));
+
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    // reconcile polls once, consuming the only queue entry; state sticks at building
+    await waitUntil(() => mock.requests.some(r => r.method === 'GET' && r.url === `/api/functions/${FN}`));
+
+    await helper.unload();
+
+    // change code and reload while the function is still building
+    mock.requests.length = 0;
+    await load(baseFlow(mock, { code: 'x = 2' }));
+
+    // the redeploy should see building state and skip the PUT; redeploying clears
+    const fn = helper.getNode('fn');
+    await waitUntil(() => fn.redeploying === false, { timeout: 8000, msg: 'redeploying cleared' });
+    assert.ok(!mock.requests.some(r => r.method === 'PUT'));
+    assert.ok(!mock.requests.some(r => r.method === 'PATCH'));
+});
+
+test('building → ready transition allows subsequent update', async () => {
+    mock = await startMockNuclio();
+    mock.nextFnStates[FN] = ['building', 'configuringResources', 'ready'];
+    await load(baseFlow(mock));
+
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    await waitReady(helper.getNode('fn'), { timeout: 10000 });
+
+    await helper.unload();
+
+    mock.requests.length = 0;
+    await load(baseFlow(mock, { code: 'x = 2' }));
+
+    const put = await mock.waitFor(r => r.method === 'PUT');
+    assert.equal(Buffer.from(put.body.spec.build.functionSourceCode, 'base64').toString(), 'x = 2');
+});
+
+test('hash survives server-side enrichment (enriched config is a no-op)', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    await waitReady(helper.getNode('fn'));
+
+    // the stored function was enriched with default triggers/resources/minReplicas etc.
+    // (see storeFunction deepMergeDefaults). redeploying the same code must be a no-op
+    // because the hash annotations survive enrichment.
+    await helper.unload();
+
+    mock.requests.length = 0;
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    assert.deepEqual(mock.requests.filter(r => ['POST', 'PUT', 'PATCH'].includes(r.method) && r.url.startsWith('/api/functions')), []);
+});
+
+test('project creation happens only when project does not exist', async () => {
+    mock = await startMockNuclio();
+    const CUSTOM = 'custom-proj';
+    const flow = baseFlow(mock);
+    flow[1].project = 'proj-node';
+    flow[2] = { id: 'proj-node', type: 'nuclio-project', name: CUSTOM, nameType: 'str' };
+    await load(flow);
+
+    // the custom project doesn't exist yet -> POST /api/projects
+    const post = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/projects');
+    assert.equal(post.body.metadata.name, CUSTOM);
+    await waitReady(helper.getNode('fn'));
+});
+
+test('scaledToZero polls at the scaledToZero interval without self-healing', async () => {
+    mock = await startMockNuclio({ functions: { [FN]: { metadata: { name: FN }, spec: {} } }, state: 'scaledToZero' });
+    await load(baseFlow(mock));
+
+    // initial startup deploy migrates the pre-seeded (no-hash) function; let it
+    // finish, then clear the slate to check no self-heal deploys follow
+    const fn = helper.getNode('fn');
+    await waitUntil(() => fn.fnState === 'scaledToZero', { timeout: 5000 });
+    assert.equal(fn.fnState, 'scaledToZero');
+
+    mock.requests.length = 0;
+    // let a few reconcile polls pass
+    await new Promise(r => setTimeout(r, 200));
+    assert.equal(mock.requests.filter(isDeployWrite).length, 0);
+});
+
+test('state null is treated as unhealthy-unknown with debounce', async () => {
+    mock = await startMockNuclio({ functions: { [FN]: { metadata: { name: FN }, spec: {} } }, state: null });
+    await load(baseFlow(mock));
+
+    const fn = helper.getNode('fn');
+    await waitUntil(() => fn.fnState === null, { timeout: 5000 });
+    // first poll: unhealthyStreak=1, debounce holds (no deploy)
+    await waitUntil(() => fn.lastStatus?.text === 'Unhealthy?', { timeout: 5000 });
+});
+
+test('legacy migration works against server-enriched config', async () => {
+    // seed a realistic Nuclio-enriched legacy function (pre-hash, with server
+    // defaults) and verify the migration PUT correctly identifies no meaningful
+    // changes, stamps hashes, and skips the build.
+    const enrichedLegacy = {
+        apiVersion: 'nuclio.io/v1',
+        kind: 'Function',
+        metadata: {
+            name: FN,
+            labels: { 'nuclio.io/project-name': 'default' },
+            annotations: { 'nuclio.io/generated-by': 'node-red' },
+        },
+        spec: {
+            runtime: 'python:3.12',
+            handler: 'main:handler',
+            build: { functionSourceCode: Buffer.from('x = 1').toString('base64') },
+            env: [],
+            resources: { requests: { cpu: '25m', memory: '1M' }, limits: { cpu: '1', memory: '512M' } },
+            triggers: { 'default-http': { kind: 'http', maxWorkers: 1 } },
+            minReplicas: 1,
+            maxReplicas: 1,
+            version: 5,
+        },
+    };
+    mock = await startMockNuclio({ functions: { [FN]: enrichedLegacy }, state: 'ready' });
+    await load(baseFlow(mock));
+
+    const put = await mock.waitFor(r => r.method === 'PUT');
+    assert.equal(put.body.metadata.annotations['skip-build'], 'true');
+    assert.match(put.body.metadata.annotations[HASH_ANNOTATION], /^[0-9a-f]{64}$/);
+    assert.match(put.body.metadata.annotations[BUILD_HASH_ANNOTATION], /^[0-9a-f]{64}$/);
+    await waitReady(helper.getNode('fn'));
+
+    await helper.unload();
+
+    // second deploy is a hash-based no-op
+    mock.requests.length = 0;
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+    assert.deepEqual(mock.requests.filter(r => ['POST', 'PUT', 'PATCH'].includes(r.method) && r.url.startsWith('/api/functions')), []);
 });

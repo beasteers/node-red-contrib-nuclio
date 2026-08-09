@@ -7,19 +7,53 @@ const http = require('http');
 // endpoint (POST /). Records every request so tests can assert on the deploy
 // pipeline, and exposes knobs for state/failure scenarios:
 //
-//   mock.functions    name -> last deployed config body (pre-populate to "exist")
-//   mock.state        status.state reported for every function (default 'ready')
-//   mock.failDeploys  POST/PUT /api/functions return 500
-//   mock.invoke       (body, req) -> { status, body } for invocations
-//   mock.invokeAddress override the reported internal invocation host:port
-//   mock.requests     [{ method, url, headers, body }]
+//   mock.functions      name -> stored config body (pre-populate to "exist")
+//   mock.state          default status.state when no per-fn override is set
+//   mock.functionStates per-fn current state (overrides mock.state)
+//   mock.nextFnStates   per-fn queue of states to cycle through on GET polls
+//   mock.failDeploys    POST/PUT /api/functions return 500
+//   mock.invoke         (body, req) -> { status, body } for invocations
+//   mock.invokeAddress  override the reported internal invocation host:port
+//   mock.requests       [{ method, url, headers, body }]
 //   mock.waitFor(matchFn, { timeout }) -> Promise<request>
+//   mock.setFnState(name, state, [transitions])  convenience setter
+//
+// Server-enrichment mimics real Nuclio: stored bodies include filled-in
+// defaults for triggers/resources/status, so hash-based change detection
+// is actually tested against a server-enriched response rather than the
+// verbatim POST/PUT body. GET adds live status alongside the stored config.
+//
+// State-transition support: after POST/PUT, a function enters the first
+// state in mock.nextFnStates[name] (or 'ready' if none configured). Each
+// subsequent GET poll consumes the next state, then stays at the terminal
+// state. This lets tests drive the full building -> ready lifecycle.
+
+const ENRICH_DEFAULTS = {
+    triggers: {
+        'default-http': { kind: 'http', maxWorkers: 1, attributes: { ingresses: {}, serviceType: 'ClusterIP' } },
+    },
+    resources: { requests: { cpu: '25m', memory: '1M' }, limits: { cpu: '1', memory: '512M' } },
+    minReplicas: 1,
+    maxReplicas: 1,
+    version: -1,
+};
+
+const deepMergeDefaults = (spec) => {
+    const merged = { ...ENRICH_DEFAULTS, ...spec };
+    // top-level keys: shallow-merge sub-objects so user values win
+    for (const key of ['triggers', 'resources']) {
+        if (spec[key]) merged[key] = { ...ENRICH_DEFAULTS[key], ...spec[key] };
+    }
+    return merged;
+};
 
 const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promise((resolveServer) => {
     const waiters = [];
     const mock = {
         functions,
         state,
+        functionStates: {},
+        nextFnStates: {},
         failDeploys: false,
         invokeAddress: null,
         requests: [],
@@ -28,9 +62,13 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
             const found = mock.requests.find(match);
             if (found) return Promise.resolve(found);
             return new Promise((resolve, reject) => {
-                const timer = setTimeout(() => reject(new Error(`timed out waiting for request`)), timeout);
+                const timer = setTimeout(() => reject(new Error('timed out waiting for request')), timeout);
                 waiters.push({ match, resolve: (entry) => { clearTimeout(timer); resolve(entry); } });
             });
+        },
+        setFnState: (name, fnState, transitions = []) => {
+            mock.functionStates[name] = fnState;
+            mock.nextFnStates[name] = [...transitions];
         },
     };
 
@@ -44,7 +82,43 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
         return entry;
     };
 
-    const fnStatus = () => ({ state: mock.state, internalInvocationUrls: [mock.invokeAddress || `127.0.0.1:${mock.port}`] });
+    const currentState = (name) => {
+        if (mock.nextFnStates[name]?.length) {
+            mock.functionStates[name] = mock.nextFnStates[name].shift();
+        }
+        return mock.functionStates[name] || mock.state;
+    };
+
+    const fnStatus = (name) => ({
+        state: currentState(name),
+        internalInvocationUrls: [mock.invokeAddress || `127.0.0.1:${mock.port}`],
+        externalInvocationUrls: [],
+    });
+
+    const storeFunction = (name, body) => {
+        const stored = {
+            apiVersion: body.apiVersion || 'nuclio.io/v1',
+            kind: body.kind || 'Function',
+            metadata: {
+                labels: { 'nuclio.io/project-name': 'default' },
+                ...(body.metadata || {}),
+                annotations: { ...(body.metadata?.annotations || {}) },
+            },
+            spec: deepMergeDefaults(body.spec || {}),
+        };
+        mock.functions[name] = stored;
+
+        // Only seed per-function state when a transition queue was
+        // configured ahead of time (caller wants lifecycle control).
+        // Otherwise let currentState() fall through to mock.state so
+        // tests can change mock.state mid-test for state-change scenarios
+        // (e.g. unhealthy → self-heal → PATCH).
+        if (mock.nextFnStates[name]?.length && !mock.functionStates[name]) {
+            mock.functionStates[name] = mock.nextFnStates[name].shift();
+        }
+    };
+
+    const projectRegistry = { default: { metadata: { name: 'default' } } };
 
     const server = http.createServer((req, res) => {
         let raw = '';
@@ -62,8 +136,14 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
 
             /* ---------------------------- Dashboard API ---------------------------- */
 
-            if (req.method === 'GET' && req.url === '/api/projects') return send(200, {});
-            if (req.method === 'POST' && req.url === '/api/projects') return send(201, body);
+            if (req.method === 'GET' && req.url === '/api/projects') {
+                return send(200, projectRegistry);
+            }
+            if (req.method === 'POST' && req.url === '/api/projects') {
+                const name = body?.metadata?.name;
+                if (name) projectRegistry[name] = { metadata: { name } };
+                return send(201, body);
+            }
 
             if (req.method === 'GET' && fnMatch && req.url.includes('/replicas')) {
                 return send(200, { names: ['replica-1', 'replica-2'] });
@@ -75,19 +155,22 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
             if (req.method === 'GET' && fnMatch) {
                 const fn = mock.functions[fnMatch[1]];
                 if (!fn) return send(404, { error: 'Function not found' });
-                return send(200, { ...fn, status: fnStatus() });
+                return send(200, { ...fn, status: fnStatus(fnMatch[1]) });
             }
             if (req.method === 'POST' && req.url === '/api/functions') {
                 if (mock.failDeploys) return send(500, { error: 'deploy failed' });
-                mock.functions[body?.metadata?.name] = body;
+                const name = body?.metadata?.name;
+                storeFunction(name, body);
                 return send(202, body);
             }
             if (req.method === 'PUT' && fnMatch) {
                 if (mock.failDeploys) return send(500, { error: 'deploy failed' });
-                mock.functions[fnMatch[1]] = body;
+                storeFunction(fnMatch[1], body);
                 return send(202, body);
             }
-            if (req.method === 'PATCH' && fnMatch) return send(200, {});
+            if (req.method === 'PATCH' && fnMatch) {
+                return send(200, {});
+            }
 
             /* --------------------------- Function Invocation ------------------------ */
 
