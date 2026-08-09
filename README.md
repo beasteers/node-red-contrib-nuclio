@@ -64,8 +64,15 @@ field blank reproduces the old env-only behavior, so existing deployments are un
 | Redeploy deadline / `NUCLIO_REDEPLOY_DEADLINE_MS` | `120000` | How long a redeploy may run before it's treated as failed. |
 | Auto-redeploy on error / `NUCLIO_AUTO_REDEPLOY_ON_ERROR` | `false` | Also auto-redeploy functions in Nuclio's `error` state. |
 
-The invoke node's per-call **Timeout** and **Concurrency Cap** are set on the `nuclio`
-node itself (`NUCLIO_INVOCATION_TIMEOUT_MS` is the timeout fallback default).
+The invoke node's per-call **Timeout**, **Concurrency Cap**, **Retries**, and **Retry
+Delay** are set on the `nuclio` node itself (`NUCLIO_INVOCATION_TIMEOUT_MS`,
+`NUCLIO_INVOKE_RETRIES`, and `NUCLIO_INVOKE_RETRY_DELAY_MS` are the fallback defaults).
+
+Transient failures — connection errors and `429`/`502`/`503`/`504` responses (a function
+scaling or redeploying) — only log a warning (they never trigger Catch nodes), and are
+retried with exponential backoff when **Retries** > 0, honoring a numeric `Retry-After`
+header. Retries are at-least-once: a dropped connection may still have delivered the
+request, so make side-effecting functions idempotent if you enable retries.
 
 ## How deploy & health work
 

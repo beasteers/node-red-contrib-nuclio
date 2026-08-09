@@ -340,6 +340,71 @@ test('transient connectivity errors warn only - no Catch trigger', async () => {
     assert.equal(inv.warn.callCount, 1);
 });
 
+test('transient HTTP failures are retried until success', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {}, { retries: '3', retryDelayMs: '10' }));
+    await waitReady(helper.getNode('fn'));
+
+    let calls = 0;
+    mock.invoke = () => (++calls < 3 ? { status: 503, body: { error: 'waking' } } : { status: 200, body: { ok: true } });
+
+    const reply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ payload: 'hi' });
+    const msg = await reply;
+    assert.deepEqual(msg.payload, { ok: true });
+    assert.equal(msg.statusCode, 200);
+    assert.equal(calls, 3);  // two 503s, then success
+});
+
+test('exhausted retries fall back with the last transient error, no Catch', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {}, { retries: '2', retryDelayMs: '10' }));
+    await waitReady(helper.getNode('fn'));
+
+    mock.invoke = () => ({ status: 503, body: { error: 'down' } });
+    const inv = helper.getNode('inv');
+    inv.error.resetHistory();
+    inv.warn.resetHistory();
+
+    const reply = nextMsg(helper.getNode('out2'));
+    inv.receive({ payload: 'hi' });
+    const msg = await reply;
+    assert.equal(msg.statusCode, 503);
+    assert.equal(msg.error.message, 'Request failed with status code 503');
+    // 1 initial attempt + 2 retries
+    assert.equal(mock.requests.filter(r => r.method === 'POST' && r.url === '/').length, 3);
+    // transient: warns only (retry notices + final), never Catch
+    assert.equal(inv.error.callCount, 0);
+    assert.equal(inv.warn.callCount, 3);
+});
+
+test('non-transient errors are not retried', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {}, { retries: '3', retryDelayMs: '10' }));
+    await waitReady(helper.getNode('fn'));
+
+    mock.invoke = () => ({ status: 500, body: { error: 'boom' } });
+    const reply = nextMsg(helper.getNode('out2'));
+    helper.getNode('inv').receive({ payload: 'hi' });
+    const msg = await reply;
+    assert.equal(msg.statusCode, 500);
+    // a 500 is a real answer from the function - exactly one attempt
+    assert.equal(mock.requests.filter(r => r.method === 'POST' && r.url === '/').length, 1);
+});
+
+test('retries default to 0 - transient failure falls back immediately', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    mock.invoke = () => ({ status: 503, body: {} });
+    const reply = nextMsg(helper.getNode('out2'));
+    helper.getNode('inv').receive({ payload: 'hi' });
+    const msg = await reply;
+    assert.equal(msg.statusCode, 503);
+    assert.equal(mock.requests.filter(r => r.method === 'POST' && r.url === '/').length, 1);
+});
+
 test('invoke shows a Redeploying status while the function is redeploying', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));

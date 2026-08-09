@@ -62,6 +62,8 @@
             },
             timeoutMs: { value: '' },
             maxInFlight: { value: '' },
+            retries: { value: '' },
+            retryDelayMs: { value: '' },
             headers: { value: [] },
         },
         label: function () {
@@ -1217,6 +1219,24 @@ rev /dev/stdin
             <small>Limits in-flight requests; excess messages go to the fallback output.</small>
         </div>
     </div>
+    <div class="form-row">
+        <label for="node-input-retries">
+            <span>Retries</span>
+        </label>
+        <input type="text" id="node-input-retries" placeholder="0 = no retry" />
+        <div>
+            <small>Transient failures (connection errors, 429/502/503/504) are retried this many times with exponential backoff. Retries are at-least-once.</small>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-input-retryDelayMs">
+            <span>Retry Delay (ms)</span>
+        </label>
+        <input type="text" id="node-input-retryDelayMs" placeholder="500 (doubles per retry)" />
+        <div>
+            <small>First retry delay; doubles on each retry (capped at 10s). A numeric <code>Retry-After</code> response header wins when larger.</small>
+        </div>
+    </div>
     <div class="form-row node-input-list-row">
         <label for="node-input-headers">
             Request Headers
@@ -1291,10 +1311,13 @@ rev /dev/stdin
     </ol>
         <h3>Details</h3>
     <p>Select a <b>Nuclio Function</b> config node to invoke. Optional headers,
-    timeout, and concurrency cap apply per node instance.</p>
-    <p>Non-transient invocation errors are also reported to <b>Catch</b> nodes.
-    Transient connectivity errors (the function scaling or redeploying) only log a
-    warning and route to the fallback output.</p>
+    timeout, concurrency cap, and retries apply per node instance.</p>
+    <p>Transient failures &mdash; connection errors and 429/502/503/504 responses
+    (the function scaling or redeploying) &mdash; are retried up to <b>Retries</b>
+    times with exponential backoff (honoring a numeric <code>Retry-After</code>
+    header), then route to the fallback output without triggering Catch nodes.
+    Retries are at-least-once: a transiently failed request may still have
+    reached the function. Other errors are reported to <b>Catch</b> nodes.</p>
     <p><b>Note:</b> header values are stored with the flow (the credential type
     only masks the input). For sensitive headers, use the <code>env</code> type
     and provide the value via an environment variable.</p>

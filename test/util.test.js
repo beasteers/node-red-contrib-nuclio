@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, stableStringify, hashConfig } = require('../lib/util');
+const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, stableStringify, hashConfig, retryBackoff } = require('../lib/util');
 
 
 /* ----------------------------------- diff ---------------------------------- */
@@ -106,4 +106,15 @@ test('hashConfig is deterministic and sensitive to changes', () => {
     const b = hashConfig({ spec: { build: { functionSourceCode: 'eA==' }, env: [{ name: 'A', value: '1' }] } });
     assert.equal(a, b);  // key order irrelevant
     assert.notEqual(a, hashConfig({ spec: { env: [{ name: 'A', value: '2' }], build: { functionSourceCode: 'eA==' } } }));
+});
+
+test('retryBackoff doubles per attempt, caps, and honors Retry-After', () => {
+    assert.equal(retryBackoff(1, 500), 500);
+    assert.equal(retryBackoff(2, 500), 1000);
+    assert.equal(retryBackoff(3, 500), 2000);
+    assert.equal(retryBackoff(10, 500), 10000);       // backoff capped
+    assert.equal(retryBackoff(1, 500, '3'), 3000);    // Retry-After wins when larger
+    assert.equal(retryBackoff(3, 500, '1'), 2000);    // ...but not when smaller
+    assert.equal(retryBackoff(1, 500, '999'), 30000); // Retry-After capped too
+    assert.equal(retryBackoff(1, 500, 'garbage'), 500);  // bogus header ignored
 });
