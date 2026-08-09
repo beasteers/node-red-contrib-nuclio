@@ -30,7 +30,9 @@ if (!Array.isArray(input)) {
 
 const configNodes = [];
 const migrated = input.map(node => {
-    if (!node || node.type !== 'nuclio') return node;
+    // only legacy invoke nodes carry their function config inline; nodes that
+    // already reference a config node are left alone (keeps this idempotent)
+    if (!node || node.type !== 'nuclio' || node.function) return node;
 
     const configId = genId();
     configNodes.push({

@@ -2,13 +2,15 @@
 
 Deploy Nuclio Functions directly from a Node-Red script. These are essentially Python, Go, Node.js, or Shell HTTP endpoints that nodered calls.
 
-The "nuclio" node acts essentially like a function node, giving you a code editor. Once the node is deployed, it will deploy the function to nuclio and act as an HTTP request node, making requests to the nuclio function.
+The **nuclio-function** config node acts essentially like a function node, giving you a
+code editor. Once it is deployed, it deploys the function to Nuclio and keeps it healthy.
+The **nuclio** node then acts as an HTTP request node, making requests to that function.
 
 > NOTE: This node is specifically intended for the `sourceCode` [code entry type](https://docs.nuclio.io/en/latest/reference/function-configuration/code-entry-types.html) and the default [HTTP trigger](https://docs.nuclio.io/en/latest/reference/triggers/http.html), though there isn't anything stopping you from customizing the function config to get the desired functionality (e.g. setting `spec.image` or `build.codeEntryType=archive, build.path=<URL>`). 
 
 ## Install
 
-> This is a prototype - I look forward to hearing your experience, feedback, and ideas for improvements.
+> This project is under active development — I look forward to hearing your experience, feedback, and ideas for improvements.
 
 ```bash
 npm i @bea.steers/node-red-contrib-nuclio
@@ -107,6 +109,17 @@ acts on the small known set (`ready`, `error`, `unhealthy`, `scaledToZero`, 404)
 treats any other state as "in transition — show it and wait," so unknown future states
 degrade to observation rather than breakage. If a Nuclio release changes the API, that
 one file is where to look.
+
+## Migrating from 1.0
+
+Since 1.1 the function configuration (code, runtime, env) lives on a shared
+`nuclio-function` config node instead of the invoke node, so several invoke nodes (or
+subflows) can share one function. To convert a pre-1.1 `flows.json`:
+
+```bash
+node scripts/migrate-nuclio-config.js path/to/flows.json            # writes flows.migrated.json
+node scripts/migrate-nuclio-config.js path/to/flows.json --in-place # or overwrite
+```
 
 ## Hacks
 [bug](https://github.com/nuclio/nuclio/issues/3968)
