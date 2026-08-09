@@ -46,11 +46,29 @@ const UNREACHABLE = 'http://127.0.0.1:1';  // port 1 -> immediate ECONNREFUSED
 
 /* -------------------------------- Idle poll -------------------------------- */
 
-test('a steadily-succeeding function polls at the ready interval, not the fast default', async () => {
-    // regression: once invocations succeed, reconcile used to spin at 1Hz doing nothing
-    const node = makeNode(UNREACHABLE, { fnInvocationStatus: 200 });
-    const ms = await reconcileStep(node);  // short-circuits before any network call
-    assert.equal(ms, 5000);  // POLL_MS.ready, not POLL_MS.default (1000)
+test('a freshly-succeeding function still polls status, at the ready interval', async () => {
+    // regression: invocations succeeding used to skip status checks entirely,
+    // leaving state drift invisible; now they only slow the poll down
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'ready' });
+    const node = makeNode(mock.url, { fnInvocationStatus: 200, lastInvocationAt: Date.now() });
+    const ms = await reconcileStep(node);
+    assert.equal(ms, 5000);  // ready + fresh success -> slow poll
+    assert.ok(mock.requests.some(r => r.method === 'GET' && r.url === '/api/functions/fn'));
+});
+
+test('a stale success does not suppress observation or self-heal evidence', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'ready' });
+    const node = makeNode(mock.url, { fnInvocationStatus: 200, lastInvocationAt: Date.now() - 60000 });
+    const ms = await reconcileStep(node);
+    assert.equal(ms, 5000);  // idle (stale result) -> slow poll, but the GET happened
+    assert.ok(mock.requests.some(r => r.method === 'GET' && r.url === '/api/functions/fn'));
+});
+
+test('a recent invocation failure on a ready function polls fast', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'ready' });
+    const node = makeNode(mock.url, { fnInvocationStatus: 500, lastInvocationAt: Date.now() });
+    const ms = await reconcileStep(node);
+    assert.equal(ms, 1000);  // fresh failure -> watch closely
 });
 
 
@@ -87,12 +105,38 @@ test('unhealthy self-heal is bounded, then gives up with an honest status', asyn
     assert.equal(node.redeploying, false);
 });
 
+test('self-heal waits for two consecutive unhealthy readings', async () => {
+    // debounce: one flaky health verdict must not churn a redeploy
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
+    const node = makeNode(mock.url);
+
+    await reconcileStep(node);  // reading 1: debounce holds
+    assert.equal(deployWrites(mock).length, 0);
+    assert.equal(node.lastStatus.text, 'Unhealthy');
+
+    await reconcileStep(node);  // reading 2: self-heal kicks in
+    assert.equal(deployWrites(mock).length, 1);
+    assert.equal(node.selfHealAttempts, 1);
+});
+
+test('fresh succeeding invocations suppress self-heal despite unhealthy state', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
+    const node = makeNode(mock.url, { fnInvocationStatus: 200, lastInvocationAt: Date.now() });
+
+    await reconcileStep(node);
+    await reconcileStep(node);
+    assert.equal(deployWrites(mock).length, 0);  // still serving traffic -> no redeploy
+    assert.equal(node.lastStatus.text, 'Unhealthy');
+});
+
 test('a redeploy that never restores health cannot pin "Redeploying" forever', async () => {
     // the deadline lets a stuck redeploy lapse so the next attempt (or give-up) proceeds
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
     const node = makeNode(mock.url);
 
-    await reconcileStep(node);                 // attempt 1 -> redeploying = true
+    await reconcileStep(node);                 // reading 1: debounce, no deploy yet
+    assert.equal(node.redeploying, false);
+    await reconcileStep(node);                 // reading 2 -> attempt 1 -> redeploying = true
     assert.equal(node.redeploying, true);
     await reconcileStep(node);                 // still within deadline -> holds "Redeploying"
     assert.equal(node.lastStatus.text, 'Redeploying...');

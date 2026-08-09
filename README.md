@@ -67,6 +67,40 @@ field blank reproduces the old env-only behavior, so existing deployments are un
 The invoke node's per-call **Timeout** and **Concurrency Cap** are set on the `nuclio`
 node itself (`NUCLIO_INVOCATION_TIMEOUT_MS` is the timeout fallback default).
 
+## How deploy & health work
+
+**Change detection is hash-based.** Each deploy stamps the function with a fingerprint
+(`nuclio.io/node-red-config-hash`, plus a build-only hash) as annotations. On the next
+deploy, node-red compares fingerprints instead of deep-diffing the live config, so
+server-side defaults never cause churn. If only non-build inputs changed (env, replicas,
+...), the update is pushed with `skip-build` and no image rebuild. Functions deployed by
+older versions are migrated on their first update. Note: edits made **directly in the
+Nuclio dashboard** are not reverted while the fingerprint matches — node-red reasserts
+your config the next time it actually changes.
+
+**Health is a two-party split.** Nuclio is the *sensor* — it watches container health and
+reports function state, but does not redeploy. Node-RED is the *actuator* — the reconcile
+loop reads state and is the only thing that redeploys (self-heal). They don't fight; the
+guards below keep node-red from reacting to flaky verdicts:
+
+ * Status is always polled (at the **Ready poll** cadence when healthy). Succeeding
+   invocations never skip observation — they only slow the poll and suppress self-heal.
+ * An invocation success only counts while **fresh** (~30s), so an idle function that
+   served one request an hour ago is still watched.
+ * Self-heal waits for **two consecutive** unhealthy readings before redeploying, so a
+   single flaky health verdict doesn't churn a redeploy. Self-heal remains bounded by
+   **Self-heal attempts**, then gives up with an honest status.
+
+## Nuclio compatibility
+
+All dashboard interaction is isolated in `lib/nuclio-client.js` (endpoints, headers,
+request shapes, and the function state names). Tested against dashboard **1.15.x**
+(see the pinned image in `docker-compose.yml`). State handling is open-world: node-red
+acts on the small known set (`ready`, `error`, `unhealthy`, `scaledToZero`, 404) and
+treats any other state as "in transition — show it and wait," so unknown future states
+degrade to observation rather than breakage. If a Nuclio release changes the API, that
+one file is where to look.
+
 ## Hacks
 [bug](https://github.com/nuclio/nuclio/issues/3968)
 ```bash
