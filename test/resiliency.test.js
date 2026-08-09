@@ -161,3 +161,68 @@ test('error state does not self-heal by default', async () => {
     assert.equal(node.lastStatus.text, 'Error');
     assert.equal(ms, 5000);  // POLL_MS.error
 });
+
+test('autoRedeployOnError: true triggers self-heal from error state', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'error' });
+    const node = makeNode(mock.url, { autoRedeployOnError: true });
+
+    // error self-heal has no debounce — deploys on the first poll.
+    // deployFunction sets status to 'Redeploying...' after the attemptSelfHeal label
+    await reconcileStep(node);
+    assert.equal(deployWrites(mock).length, 1);
+    assert.equal(node.selfHealAttempts, 1);
+    assert.ok(node.lastStatus.text.includes('Redeploying'));
+});
+
+test('autoRedeployOnError skips self-heal when invocations are succeeding', async () => {
+    // if invocations are still ok, we should observe the error state
+    // but not trigger a redeploy (same guard as unhealthy)
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'error' });
+    const node = makeNode(mock.url, { autoRedeployOnError: true, fnInvocationStatus: 200, lastInvocationAt: Date.now() });
+
+    await reconcileStep(node);
+    assert.equal(deployWrites(mock).length, 0);
+    assert.equal(node.lastStatus.text, 'Error');
+});
+
+test('dashboard 502 during status GET backs off and shows error', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'ready' });
+    mock.failStatus = 502;
+    const node = makeNode(mock.url);
+
+    const ms = await reconcileStep(node);
+    assert.equal(ms, 100);  // first backoff (SERVER.backoffMs)
+    assert.equal(node.lastStatus.text, 'Error 502');
+    assert.equal(deployWrites(mock).length, 0);
+});
+
+test('dashboard 503 during status GET backs off and shows error', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'ready' });
+    mock.failStatus = 503;
+    const node = makeNode(mock.url);
+
+    const ms = await reconcileStep(node);
+    assert.equal(ms, 100);  // first backoff
+    assert.equal(node.lastStatus.text, 'Error 503');
+});
+
+test('waitingForScaleResourceFromZero polls at 3s and blocks updates', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'waitingForScaleResourceFromZero' });
+    const node = makeNode(mock.url);
+
+    const ms = await reconcileStep(node);
+    assert.equal(ms, 3000);  // POLL_MS via WAITING spread
+    assert.match(node.lastStatus.text, /Scale Resource From Zero/i);
+    // no deploy writes — the function is in a WAITING state
+    assert.equal(deployWrites(mock).length, 0);
+});
+
+test('waitingForBuild blocks deploy and shows correct status', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'waitingForBuild' });
+    const node = makeNode(mock.url);
+
+    const ms = await reconcileStep(node);
+    assert.equal(ms, 3000);
+    assert.match(node.lastStatus.text, /Waiting For Build/i);
+    assert.equal(deployWrites(mock).length, 0);
+});

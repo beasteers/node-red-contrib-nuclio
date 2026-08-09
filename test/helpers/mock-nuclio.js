@@ -12,6 +12,8 @@ const http = require('http');
 //   mock.functionStates per-fn current state (overrides mock.state)
 //   mock.nextFnStates   per-fn queue of states to cycle through on GET polls
 //   mock.failDeploys    POST/PUT /api/functions return 500
+//   mock.failStatus     if set, GET /api/functions/* returns this status code
+//   mock.fn404ContentType  if set, 404s use this content-type instead of JSON
 //   mock.invoke         (body, req) -> { status, body } for invocations
 //   mock.invokeAddress  override the reported internal invocation host:port
 //   mock.requests       [{ method, url, headers, body }]
@@ -55,6 +57,8 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
         functionStates: {},
         nextFnStates: {},
         failDeploys: false,
+        failStatus: null,
+        fn404ContentType: null,
         invokeAddress: null,
         requests: [],
         invoke: (body) => ({ status: 200, body: { echo: body } }),
@@ -153,8 +157,19 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
                 return send(200, `logs for ${replica}`);
             }
             if (req.method === 'GET' && fnMatch) {
+                if (mock.failStatus) {
+                    return send(mock.failStatus, { error: `simulated ${mock.failStatus}` });
+                }
                 const fn = mock.functions[fnMatch[1]];
-                if (!fn) return send(404, { error: 'Function not found' });
+                if (!fn) {
+                    if (mock.fn404ContentType) {
+                        res.writeHead(404, { 'Content-Type': mock.fn404ContentType });
+                        res.end('<html><body>Not Found</body></html>');
+                    } else {
+                        send(404, { error: 'Function not found' });
+                    }
+                    return;
+                }
                 return send(200, { ...fn, status: fnStatus(fnMatch[1]) });
             }
             if (req.method === 'POST' && req.url === '/api/functions') {

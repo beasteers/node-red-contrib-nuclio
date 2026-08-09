@@ -755,3 +755,67 @@ test('legacy migration works against server-enriched config', async () => {
     await waitReady(helper.getNode('fn'));
     assert.deepEqual(mock.requests.filter(r => ['POST', 'PUT', 'PATCH'].includes(r.method) && r.url.startsWith('/api/functions')), []);
 });
+
+/* -------------------------------------------------------------------------- */
+/*                           Guard & Edge Scenarios                           */
+/* -------------------------------------------------------------------------- */
+
+test('non-JSON 404 (proxy) backoffs instead of deploying', async () => {
+    mock = await startMockNuclio();
+    // use a fast poll so the reconcile loop fires quickly after we delete the fn
+    const flow = baseFlow(mock);
+    flow[0].pollMs = '250'; flow[0].readyPollMs = '500';
+    await load(flow);
+    await waitReady(helper.getNode('fn'));
+
+    // simulate: the function is deleted externally and the dashboard
+    // returns HTML (a reverse proxy is misconfigured). the content-type
+    // guard in reconcileStep must prevent a deploy against a likely-wrong server.
+    delete mock.functions[FN];
+    mock.fn404ContentType = 'text/html';
+    mock.requests.length = 0;
+
+    // let a reconcile poll fire; it should back off, not POST a new function
+    await new Promise(r => setTimeout(r, 1000));
+    assert.ok(!mock.requests.some(r => r.method === 'POST' && r.url === '/api/functions'));
+});
+
+test('multiple functions deploy independently on the same server', async () => {
+    mock = await startMockNuclio();
+    const flow = [
+        { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str' },
+        { id: 'fnA', type: 'nuclio-function', server: 'srv', name: 'fn-a', runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [], secret_vars: [] },
+        { id: 'fnB', type: 'nuclio-function', server: 'srv', name: 'fn-b', runtime: 'golang', code: 'y = 1', configCode: '', env_vars: [], secret_vars: [] },
+        { id: 'invA', type: 'nuclio', function: 'fnA', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1A'], ['out2A']] },
+        { id: 'invB', type: 'nuclio', function: 'fnB', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1B'], ['out2B']] },
+        { id: 'out1A', type: 'helper' }, { id: 'out2A', type: 'helper' },
+        { id: 'out1B', type: 'helper' }, { id: 'out2B', type: 'helper' },
+    ];
+    await load(flow);
+
+    const postA = await mock.waitFor(r => r.method === 'POST' && r.body?.metadata?.name === 'fn-a');
+    const postB = await mock.waitFor(r => r.method === 'POST' && r.body?.metadata?.name === 'fn-b');
+    assert.equal(postA.body.spec.runtime, 'python:3.12');
+    assert.equal(postB.body.spec.runtime, 'golang');
+    assert.equal(postB.body.spec.handler, 'main:Handler');
+
+    const fnA = helper.getNode('fnA');
+    const fnB = helper.getNode('fnB');
+    await waitReady(fnA);
+    await waitReady(fnB);
+    assert.equal(fnA.fnState, 'ready');
+    assert.equal(fnB.fnState, 'ready');
+    // both functions are on the same server so invocation host:port match;
+    // verify they're independent by checking runtime/handler and invocation output
+
+    // invoke each one independently
+    const replyA = nextMsg(helper.getNode('out1A'));
+    helper.getNode('invA').receive({ payload: { func: 'a' } });
+    const msgA = await replyA;
+    assert.deepEqual(msgA.payload, { echo: { func: 'a' } });
+
+    const replyB = nextMsg(helper.getNode('out1B'));
+    helper.getNode('invB').receive({ payload: { func: 'b' } });
+    const msgB = await replyB;
+    assert.deepEqual(msgB.payload, { echo: { func: 'b' } });
+});
