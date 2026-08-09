@@ -474,7 +474,7 @@ rev /dev/stdin
     };
 
     const statusTone = (state) => {
-        if (!state) return 'unknown';
+        if (!state || typeof state !== 'string') return 'unknown';
         if (state === 'ready') return 'ok';
         if (state === 'error' || state === 'unhealthy') return 'error';
         if (state === 'scaledToZero') return 'idle';
@@ -731,6 +731,8 @@ rev /dev/stdin
             $('#node-config-input-name').on('input', updateDashboardLink);
             $('#node-config-input-project, #node-config-input-server').on('change', updateDashboardLink);
             $('#nuclio-redeploy').on('click', function() {
+                const btn = $(this);
+                btn.prop('disabled', true).text('Redeploying...');
                 ajaxJson({
                     url: `/nuclio/api/functions/deploy?id=${node.id}`,
                     method: 'POST',
@@ -738,9 +740,13 @@ rev /dev/stdin
                     console.log(data);
                 }).fail((e) => {
                     alert('Error redeploying: ' + JSON.stringify(e));
+                }).always(() => {
+                    btn.prop('disabled', false).text('Redeploy');
                 });
             })
             $('#nuclio-rebuild').on('click', function() {
+                const btn = $(this);
+                btn.prop('disabled', true).text('Rebuilding...');
                 ajaxJson({
                     url: `/nuclio/api/functions/deploy?id=${node.id}&rebuild=true`,
                     method: 'POST',
@@ -748,6 +754,8 @@ rev /dev/stdin
                     console.log(data);
                 }).fail((e) => {
                     alert('Error rebuilding: ' + JSON.stringify(e));
+                }).always(() => {
+                    btn.prop('disabled', false).text('Rebuild');
                 });
             })
             $('#nuclio-generate-name').on('click', function() {
@@ -828,6 +836,11 @@ rev /dev/stdin
             /* --------------------------------- Status Page -------------------------------- */
 
             this.statusPoller = new Poller(() => {
+                // bail if the editor dialog was closed without save/cancel
+                if (!document.getElementById('nuclio-status-state')) {
+                    node.statusPoller?.stop();
+                    return;
+                }
                 ajaxJson({
                     url: `/nuclio/api/functions?id=${this.id}`,
                     method: 'GET',
