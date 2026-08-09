@@ -819,3 +819,62 @@ test('multiple functions deploy independently on the same server', async () => {
     const msgB = await replyB;
     assert.deepEqual(msgB.payload, { echo: { func: 'b' } });
 });
+
+/* -------------------------------------------------------------------------- */
+/*                          Error Recovery & Stress                           */
+/* -------------------------------------------------------------------------- */
+
+test('function recovers from error state after code fix', async () => {
+    // bad code pushes nuclio into error; user fixes code, redeploys, function recovers
+    mock = await startMockNuclio();
+    mock.nextFnStates[FN] = ['error'];
+    await load(baseFlow(mock));
+
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    const fn = helper.getNode('fn');
+    await waitUntil(() => fn.fnState === 'error', { timeout: 5000 });
+    assert.equal(fn.fnState, 'error');
+
+    await helper.unload();
+
+    // user fixes the code and redeploys — the function is now healthy
+    mock.requests.length = 0;
+    mock.functionStates[FN] = 'ready';
+    await load(baseFlow(mock, { code: 'x = 2' }));
+
+    const put = await mock.waitFor(r => r.method === 'PUT');
+    assert.equal(Buffer.from(put.body.spec.build.functionSourceCode, 'base64').toString(), 'x = 2');
+    await waitReady(helper.getNode('fn'));
+    assert.equal(helper.getNode('fn').fnState, 'ready');
+});
+
+test('in-flight invocation counter clears cleanly during concurrent redeploy', async () => {
+    mock = await startMockNuclio();
+    // slow invoke so we can set redeploying mid-flight
+    let resolveInvoke;
+    const invoked = new Promise(r => { resolveInvoke = r; });
+    mock.invoke = (body) => new Promise(resolve => {
+        setTimeout(() => {
+            resolve({ status: 200, body: { echo: body } });
+            resolveInvoke();
+        }, 150);
+    });
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    const inv = helper.getNode('inv');
+    const fn = helper.getNode('fn');
+    const reply = nextMsg(helper.getNode('out1'));
+
+    // fire invocation; while axios is in-flight, simulate a concurrent redeploy
+    inv.receive({ payload: 'hi' });
+    await new Promise(r => setTimeout(r, 20));  // let axios start
+    fn.redeploying = true;  // concurrent redeploy starts mid-invocation
+
+    await invoked;  // wait for the slow invocation to finish
+    const msg = await reply;
+    assert.deepEqual(msg.payload, { echo: 'hi' });
+
+    // the counter must have been decremented — no backpressure leak
+    assert.equal(inv.counter, 0);
+});

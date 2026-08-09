@@ -226,3 +226,13 @@ test('waitingForBuild blocks deploy and shows correct status', async () => {
     assert.match(node.lastStatus.text, /Waiting For Build/i);
     assert.equal(deployWrites(mock).length, 0);
 });
+
+test('waitingForScaleResourceToZero polls at 3s and blocks updates', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'waitingForScaleResourceToZero' });
+    const node = makeNode(mock.url);
+
+    const ms = await reconcileStep(node);
+    assert.equal(ms, 3000);  // POLL_MS via WAITING spread
+    assert.match(node.lastStatus.text, /Scale Resource To Zero/i);
+    assert.equal(deployWrites(mock).length, 0);
+});
