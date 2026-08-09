@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "test": "node --test",
-    "lint": "eslint"
+    "lint": "eslint",
+    "smoke": "bash scripts/smoke-test.sh"
   },
   "node-red": {
     "version": ">=3.0.0",

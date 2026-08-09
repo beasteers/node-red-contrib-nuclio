@@ -30,6 +30,10 @@ Unit tests and lint:
 npm test
 npm run lint
 ```
+Smoke test (spins up docker-compose, deploys a real Nuclio function, invokes it):
+```bash
+npm run smoke
+```
 You can access: 
  * Node-Red dashboard [here](http://localhost:1882). 
  * The Nuclio dashboard can be found [here](http://localhost:8072).
