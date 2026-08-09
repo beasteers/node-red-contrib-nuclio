@@ -56,7 +56,7 @@ const nextMsg = (node, { timeout = 5000 } = {}) => new Promise((resolve, reject)
 
 // wait until the function is deployed, observed ready, and invocable
 const waitReady = (fnNode, opts = {}) => waitUntil(
-    () => fnNode.urls?.invocation && !fnNode.redeploying,
+    () => fnNode.invocationUrl && !fnNode.redeploying,
     { msg: 'function ready', ...opts },
 );
 
