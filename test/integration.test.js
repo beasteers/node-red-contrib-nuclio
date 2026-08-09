@@ -523,6 +523,21 @@ test('POST /nuclio/api/functions/deploy forces a redeploy', async () => {
     assert.ok(mock.requests.some(r => r.method === 'PATCH'));
 });
 
+test('POST /nuclio/api/functions/deploy?rebuild=true forces a rebuild PUT', async () => {
+    // unchanged config, but rebuild must PUT without skip-build so Nuclio
+    // re-fetches the source (e.g. new commits behind an unchanged git URL)
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    mock.requests.length = 0;
+    await helper.request().post('/nuclio/api/functions/deploy?id=fn&rebuild=true').expect(200);
+    const put = mock.requests.find(r => r.method === 'PUT');
+    assert.ok(put, 'expected a PUT');
+    assert.equal(put.body.metadata.annotations['skip-build'], undefined);
+    assert.ok(!mock.requests.some(r => r.method === 'PATCH'), 'no desiredState PATCH on rebuild');
+});
+
 test('unknown node ids return 404', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));

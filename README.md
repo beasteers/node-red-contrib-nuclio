@@ -87,6 +87,12 @@ older versions are migrated on their first update. Note: edits made **directly i
 Nuclio dashboard** are not reverted while the fingerprint matches — node-red reasserts
 your config the next time it actually changes.
 
+**Rebuild vs. redeploy.** The status tab's **Redeploy** re-converges the function from
+its existing image (fast, no build). **Rebuild** forces a full image rebuild even when
+the config is unchanged. For `git`/`archive`/`github` code entries, that is how you pick
+up new commits behind an unchanged URL — the fingerprint covers your config, not the
+repo's contents, so a plain redeploy would reuse the old image.
+
 **Health is a two-party split.** Nuclio is the *sensor* — it watches container health and
 reports function state, but does not redeploy. Node-RED is the *actuator* — the reconcile
 loop reads state and is the only thing that redeploys (self-heal). They don't fight; the

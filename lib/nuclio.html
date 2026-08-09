@@ -740,6 +740,16 @@ rev /dev/stdin
                     alert('Error redeploying: ' + JSON.stringify(e));
                 });
             })
+            $('#nuclio-rebuild').on('click', function() {
+                ajaxJson({
+                    url: `/nuclio/api/functions/deploy?id=${node.id}&rebuild=true`,
+                    method: 'POST',
+                }).done(function(data) {
+                    console.log(data);
+                }).fail((e) => {
+                    alert('Error rebuilding: ' + JSON.stringify(e));
+                });
+            })
             $('#nuclio-generate-name').on('click', function() {
                 let name = randomEndpoint();
                 let existing = getUniqueValues(node, n=>n.name);
@@ -1132,6 +1142,7 @@ rev /dev/stdin
                     </div>
                     <div class="nuclio-status-actions">
                         <a id="nuclio-dashboard-link" href="about:blank" target="_blank" rel="noopener noreferrer">Dashboard</a>
+                        <button id="nuclio-rebuild" title="Re-fetch the source and rebuild the image (picks up new commits behind an unchanged git/archive URL)">Rebuild</button>
                         <button id="nuclio-redeploy">Redeploy</button>
                     </div>
                 </div>
