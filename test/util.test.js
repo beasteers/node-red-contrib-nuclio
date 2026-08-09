@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign } = require('../lib/util');
+const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, stableStringify, hashConfig } = require('../lib/util');
 
 
 /* ----------------------------------- diff ---------------------------------- */
@@ -90,4 +90,20 @@ test('nestedAssign rejects prototype-chain keys instead of polluting', () => {
     assert.throws(() => nestedAssign({}, 'constructor.prototype.polluted', 'yes'), /Unsafe key/);
     assert.throws(() => nestedAssign({}, 'spec.__proto__', 'yes'), /Unsafe key/);
     assert.equal({}.polluted, undefined);
+});
+
+/* ------------------------------ stable hashing ------------------------------ */
+
+test('stableStringify is independent of key order, preserves array order', () => {
+    assert.equal(stableStringify({ b: 1, a: 2 }), stableStringify({ a: 2, b: 1 }));
+    assert.equal(stableStringify({ x: { d: 1, c: [1, 2] } }), '{"x":{"c":[1,2],"d":1}}');
+    // array order is meaningful (e.g. env vars) - not sorted
+    assert.notEqual(stableStringify([{ name: 'A' }, { name: 'B' }]), stableStringify([{ name: 'B' }, { name: 'A' }]));
+});
+
+test('hashConfig is deterministic and sensitive to changes', () => {
+    const a = hashConfig({ spec: { env: [{ name: 'A', value: '1' }], build: { functionSourceCode: 'eA==' } } });
+    const b = hashConfig({ spec: { build: { functionSourceCode: 'eA==' }, env: [{ name: 'A', value: '1' }] } });
+    assert.equal(a, b);  // key order irrelevant
+    assert.notEqual(a, hashConfig({ spec: { env: [{ name: 'A', value: '2' }], build: { functionSourceCode: 'eA==' } } }));
 });

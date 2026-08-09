@@ -7,6 +7,7 @@ const { test, before, after, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const helper = require('node-red-node-test-helper');
 const nuclioNodes = require('../lib/nuclio.js');
+const { HASH_ANNOTATION, BUILD_HASH_ANNOTATION } = require('../lib/nuclio-api.js');
 const { startMockNuclio } = require('./helpers/mock-nuclio');
 
 helper.init(require.resolve('node-red'), { logging: { console: { level: 'off' } } });
@@ -134,6 +135,90 @@ test('numeric-only config change deploys via PUT, skipping the build', async () 
     assert.equal(put.body.spec.minReplicas, 2);
     // no build inputs changed: rebuild is skipped
     assert.equal(put.body.metadata.annotations['skip-build'], 'true');
+});
+
+test('deploys stamp config + build hash annotations', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.match(req.body.metadata.annotations[HASH_ANNOTATION], /^[0-9a-f]{64}$/);
+    assert.match(req.body.metadata.annotations[BUILD_HASH_ANNOTATION], /^[0-9a-f]{64}$/);
+    await waitReady(helper.getNode('fn'));
+});
+
+test('matching config hash is a no-op even if the live spec drifted', async () => {
+    // hash-based detection trusts the fingerprint over a deep-diff of server
+    // state, so out-of-band edits are not churned back on every reconcile
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    await waitReady(helper.getNode('fn'));
+    await helper.unload();
+
+    // someone edits the function out-of-band (hash annotation stays)
+    mock.functions[FN].spec.minReplicas = 9;
+    mock.requests.length = 0;
+
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+    assert.deepEqual(mock.requests.filter(isDeployWrite), []);
+});
+
+test('a legacy function (no hash) is migrated via one PUT that stamps the hashes', async () => {
+    const legacy = {
+        apiVersion: 'nuclio.io/v1',
+        kind: 'Function',
+        metadata: {
+            name: FN,
+            labels: { 'nuclio.io/project-name': 'default' },
+            annotations: { 'nuclio.io/generated-by': 'node-red' },
+        },
+        spec: {
+            runtime: 'python:3.12',
+            handler: 'main:handler',
+            build: { functionSourceCode: Buffer.from('x = 1').toString('base64') },
+            env: [],
+        },
+    };
+    mock = await startMockNuclio({ functions: { [FN]: legacy } });
+    await load(baseFlow(mock));
+
+    // unchanged build inputs -> migration PUT skips the rebuild...
+    const put = await mock.waitFor(r => r.method === 'PUT');
+    assert.equal(put.body.metadata.annotations['skip-build'], 'true');
+    // ...and stamps the hashes so future deploys are hash-based
+    assert.match(put.body.metadata.annotations[HASH_ANNOTATION], /^[0-9a-f]{64}$/);
+    assert.match(put.body.metadata.annotations[BUILD_HASH_ANNOTATION], /^[0-9a-f]{64}$/);
+    await waitReady(helper.getNode('fn'));
+    await helper.unload();
+
+    // second deploy is now a hash-based no-op
+    mock.requests.length = 0;
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+    assert.deepEqual(mock.requests.filter(isDeployWrite), []);
+});
+
+test('build-hash change rebuilds; non-build change after migration skips build', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    await helper.unload();
+
+    // code change -> build hash differs -> no skip-build
+    mock.requests.length = 0;
+    await load(baseFlow(mock, { code: 'x = 2' }));
+    let put = await mock.waitFor(r => r.method === 'PUT');
+    assert.equal(put.body.metadata.annotations['skip-build'], undefined);
+    await waitReady(helper.getNode('fn'));
+    await helper.unload();
+
+    // env-only change -> build hash matches -> skip-build
+    mock.requests.length = 0;
+    await load(baseFlow(mock, { code: 'x = 2', env_vars: [{ name: 'NEW_VAR', type: 'str', value: 'v' }] }));
+    put = await mock.waitFor(r => r.method === 'PUT');
+    assert.equal(put.body.metadata.annotations['skip-build'], 'true');
+    assert.deepEqual(put.body.spec.env.find(e => e.name === 'NEW_VAR'), { name: 'NEW_VAR', value: 'v' });
 });
 
 test('secrets from the encrypted credential store land in the deployed spec', async () => {
