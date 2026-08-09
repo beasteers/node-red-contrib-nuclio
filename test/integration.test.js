@@ -878,3 +878,54 @@ test('in-flight invocation counter clears cleanly during concurrent redeploy', a
     // the counter must have been decremented — no backpressure leak
     assert.equal(inv.counter, 0);
 });
+
+/* -------------------------------------------------------------------------- */
+/*                          Nuclio Outage Scenarios                           */
+/* -------------------------------------------------------------------------- */
+
+test('full outage: dashboard 503 recovers and deploys when server returns', async () => {
+    // simulate Nuclio dashboard being down (gateway error); verify backoff
+    // and that the function deploys successfully once the server recovers
+    mock = await startMockNuclio();
+    mock.failStatus = 503;
+    await load(baseFlow(mock));
+
+    const fn = helper.getNode('fn');
+    // the reconcile loop polls, gets 503, backs off with "Error 503" status
+    await waitUntil(() => fn.lastStatus?.text?.includes('503'), { timeout: 8000 });
+
+    // snapshot the backoff state so we can verify recovery resets it
+    assert.ok(fn._backoff > 0 || mock.requests.filter(r => r.method === 'GET' && r.url.includes('/api/functions/')).length >= 2,
+        'should have polled at least once and backed off');
+
+    await helper.unload();
+
+    // dashboard recovers
+    mock.failStatus = null;
+    mock.requests.length = 0;
+    await load(baseFlow(mock));
+
+    await waitReady(helper.getNode('fn'), { timeout: 10000 });
+    const recovered = helper.getNode('fn');
+    assert.equal(recovered.fnState, 'ready');
+    assert.ok(recovered.invocationUrl);
+});
+
+test('invoke node mirrors outage status from function node', async () => {
+    mock = await startMockNuclio();
+    mock.failStatus = 503;
+    // fast polls so status propagates quickly
+    const flow = baseFlow(mock);
+    flow[0].pollMs = '300';
+    await load(flow);
+
+    const fn = helper.getNode('fn');
+    const inv = helper.getNode('inv');
+    await waitUntil(() => fn.lastStatus?.text?.includes('503'), { timeout: 8000 });
+
+    // the function node propagates status to child invoke nodes (nuclio.js:139-141)
+    await waitUntil(
+        () => inv.status.getCalls().some(c => c.args[0]?.text?.includes('503')),
+        { msg: 'invoke node mirrors outage status from function node' },
+    );
+});

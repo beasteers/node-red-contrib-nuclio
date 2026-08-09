@@ -236,3 +236,21 @@ test('waitingForScaleResourceToZero polls at 3s and blocks updates', async () =>
     assert.match(node.lastStatus.text, /Scale Resource To Zero/i);
     assert.equal(deployWrites(mock).length, 0);
 });
+
+/* ----------------------- deployFunction error paths ----------------------- */
+
+test('deployFunction warns on connectivity failure, does not trigger Catch nodes', async () => {
+    const errors = [];
+    const warns = [];
+    const node = makeNode(UNREACHABLE, {
+        error(msg) { errors.push(msg); },
+        warn(msg) { warns.push(msg); },
+    });
+
+    const ok = await deployFunction(node);
+    assert.equal(ok, false);
+    assert.equal(node.redeploying, false);
+    assert.equal(errors.length, 0, 'Catch nodes must not fire for server-outage deploy failures');
+    assert.ok(warns.length >= 1);
+    assert.match(warns[0], /not reachable/);
+});
