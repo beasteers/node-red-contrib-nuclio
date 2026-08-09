@@ -1289,9 +1289,12 @@ rev /dev/stdin
             </dl>
         </li>
     </ol>
-    <h3>Details</h3>
+        <h3>Details</h3>
     <p>Select a <b>Nuclio Function</b> config node to invoke. Optional headers,
     timeout, and concurrency cap apply per node instance.</p>
+    <p>Non-transient invocation errors are also reported to <b>Catch</b> nodes.
+    Transient connectivity errors (the function scaling or redeploying) only log a
+    warning and route to the fallback output.</p>
     <p><b>Note:</b> header values are stored with the flow (the credential type
     only masks the input). For sensitive headers, use the <code>env</code> type
     and provide the value via an environment variable.</p>

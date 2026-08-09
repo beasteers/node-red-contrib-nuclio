@@ -11,6 +11,7 @@ const http = require('http');
 //   mock.state        status.state reported for every function (default 'ready')
 //   mock.failDeploys  POST/PUT /api/functions return 500
 //   mock.invoke       (body, req) -> { status, body } for invocations
+//   mock.invokeAddress override the reported internal invocation host:port
 //   mock.requests     [{ method, url, headers, body }]
 //   mock.waitFor(matchFn, { timeout }) -> Promise<request>
 
@@ -20,6 +21,7 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
         functions,
         state,
         failDeploys: false,
+        invokeAddress: null,
         requests: [],
         invoke: (body) => ({ status: 200, body: { echo: body } }),
         waitFor: (match, { timeout = 5000 } = {}) => {
@@ -42,7 +44,7 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
         return entry;
     };
 
-    const fnStatus = () => ({ state: mock.state, internalInvocationUrls: [`127.0.0.1:${mock.port}`] });
+    const fnStatus = () => ({ state: mock.state, internalInvocationUrls: [mock.invokeAddress || `127.0.0.1:${mock.port}`] });
 
     const server = http.createServer((req, res) => {
         let raw = '';

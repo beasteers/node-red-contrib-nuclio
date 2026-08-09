@@ -1,4 +1,4 @@
-FROM nodered/node-red:latest-18
+FROM nodered/node-red:latest-20
 
 # Install
 RUN mkdir app

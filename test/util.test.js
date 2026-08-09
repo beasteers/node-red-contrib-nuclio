@@ -83,3 +83,11 @@ test('nestedAssign honors escaped dots in keys', () => {
     nestedAssign(obj, 'metadata.annotations.nuclio\\.io/x', 'v');
     assert.deepEqual(obj, { metadata: { annotations: { 'nuclio.io/x': 'v' } } });
 });
+
+test('nestedAssign rejects prototype-chain keys instead of polluting', () => {
+    assert.throws(() => nestedAssign({}, '__proto__.polluted', 'yes'), /Unsafe key/);
+    assert.throws(() => nestedAssign({}, 'a.__proto__.polluted', 'yes'), /Unsafe key/);
+    assert.throws(() => nestedAssign({}, 'constructor.prototype.polluted', 'yes'), /Unsafe key/);
+    assert.throws(() => nestedAssign({}, 'spec.__proto__', 'yes'), /Unsafe key/);
+    assert.equal({}.polluted, undefined);
+});

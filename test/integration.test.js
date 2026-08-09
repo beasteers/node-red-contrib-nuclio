@@ -85,6 +85,16 @@ test('deploys a new function: project + full spec', async () => {
     await waitReady(helper.getNode('fn'));
 });
 
+test('a trailing slash on the server address is normalized', async () => {
+    mock = await startMockNuclio();
+    const flow = baseFlow(mock);
+    flow[0].address = `${mock.url}/`;
+    await load(flow);
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(req.body.metadata.name, FN);
+    await waitReady(helper.getNode('fn'));
+});
+
 test('redeploying an unchanged function is a no-op', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));
@@ -208,6 +218,41 @@ test('function errors route to the fallback output with response details', async
     const msg = await reply;
     assert.equal(msg.statusCode, 500);
     assert.equal(msg.error.message, 'Request failed with status code 500');
+});
+
+test('non-transient invoke errors are reported exactly once (Catch fires once)', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    mock.invoke = () => ({ status: 500, body: { error: 'boom' } });
+    const inv = helper.getNode('inv');
+    inv.error.resetHistory();
+
+    const reply = nextMsg(helper.getNode('out2'));
+    inv.receive({ payload: 'hi' });
+    const msg = await reply;
+    assert.equal(msg.statusCode, 500);
+    assert.equal(inv.error.callCount, 1);  // node.error triggers Catch nodes
+    assert.match(`${inv.error.firstCall.args[0]}`, /boom/);
+});
+
+test('transient connectivity errors warn only - no Catch trigger', async () => {
+    mock = await startMockNuclio();
+    mock.invokeAddress = '127.0.0.1:1';  // closed port -> ECONNREFUSED
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    const inv = helper.getNode('inv');
+    inv.error.resetHistory();
+    inv.warn.resetHistory();
+
+    const reply = nextMsg(helper.getNode('out2'));
+    inv.receive({ payload: 'hi' });
+    const msg = await reply;
+    assert.equal(msg.error.code, 'ECONNREFUSED');
+    assert.equal(inv.error.callCount, 0);  // Catch nodes don't fire
+    assert.equal(inv.warn.callCount, 1);
 });
 
 test('invoke shows a Redeploying status while the function is redeploying', async () => {

@@ -1,6 +1,6 @@
 # Deploy Nuclio Functions with Node-Red.
 
-Deploy Nuclio Functions directly from a Node-Red script. These are essentially Python or Go HTTP endpoints that nodered calls.
+Deploy Nuclio Functions directly from a Node-Red script. These are essentially Python, Go, Node.js, or Shell HTTP endpoints that nodered calls.
 
 The "nuclio" node acts essentially like a function node, giving you a code editor. Once the node is deployed, it will deploy the function to nuclio and act as an HTTP request node, making requests to the nuclio function.
 
@@ -29,8 +29,8 @@ npm test
 npm run lint
 ```
 You can access: 
- * Node-Red dashboard [here](http://localhost:1881). 
- * The Nuclio dashboard can be found [here](http://localhost:8070).
+ * Node-Red dashboard [here](http://localhost:1882). 
+ * The Nuclio dashboard can be found [here](http://localhost:8072).
 
 ## Tuning
 
