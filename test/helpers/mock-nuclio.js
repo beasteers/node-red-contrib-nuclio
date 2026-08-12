@@ -129,7 +129,9 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
         req.on('data', c => raw += c);
         req.on('end', async () => {
             let body = raw;
-            try { body = raw ? JSON.parse(raw) : undefined; } catch { /* keep raw string */ }
+            try { body = raw ? JSON.parse(raw) : undefined; } catch {
+                body = raw;  // pass raw string so tests see the bad payload
+            }
             record(req, body);
             const send = (status, data) => {
                 res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -193,7 +195,7 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
                 const r = await mock.invoke(body, req);
                 return send(r.status, r.body);
             }
-            send(200, {});
+            send(404, { error: `unmatched route ${req.method} ${req.url}` });
         });
     });
 
