@@ -230,6 +230,17 @@ test('secrets from the encrypted credential store land in the deployed spec', as
     assert.equal(req.body.spec.build.codeEntryAttributes.s3SecretAccessKey, 'shh-cred');
 });
 
+test('status API redacts encrypted secrets', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock), {
+        fn: { secret_vars: JSON.stringify([{ name: 'spec.build.codeEntryAttributes.s3SecretAccessKey', type: 'cred', value: 'shh-cred' }]) },
+    });
+    await waitReady(helper.getNode('fn'));
+
+    const res = await helper.request().get('/nuclio/api/functions?id=fn').expect(200);
+    assert.equal(res.body.spec.build.codeEntryAttributes.s3SecretAccessKey, '[redacted]');
+});
+
 test('legacy plaintext secret_vars still deploy (pre-1.2 flows)', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {
@@ -340,6 +351,22 @@ test('transient connectivity errors warn only - no Catch trigger', async () => {
     assert.equal(inv.warn.callCount, 1);
 });
 
+test('auto invocation falls back from an unreachable internal URL to external HTTP', async () => {
+    mock = await startMockNuclio();
+    mock.invokeAddress = '127.0.0.1:1';
+    mock.externalInvocationUrls = [`http://127.0.0.1:${mock.port}`];
+    const flow = baseFlow(mock);
+    flow[0].externalInvocationProtocol = 'http';
+    await load(flow);
+    await waitReady(helper.getNode('fn'));
+
+    const reply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ payload: 'hi' });
+    const msg = await reply;
+    assert.deepEqual(msg.payload, { echo: 'hi' });
+    assert.equal(helper.getNode('fn').invocationUrl, `http://127.0.0.1:${mock.port}`);
+});
+
 test('transient HTTP failures are retried until success', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {}, { retries: '3', retryDelayMs: '10' }));
@@ -403,6 +430,23 @@ test('retries default to 0 - transient failure falls back immediately', async ()
     const msg = await reply;
     assert.equal(msg.statusCode, 503);
     assert.equal(mock.requests.filter(r => r.method === 'POST' && r.url === '/').length, 1);
+});
+
+test('closing an invoke node stops pending retries', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {}, { retries: '3', retryDelayMs: '100' }));
+    await waitReady(helper.getNode('fn'));
+
+    mock.invoke = () => ({ status: 503, body: { error: 'down' } });
+    const inv = helper.getNode('inv');
+    inv.receive({ payload: 'hi' });
+    await waitUntil(() => inv.warn.callCount >= 1, { msg: 'first retry warning' });
+    const attemptsBeforeClose = mock.requests.filter(r => r.method === 'POST' && r.url === '/').length;
+
+    await helper.unload();
+    await new Promise(r => setTimeout(r, 250));
+    const attemptsAfterClose = mock.requests.filter(r => r.method === 'POST' && r.url === '/').length;
+    assert.equal(attemptsAfterClose, attemptsBeforeClose);
 });
 
 test('invoke shows a Redeploying status while the function is redeploying', async () => {
@@ -551,7 +595,13 @@ test('unknown node ids return 404', async () => {
 test('server cadence + function recovery resolve from node config', async () => {
     mock = await startMockNuclio();
     const flow = baseFlow(mock);
-    Object.assign(flow[0], { pollMs: '250', backoffMs: '750', requestTimeoutMs: '4000' });  // server node
+    Object.assign(flow[0], {
+        pollMs: '250',
+        backoffMs: '750',
+        requestTimeoutMs: '4000',
+        invocationUrlPreference: 'external',
+        externalInvocationProtocol: 'http',
+    });  // server node
     Object.assign(flow[1], { maxSelfHealAttempts: '9', redeployDeadlineMs: '30000', autoRedeployOnError: 'true', autoRedeployOnErrorType: 'bool' });  // function node
     await load(flow);
 
@@ -559,6 +609,8 @@ test('server cadence + function recovery resolve from node config', async () => 
     assert.equal(srv.pollMs, 250);
     assert.equal(srv.backoffMs, 750);
     assert.equal(srv.requestTimeoutMs, 4000);
+    assert.equal(srv.invocationUrlPreference, 'external');
+    assert.equal(srv.externalInvocationProtocol, 'http');
 
     const fn = helper.getNode('fn');
     assert.equal(fn.maxSelfHealAttempts, 9);

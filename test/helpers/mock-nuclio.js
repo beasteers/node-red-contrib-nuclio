@@ -16,6 +16,7 @@ const http = require('http');
 //   mock.fn404ContentType  if set, 404s use this content-type instead of JSON
 //   mock.invoke         (body, req) -> { status, body } for invocations
 //   mock.invokeAddress  override the reported internal invocation host:port
+//   mock.externalInvocationUrls override the reported external invocation URLs
 //   mock.requests       [{ method, url, headers, body }]
 //   mock.waitFor(matchFn, { timeout }) -> Promise<request>
 //   mock.setFnState(name, state, [transitions])  convenience setter
@@ -60,6 +61,7 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
         failStatus: null,
         fn404ContentType: null,
         invokeAddress: null,
+        externalInvocationUrls: [],
         requests: [],
         invoke: (body) => ({ status: 200, body: { echo: body } }),
         waitFor: (match, { timeout = 5000 } = {}) => {
@@ -96,7 +98,7 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
     const fnStatus = (name) => ({
         state: currentState(name),
         internalInvocationUrls: [mock.invokeAddress || `127.0.0.1:${mock.port}`],
-        externalInvocationUrls: [],
+        externalInvocationUrls: mock.externalInvocationUrls,
     });
 
     const storeFunction = (name, body) => {

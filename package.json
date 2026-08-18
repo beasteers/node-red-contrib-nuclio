@@ -4,7 +4,8 @@
   "description": "Deploy Nuclio functions from Node-RED",
   "main": "lib/nuclio.js",
   "files": [
-    "lib"
+    "lib",
+    "scripts/migrate-nuclio-config.js"
   ],
   "scripts": {
     "test": "node --test",

@@ -54,6 +54,8 @@ field blank reproduces the old env-only behavior, so existing deployments are un
 
 | Field / Variable | Default | Purpose |
 | --- | --- | --- |
+| Invocation URL | `auto` | Prefer the internal function URL; fall back to external on connection failure. Use `external` when Node-RED runs outside the Nuclio cluster. |
+| External URL protocol | `https` | Scheme for scheme-less external URLs. Explicit `http://` or `https://` URLs are preserved. |
 | Poll interval / `NUCLIO_POLL_MS` | `1000` | Poll interval while a function is building/transitioning. |
 | Ready poll / `NUCLIO_READY_POLL_MS` | `5000` | Poll interval once a function is healthy. |
 | Backoff / `NUCLIO_BACKOFF_MS` | `5000` | First retry delay after a dashboard error (doubles each failure). |

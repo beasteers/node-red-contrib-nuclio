@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, stableStringify, hashConfig, retryBackoff } = require('../lib/util');
+const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, redactPaths, stableStringify, hashConfig, retryBackoff } = require('../lib/util');
 
 
 /* ----------------------------------- diff ---------------------------------- */
@@ -90,6 +90,14 @@ test('nestedAssign rejects prototype-chain keys instead of polluting', () => {
     assert.throws(() => nestedAssign({}, 'constructor.prototype.polluted', 'yes'), /Unsafe key/);
     assert.throws(() => nestedAssign({}, 'spec.__proto__', 'yes'), /Unsafe key/);
     assert.equal({}.polluted, undefined);
+});
+
+test('redactPaths copies and redacts escaped nested paths', () => {
+    const source = { spec: { env: [{ name: 'TOKEN', value: 'secret' }], 'a.b': { value: 'keep' } } };
+    const redacted = redactPaths(source, ['spec.env.0.value', 'spec.a\\.b.value']);
+    assert.equal(redacted.spec.env[0].value, '[redacted]');
+    assert.equal(redacted.spec['a.b'].value, '[redacted]');
+    assert.equal(source.spec.env[0].value, 'secret');
 });
 
 /* ------------------------------ stable hashing ------------------------------ */

@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getInvocationUrl } = require('../lib/nuclio-reconcile');
+const { getInvocationUrl, getInvocationUrls } = require('../lib/nuclio-reconcile');
 
 
 test('getInvocationUrl prefers the internal url', () => {
@@ -13,6 +13,23 @@ test('getInvocationUrl prefers the internal url', () => {
 test('getInvocationUrl falls back to the external url', () => {
     const url = getInvocationUrl({ status: { externalInvocationUrls: ['fn.example.com'] } }, {});
     assert.equal(url, 'https://fn.example.com');
+});
+
+test('getInvocationUrls preserves explicit schemes and supports external preference', () => {
+    const urls = getInvocationUrls({
+        status: {
+            internalInvocationUrls: ['10.0.0.1:8080'],
+            externalInvocationUrls: ['http://fn.example.com'],
+        },
+    }, { server: { invocationUrlPreference: 'external' } });
+    assert.deepEqual(urls, ['http://fn.example.com']);
+});
+
+test('getInvocationUrls applies the configured protocol to scheme-less external urls', () => {
+    const urls = getInvocationUrls({ status: { externalInvocationUrls: ['fn.example.com'] } }, {
+        server: { invocationUrlPreference: 'external', externalInvocationProtocol: 'http' },
+    });
+    assert.deepEqual(urls, ['http://fn.example.com']);
 });
 
 test('getInvocationUrl keeps the last known url when none reported', () => {

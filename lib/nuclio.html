@@ -572,6 +572,8 @@ rev /dev/stdin
             addressType: { value: 'env' },
             publicAddress: { value: 'http://localhost:8070', required: false },
             publicAddressType: { value: 'str' },
+            invocationUrlPreference: { value: 'auto' },
+            externalInvocationProtocol: { value: 'https' },
             // Connection + polling cadence (blank = NUCLIO_* env, then default).
             requestTimeoutMs: { value: '' }, requestTimeoutMsType: { value: 'num' },
             deployTimeoutMs:  { value: '' }, deployTimeoutMsType:  { value: 'num' },
@@ -848,7 +850,9 @@ rev /dev/stdin
                     const { status, metadata, spec } = data;
                     const { logs, ...statusMeta } = status;
                     const state = status.state;
-                    const safeSpec = redactSecrets(spec, node.resolvedSecretVars);
+                    // Secret paths include the top-level `spec` prefix; redact
+                    // against the same object shape returned by the API.
+                    const safeSpec = redactSecrets({ spec }, node.resolvedSecretVars).spec;
                     const tone = statusTone(state);
 
                     if (canUpdateElement(document.getElementById('nuclio-status'))) {
@@ -982,6 +986,27 @@ rev /dev/stdin
         <input type="text" id="node-config-input-publicAddress" placeholder="http://localhost:8070" />
         <div>
             <small>The address that YOU (and your browser) can reach nuclio by. This is just used for links to the nuclio dashboard and is not critical to operation. This could just be your local port forward address for simplicity.</small>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-invocationUrlPreference">Invocation URL</label>
+        <select id="node-config-input-invocationUrlPreference" class="form-control">
+            <option value="auto">Auto (internal, then external on connection failure)</option>
+            <option value="internal">Internal URL only</option>
+            <option value="external">External URL only</option>
+        </select>
+        <div>
+            <small>Use External when Node-RED runs outside the Nuclio cluster. Auto keeps the internal URL unless it is unreachable.</small>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-externalInvocationProtocol">External URL protocol</label>
+        <select id="node-config-input-externalInvocationProtocol" class="form-control">
+            <option value="https">HTTPS</option>
+            <option value="http">HTTP</option>
+        </select>
+        <div>
+            <small>Used only when Nuclio reports an external host without a scheme. Explicit http:// or https:// URLs are preserved.</small>
         </div>
     </div>
 
@@ -1327,6 +1352,10 @@ rev /dev/stdin
         <dd>Address reachable by Node-RED (typically <code>http://host:8070</code>).</dd>
         <dt>Public Nuclio Dashboard URL</dt>
         <dd>Optional public address used for links in the editor.</dd>
+        <dt>Invocation URL</dt>
+        <dd>Auto prefers the internal function URL and falls back to an external URL on connection failure. Choose External when Node-RED runs outside the Nuclio cluster.</dd>
+        <dt>External URL protocol</dt>
+        <dd>Scheme used for scheme-less external URLs reported by Nuclio. Explicit schemes are preserved.</dd>
     </dl>
 </script>
 
