@@ -20,22 +20,37 @@
         font-weight: 900;
     }
 
+    .form-row small {
+        max-width: 600px;
+    }
+
     /* ------------------------- Nuclio Function editor ------------------------ */
 
     #nuclio-tabs-content {
-        height: 100%;
-        min-height: 350px;
-        max-height: calc(100% - 95px);
+        height: auto;
+        min-height: 0;
+        max-height: none;
     }
     #nuclio-tabs-content > * {
-        height: 100%;
+        height: auto;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         justify-content: stretch;
     }
 
     #nuclio-tabs-content .node-text-editor {
-        flex-grow: 1;
+        flex: 0 1 auto;
+        height: clamp(240px, 42vh, 480px);
+        min-height: 240px;
+    }
+
+    .nuclio-tabs-row {
+        overflow-x: auto;
+    }
+    #nuclio-tabs {
+        min-width: 0 !important;
+        width: 100%;
     }
 
 
@@ -88,6 +103,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        flex-wrap: wrap;
         gap: 12px;
         margin-bottom: 12px;
     }
@@ -149,6 +165,7 @@
     }
     .nuclio-status-actions {
         display: flex;
+        flex-wrap: wrap;
         gap: 8px;
         align-items: center;
     }
@@ -167,6 +184,27 @@
         background: #1d2a33;
         color: #ffffff;
         border-color: #1d2a33;
+    }
+    .nuclio-action-feedback {
+        flex: 1 0 100%;
+        margin-top: -4px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #eef3f7;
+        color: #40515d;
+        font-size: 12px;
+    }
+    .nuclio-action-feedback[data-tone="working"] {
+        background: #fff3da;
+        color: #8a6114;
+    }
+    .nuclio-action-feedback[data-tone="ok"] {
+        background: #e7f7ee;
+        color: #147a42;
+    }
+    .nuclio-action-feedback[data-tone="error"] {
+        background: #ffe6e6;
+        color: #a51d1d;
     }
     .nuclio-status-grid {
         display: grid;
@@ -211,13 +249,14 @@
         color: #1d2a33;
     }
     .nuclio-chip-key {
-        text-transform: lowercase;
         letter-spacing: 0.02em;
         color: #5a6a76;
     }
     .nuclio-chip-value {
         font-family: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
         font-weight: 600;
+        word-break: break-word;
+        overflow-wrap: anywhere;
     }
     .nuclio-kv {
         display: grid;
@@ -260,7 +299,15 @@
         display: none;
     }
     .red-ui-editor pre.nuclio-logbox code {
-        white-space: pre;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+    .nuclio-log-entry + .nuclio-log-entry {
+        margin-top: 8px;
+    }
+    .nuclio-log-level {
+        color: #536875;
     }
     #nuclio-logs, #nuclio-deploy-logs, #nuclio-status, #nuclio-spec {
         font-family: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
@@ -269,6 +316,28 @@
     }
     #nuclio-spec {
         max-height: 320px;
+    }
+    .nuclio-form-container {
+        max-width: 520px;
+    }
+    .nuclio-form-container small {
+        width: calc(100px + 70%);
+        display: block;
+    }
+
+    @media (max-width: 560px) {
+        .nuclio-status-shell {
+            padding: 10px;
+        }
+        .nuclio-status-grid {
+            grid-template-columns: 1fr;
+        }
+        .nuclio-card.full {
+            grid-column: auto;
+        }
+        .nuclio-status-actions {
+            width: 100%;
+        }
     }
 
     /* --------------------------- Nuclio Invoke editor ------------------------ */
@@ -451,16 +520,31 @@ rev /dev/stdin
     // escape anything API/log-derived before it goes into innerHTML
     const esc = (s) => `${s}`.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+    const stripAnsi = (value) => `${value ?? ''}`
+        .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '')
+        .replace(/\u009B[0-?]*[ -/]*[@-~]/g, '')
+        .replace(/\r\n/g, '\n');
+
+    const humanizeKey = (key) => `${key}`
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\bhttp\b/gi, 'HTTP')
+        .replace(/\burl(s?)\b/gi, 'URL$1')
+        .replace(/\bapi\b/gi, 'API')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/^\w/, c => c.toUpperCase());
+
     const fmt = (obj) => Object.entries(obj).map(([k,v]) => {
         if (typeof v === 'string' && v.includes('\n')) {
-            return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${esc(k)}</span><span class="nuclio-kv-value nuclio-kv-multiline">${esc(v)}</span></div>`;
+            return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${esc(humanizeKey(k))}</span><span class="nuclio-kv-value nuclio-kv-multiline">${esc(stripAnsi(v))}</span></div>`;
         }
-        return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${esc(k)}</span><span class="nuclio-kv-value">${esc(JSON.stringify(v))}</span></div>`;
+        return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${esc(humanizeKey(k))}</span><span class="nuclio-kv-value">${esc(stripAnsi(JSON.stringify(v)))}</span></div>`;
     }).join('');
 
     const statusChips = (obj) => Object.entries(obj || {}).map(([k,v]) => {
-        const value = typeof v === 'string' ? v : JSON.stringify(v);
-        return `<span class="nuclio-chip"><span class="nuclio-chip-key">${esc(k)}</span><span class="nuclio-chip-value">${esc(value)}</span></span>`;
+        const value = stripAnsi(typeof v === 'string' ? v : JSON.stringify(v));
+        return `<span class="nuclio-chip"><span class="nuclio-chip-key">${esc(humanizeKey(k))}</span><span class="nuclio-chip-value">${esc(value)}</span></span>`;
     }).join('');
 
     // don't clobber text the user is selecting/reading
@@ -525,13 +609,21 @@ rev /dev/stdin
         },
     });
 
+    const setActionFeedback = (message, tone = 'info') => {
+        const feedback = document.getElementById('nuclio-action-feedback');
+        if (!feedback) return;
+        feedback.textContent = message || '';
+        feedback.dataset.tone = tone;
+        feedback.classList.toggle('nuclio-hidden', !message);
+    };
+
     // key/value rows: a text key + a typed value. Shared by request headers,
     // environment variables, and secret overrides.
     const initKeyValueList = (selector, items, { placeholder, defaultType, types }) => {
         const list = $(selector).editableList({
             addItem: function(row, index, data) {
-                $(`<input class='node-input-key' type="text" placeholder="${placeholder}" />`).appendTo(row).val(data.name)
-                $(`<input class='node-input-value' placeholder="value" />`).appendTo(row).attr('value', data.value).typedInput({
+                $(`<input class='node-input-key' type="text" placeholder="${placeholder}" aria-label="Name" />`).appendTo(row).val(data.name)
+                $(`<input class='node-input-value' placeholder="value" aria-label="Value" />`).appendTo(row).attr('value', data.value).typedInput({
                     defaultType: data.type || defaultType,
                     types: types,
                 });
@@ -733,33 +825,39 @@ rev /dev/stdin
             $('#node-config-input-name').on('input', updateDashboardLink);
             $('#node-config-input-project, #node-config-input-server').on('change', updateDashboardLink);
             $('#nuclio-redeploy').on('click', function() {
+                if (!window.confirm('Redeploy this Nuclio function now?')) return;
                 const btn = $(this);
                 btn.prop('disabled', true).text('Redeploying...');
+                setActionFeedback('Redeploy request in progress…', 'working');
                 ajaxJson({
                     url: `/nuclio/api/functions/deploy?id=${node.id}`,
                     method: 'POST',
-                }).done(function(data) {
-                    console.log(data);
+                }).done(function() {
+                    setActionFeedback('Redeploy request accepted. Status will refresh automatically.', 'ok');
                 }).fail((e) => {
-                    alert('Error redeploying: ' + JSON.stringify(e));
+                    const message = e?.responseJSON?.error || e?.statusText || 'Redeploy failed.';
+                    setActionFeedback(`Redeploy failed: ${message}`, 'error');
                 }).always(() => {
                     btn.prop('disabled', false).text('Redeploy');
                 });
-            })
+            });
             $('#nuclio-rebuild').on('click', function() {
+                if (!window.confirm('Rebuild this Nuclio function now? This will re-fetch its source and rebuild the image.')) return;
                 const btn = $(this);
                 btn.prop('disabled', true).text('Rebuilding...');
+                setActionFeedback('Rebuild request in progress…', 'working');
                 ajaxJson({
                     url: `/nuclio/api/functions/deploy?id=${node.id}&rebuild=true`,
                     method: 'POST',
-                }).done(function(data) {
-                    console.log(data);
+                }).done(function() {
+                    setActionFeedback('Rebuild request accepted. Status will refresh automatically.', 'ok');
                 }).fail((e) => {
-                    alert('Error rebuilding: ' + JSON.stringify(e));
+                    const message = e?.responseJSON?.error || e?.statusText || 'Rebuild failed.';
+                    setActionFeedback(`Rebuild failed: ${message}`, 'error');
                 }).always(() => {
                     btn.prop('disabled', false).text('Rebuild');
                 });
-            })
+            });
             $('#nuclio-generate-name').on('click', function() {
                 let name = randomEndpoint();
                 let existing = getUniqueValues(node, n=>n.name);
@@ -862,8 +960,12 @@ rev /dev/stdin
                     $('#nuclio-status-chip').attr('data-tone', tone);
                     $('#nuclio-status-updated').text(`Updated ${new Date().toLocaleTimeString()}`);
                     if (canUpdateElement(document.getElementById('nuclio-deploy-logs'))) {
-                        $('#nuclio-deploy-logs').html(logs?.map(({ level, message, time, name, requestID, ...log }) => //builderKind, versionInfo,
-                            `<div><b>${esc(level)}</b> ${esc(message)} ${Object.keys(log).length ? `\n<div style="padding-left: 12px;">${fmt(log)}</div>` : ''}</div>`).join('\n'));
+                        const logHtml = (logs || []).map(({ level, message, time, name, requestID, ...log }) => //builderKind, versionInfo,
+                            `<div class="nuclio-log-entry"><b class="nuclio-log-level">${esc(stripAnsi(level))}</b> ${esc(stripAnsi(message))} ${Object.keys(log).length ? `\n<div style="padding-left: 12px;">${fmt(log)}</div>` : ''}</div>`).join('\n');
+                        const deployLogs = document.getElementById('nuclio-deploy-logs');
+                        const deployCard = deployLogs?.closest('.nuclio-card');
+                        deployLogs && (deployLogs.innerHTML = logHtml);
+                        deployCard?.classList.toggle('nuclio-hidden', !logHtml.trim());
                     }
                     if (canUpdateElement(document.getElementById('nuclio-spec'))) {
                         $('#nuclio-spec').text(JSON.stringify({ metadata, spec: safeSpec }, null, 2));
@@ -881,19 +983,19 @@ rev /dev/stdin
                     method: 'GET',
                 }).done(function (data) {
                     const logHtml = Object.entries(data||{}).map(([replica, log]) => {
-                        log = typeof log === 'string' ? log : JSON.stringify(log);
-                        return `<div><b>${esc(replica)}</b> \n<div style='padding-left: 12px'>${esc(log || '-- no logs --')}</div></div>`;
+                        log = stripAnsi(typeof log === 'string' ? log : JSON.stringify(log));
+                        return `<div class="nuclio-log-entry"><b class="nuclio-log-level">${esc(stripAnsi(replica))}</b> \n<div style='padding-left: 12px'>${esc(log || '-- no logs --')}</div></div>`;
                     }).join('\n');
                     if (canUpdateElement(document.getElementById('nuclio-logs'))) {
                         $('#nuclio-logs').html(logHtml);
                     }
-                    $('#nuclio-logs').closest('.nuclio-logbox').toggleClass('nuclio-hidden', !logHtml.trim());
+                    $('#nuclio-logs').closest('.nuclio-card').toggleClass('nuclio-hidden', !logHtml.trim());
                 }).fail((e) => {
                     const message = e?.responseJSON?.error || e?.statusText || 'error';
                     if (canUpdateElement(document.getElementById('nuclio-logs'))) {
-                        $('#nuclio-logs').text(message);
+                        $('#nuclio-logs').text(stripAnsi(message));
                     }
-                    $('#nuclio-logs').closest('.nuclio-logbox').removeClass('nuclio-hidden');
+                    $('#nuclio-logs').closest('.nuclio-card').removeClass('nuclio-hidden');
                 });
             }, 2400);
 
@@ -1019,31 +1121,31 @@ rev /dev/stdin
         </div>
         <div class="form-row" style="margin-top: 10px;">
             <label for="node-config-input-pollMs">Poll interval (ms)</label>
-            <input type="text" id="node-config-input-pollMs" placeholder="1000 (building / transitioning)" />
+            <input type="text" id="node-config-input-pollMs" placeholder="1000 ms (built-in default)" />
         </div>
         <div class="form-row">
             <label for="node-config-input-readyPollMs">Ready poll (ms)</label>
-            <input type="text" id="node-config-input-readyPollMs" placeholder="5000 (healthy function)" />
+            <input type="text" id="node-config-input-readyPollMs" placeholder="5000 ms (built-in default)" />
         </div>
         <div class="form-row">
             <label for="node-config-input-backoffMs">Backoff (ms)</label>
-            <input type="text" id="node-config-input-backoffMs" placeholder="5000 (first retry; doubles each failure)" />
+            <input type="text" id="node-config-input-backoffMs" placeholder="5000 ms (built-in default)" />
         </div>
         <div class="form-row">
             <label for="node-config-input-backoffMaxMs">Backoff max (ms)</label>
-            <input type="text" id="node-config-input-backoffMaxMs" placeholder="60000 (backoff cap)" />
+            <input type="text" id="node-config-input-backoffMaxMs" placeholder="60000 ms (built-in default)" />
         </div>
         <div class="form-row">
             <label for="node-config-input-startStaggerMs">Start stagger (ms)</label>
-            <input type="text" id="node-config-input-startStaggerMs" placeholder="2000 (spread first-deploys on restart)" />
+            <input type="text" id="node-config-input-startStaggerMs" placeholder="2000 ms (built-in default)" />
         </div>
         <div class="form-row">
             <label for="node-config-input-requestTimeoutMs">Request timeout (ms)</label>
-            <input type="text" id="node-config-input-requestTimeoutMs" placeholder="10000 (status / admin calls)" />
+            <input type="text" id="node-config-input-requestTimeoutMs" placeholder="10000 ms (built-in default)" />
         </div>
         <div class="form-row">
             <label for="node-config-input-deployTimeoutMs">Deploy timeout (ms)</label>
-            <input type="text" id="node-config-input-deployTimeoutMs" placeholder="60000 (create / update calls)" />
+            <input type="text" id="node-config-input-deployTimeoutMs" placeholder="60000 ms (built-in default)" />
         </div>
     </details>
 </script>
@@ -1059,13 +1161,13 @@ rev /dev/stdin
 
 <script type="text/html" data-template-name="nuclio-function">
     <div class="form-row nuclio-tabs-row">
-        <ul style="min-width: 600px; margin-bottom: 20px;" id="nuclio-tabs"></ul>
+        <ul style="margin-bottom: 20px;" id="nuclio-tabs"></ul>
     </div>
-    <div id="nuclio-tabs-content" style="min-height: calc(100% - 25px);">
+    <div id="nuclio-tabs-content">
         <div id="nuclio-tab-app" style="display:none">
             <div class="form-row">
-                <p>
-                    <h2 style="display: inline-block;">
+                <div class="nuclio-doc-links">
+                    <h2 style="display: inline-block; margin-top: 0;">
                         <a target="_blank" href="https://docs.nuclio.io/en/stable/index.html" title="">Nuclio</a> &nbsp;&nbsp;
                     </h2>
                     <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/python/python-reference.html">Python</a> &nbsp;&nbsp;
@@ -1075,7 +1177,7 @@ rev /dev/stdin
                     <a target="_blank" href="https://docs.nuclio.io/en/stable/examples/README.html">Examples</a> &nbsp;&nbsp;
                     <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/batching.html" title="Request batching to handle multiple requests at once.">Batching</a> &nbsp;&nbsp;
                     <a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/function-configuration-reference.html" title="">Ref.</a> &nbsp;&nbsp;
-                </p>
+                </div>
             </div>
 
             <div class="form-row">
@@ -1084,7 +1186,7 @@ rev /dev/stdin
                         <span>Function Name</span>
                     </label>
                     <input type="text" id="node-config-input-name" placeholder="What should the URL endpoint be?" title="This is the URL that nodered will call to run this function." />
-                    <button id="nuclio-generate-name" class="btn btn-default" title="Generate a random name">🔀</button>
+                    <button type="button" id="nuclio-generate-name" class="btn btn-default" title="Generate a random name" aria-label="Generate a random function name">🔀</button>
                 </div>
             </div>
 
@@ -1141,7 +1243,7 @@ rev /dev/stdin
                     Secret Overrides
                 </label>
                 <p>
-                    <small>You can specify secret variables (e.g. build.codeEntryAttributes.s3SecretAccessKey: my-secret-@ccess-k3y)</small>
+                    <small>Specify secret paths such as <code>build.codeEntryAttributes.s3SecretAccessKey</code>. Values are stored in Node-RED credentials.</small>
                 </p>
                 <ol id="node-config-input-secret_vars-x"></ol>
             </div>
@@ -1154,11 +1256,11 @@ rev /dev/stdin
             </div>
             <div class="form-row">
                 <label for="node-config-input-maxSelfHealAttempts">Self-heal attempts</label>
-                <input type="text" id="node-config-input-maxSelfHealAttempts" placeholder="5 (auto-redeploys of an unhealthy function before giving up)" />
+                <input type="text" id="node-config-input-maxSelfHealAttempts" placeholder="5 (built-in default)" />
             </div>
             <div class="form-row">
                 <label for="node-config-input-redeployDeadlineMs">Redeploy deadline (ms)</label>
-                <input type="text" id="node-config-input-redeployDeadlineMs" placeholder="120000 (how long a redeploy may run before it's treated as failed)" />
+                <input type="text" id="node-config-input-redeployDeadlineMs" placeholder="120000 ms (built-in default)" />
             </div>
             <div class="form-row">
                 <label for="node-config-input-autoRedeployOnError">Auto-redeploy on error</label>
@@ -1180,10 +1282,11 @@ rev /dev/stdin
                     </div>
                     <div class="nuclio-status-actions">
                         <a id="nuclio-dashboard-link" href="about:blank" target="_blank" rel="noopener noreferrer">Dashboard</a>
-                        <button id="nuclio-rebuild" title="Re-fetch the source and rebuild the image (picks up new commits behind an unchanged git/archive URL)">Rebuild</button>
-                        <button id="nuclio-redeploy">Redeploy</button>
+                        <button type="button" id="nuclio-rebuild" title="Re-fetch the source and rebuild the image (picks up new commits behind an unchanged git/archive URL)">Rebuild</button>
+                        <button type="button" id="nuclio-redeploy">Redeploy</button>
                     </div>
                 </div>
+                <div id="nuclio-action-feedback" class="nuclio-action-feedback nuclio-hidden" role="status" aria-live="polite"></div>
                 <div class="nuclio-status-grid">
                     <section class="nuclio-card compact full">
                         <div class="nuclio-card-title">Runtime Status</div>
@@ -1208,59 +1311,61 @@ rev /dev/stdin
 </script>
 
 <script type="text/html" data-template-name="nuclio">
+    <div class="nuclio-form-container">
     <div class="form-row">
         <label for="node-input-function">
-            <span>Function</span>
+            <span>Function <span aria-hidden="true">*</span></span>
         </label>
-        <input type="text" id="node-input-function" />
+        <input type="text" id="node-input-function" aria-required="true" />
+        <small>Invoke a shared Nuclio function configuration.</small>
         <div>
-            <small>Invoke a shared Nuclio function configuration.</small>
         </div>
     </div>
     <div class="form-row">
         <label for="node-input-timeoutMs">
             <span>Timeout (ms)</span>
         </label>
-        <input type="text" id="node-input-timeoutMs" placeholder="30000" />
+        <input type="text" id="node-input-timeoutMs" inputmode="numeric" min="0" aria-describedby="node-input-timeoutMs-help" placeholder="30000" />
+        <small id="node-input-timeoutMs-help">Function call timeout in milliseconds. Blank uses <code>NUCLIO_INVOCATION_TIMEOUT_MS</code>, then <b>30,000 ms</b>.</small>
         <div>
-            <small>Function call timeout in milliseconds.</small>
         </div>
     </div>
     <div class="form-row">
         <label for="node-input-maxInFlight">
             <span>Concurrency Cap</span>
         </label>
-        <input type="text" id="node-input-maxInFlight" placeholder="0 = unlimited" />
+        <input type="text" id="node-input-maxInFlight" inputmode="numeric" min="0" aria-describedby="node-input-maxInFlight-help" placeholder="0 = unlimited" />
+        <small id="node-input-maxInFlight-help">Limits in-flight requests; excess messages go to the fallback output. Blank or <b>0</b> means unlimited.</small>
         <div>
-            <small>Limits in-flight requests; excess messages go to the fallback output.</small>
         </div>
     </div>
     <div class="form-row">
         <label for="node-input-retries">
             <span>Retries</span>
         </label>
-        <input type="text" id="node-input-retries" placeholder="0 = no retry" />
+        <input type="text" id="node-input-retries" inputmode="numeric" min="0" aria-describedby="node-input-retries-help" placeholder="0 = no retry" />
+        <small id="node-input-retries-help">Transient failures are retried this many times. Blank uses <code>NUCLIO_INVOKE_RETRIES</code>, then <b>0</b>. Retries are at-least-once.</small>
         <div>
-            <small>Transient failures (connection errors, 429/502/503/504) are retried this many times with exponential backoff. Retries are at-least-once.</small>
         </div>
     </div>
     <div class="form-row">
         <label for="node-input-retryDelayMs">
             <span>Retry Delay (ms)</span>
         </label>
-        <input type="text" id="node-input-retryDelayMs" placeholder="500 (doubles per retry)" />
+        <input type="text" id="node-input-retryDelayMs" inputmode="numeric" min="0" aria-describedby="node-input-retryDelayMs-help" placeholder="500 ms" />
+        <small id="node-input-retryDelayMs-help">First retry delay; doubles on each retry (capped at 10s). Blank uses <code>NUCLIO_INVOKE_RETRY_DELAY_MS</code>, then <b>500 ms</b>. A numeric <code>Retry-After</code> wins when larger.</small>
         <div>
-            <small>First retry delay; doubles on each retry (capped at 10s). A numeric <code>Retry-After</code> response header wins when larger.</small>
         </div>
     </div>
     <div class="form-row node-input-list-row">
         <label for="node-input-headers">
             Request Headers
         </label>
+        <small>Optional headers to include with each invocation.</small>
         <div>
-            <small>Optional headers to include with each invocation.</small>
         </div>
         <ol id="node-input-headers"></ol>
+    </div>
     </div>
 </script>
 
