@@ -1,5 +1,4 @@
-FROM nodered/node-red:latest-20
-
+FROM nodered/node-red:5.0.4-24
 # Install
 RUN mkdir app
 COPY package*.json app/
