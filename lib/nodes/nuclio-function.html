@@ -137,6 +137,7 @@
     .nuclio-status-chip[data-tone="working"] { background: #fff3da; border-color: #f0d29b; color: #9a6b15; }
     .nuclio-status-chip[data-tone="warn"] { background: #fff0e6; border-color: #f2c7aa; color: #a34811; }
     .nuclio-status-chip[data-tone="error"] { background: #ffe6e6; border-color: #f3b2b2; color: #b21c1c; }
+    .nuclio-status-chip[data-tone="unavailable"] { background: #e9f1f8; border-color: #b9ccdc; color: #315d7d; }
     .nuclio-status-chip[data-tone="idle"] { background: #eef1f4; border-color: #d7dde4; color: #4b5b66; }
     .nuclio-status-chip[data-tone="unknown"] { background: #f3f4f6; border-color: #dfe3e8; color: #6b7a86; }
     .nuclio-status-meta {
@@ -523,6 +524,7 @@ rev /dev/stdin
 
     const statusTone = (state) => {
         if (!state || typeof state !== 'string') return 'unknown';
+        if (state === 'unavailable') return 'unavailable';
         if (state === 'ready') return 'ok';
         if (state === 'error' || state === 'unhealthy') return 'error';
         if (state === 'scaledToZero') return 'idle';
@@ -657,6 +659,18 @@ rev /dev/stdin
         oneditprepare: function() {
             let node = this;
             node.originalName = node.name;
+            node.nuclioEditorDirty = false;
+
+            const markEditorDirty = () => {
+                node.nuclioEditorDirty = true;
+            };
+
+            const confirmOperationalAction = (action) => {
+                const savedState = node.nuclioEditorDirty
+                    ? 'This editor has unsaved changes. '
+                    : '';
+                return window.confirm(`${savedState}${action} uses the last saved configuration, not unsaved editor changes. Continue?`);
+            };
 
             /* ------------------------------ Buttons / Links ------------------------------ */
 
@@ -684,10 +698,10 @@ rev /dev/stdin
             $('#node-config-input-name').on('input', updateDashboardLink);
             $('#node-config-input-project, #node-config-input-server').on('change', updateDashboardLink);
             $('#nuclio-redeploy').on('click', function() {
-                if (!window.confirm('Redeploy this Nuclio function now?')) return;
+                if (!confirmOperationalAction('Redeploy the existing image for this Nuclio function now?')) return;
                 const btn = $(this);
-                btn.prop('disabled', true).text('Redeploying...');
-                setActionFeedback('Redeploy request in progress…', 'working');
+                btn.prop('disabled', true).text('Redeploying image...');
+                setActionFeedback('Redeploying the existing image. Unsaved editor changes are not included.', 'working');
                 ajaxJson({
                     url: `/nuclio/api/functions/deploy?id=${node.id}`,
                     method: 'POST',
@@ -697,14 +711,14 @@ rev /dev/stdin
                     const message = e?.responseJSON?.error || e?.statusText || 'Redeploy failed.';
                     setActionFeedback(`Redeploy failed: ${message}`, 'error');
                 }).always(() => {
-                    btn.prop('disabled', false).text('Redeploy');
+                    btn.prop('disabled', false).text('Redeploy existing image');
                 });
             });
             $('#nuclio-rebuild').on('click', function() {
-                if (!window.confirm('Rebuild this Nuclio function now? This will re-fetch its source and rebuild the image.')) return;
+                if (!confirmOperationalAction('Re-fetch the source, rebuild the image, and redeploy this Nuclio function now?')) return;
                 const btn = $(this);
-                btn.prop('disabled', true).text('Rebuilding...');
-                setActionFeedback('Rebuild request in progress…', 'working');
+                btn.prop('disabled', true).text('Rebuilding image...');
+                setActionFeedback('Rebuilding the image. Unsaved editor changes are not included.', 'working');
                 ajaxJson({
                     url: `/nuclio/api/functions/deploy?id=${node.id}&rebuild=true`,
                     method: 'POST',
@@ -714,10 +728,11 @@ rev /dev/stdin
                     const message = e?.responseJSON?.error || e?.statusText || 'Rebuild failed.';
                     setActionFeedback(`Rebuild failed: ${message}`, 'error');
                 }).always(() => {
-                    btn.prop('disabled', false).text('Rebuild');
+                    btn.prop('disabled', false).text('Rebuild image');
                 });
             });
             $('#nuclio-generate-name').on('click', function() {
+                markEditorDirty();
                 let name = randomEndpoint();
                 let existing = getUniqueValues(node, n=>n.name);
                 while (existing[name]) {
@@ -741,6 +756,8 @@ rev /dev/stdin
                 value: this.configCode || "",
                 focus: true,
             });
+            this.editor.on('change', markEditorDirty);
+            this.configeditor.on('change', markEditorDirty);
 
             $('#node-config-input-runtime').on('change', function() {
                 const runtime = $(this).val();
@@ -791,6 +808,12 @@ rev /dev/stdin
                 $('#node-config-input-' + f).typedInput({ default: node[f + 'Type'] || 'num', types: ['num','env'] });
             });
             $('#node-config-input-autoRedeployOnError').typedInput({ default: node.autoRedeployOnErrorType || 'bool', types: ['bool','env'] });
+
+            // Track edits made in the dialog so operational actions can state
+            // clearly that they use the last saved node configuration.
+            const dialogForm = $('#dialog-form');
+            dialogForm.on('input.nuclioFunctionDirty change.nuclioFunctionDirty', 'input, select, textarea', markEditorDirty);
+            dialogForm.on('click.nuclioFunctionDirty', '#node-config-input-env_vars-x button, #node-config-input-secret_vars-x button', markEditorDirty);
 
             /* --------------------------------- Status Page -------------------------------- */
 
@@ -931,13 +954,20 @@ rev /dev/stdin
                     method: 'GET',
                 }).done(renderSummary).fail((e) => {
                     const message = e?.responseJSON?.error || e?.statusText || 'Unable to load function status.';
-                    if (canUpdateElement(statusElement('nuclio-status'))) {
-                        $('#nuclio-status').html(statusChips({ error: message }));
-                    }
-                    $('#nuclio-status-state').text('error');
-                    $('#nuclio-status-chip').attr('data-tone', 'error');
-                    $('#nuclio-deployment-value').text('Unavailable');
-                    $('#nuclio-deployment-meta').text(message);
+                    if (!canUpdateElement(statusElement('nuclio-status'))) return;
+                    $('#nuclio-status').empty();
+                    $('#nuclio-status-signals').addClass('nuclio-hidden');
+                    $('#nuclio-status-state').text('unavailable');
+                    $('#nuclio-status-chip').attr('data-tone', 'unavailable');
+                    $('#nuclio-status-updated').text(`Last checked ${new Date().toLocaleTimeString()}`);
+                    $('#nuclio-deployment-value').text('Status unavailable');
+                    $('#nuclio-deployment-meta').text(`Nuclio status API unavailable: ${message}`);
+                    $('#nuclio-runtime-value').text('Unavailable');
+                    $('#nuclio-runtime-meta').text('Nuclio status API unavailable');
+                    $('#nuclio-scale-value').text('Unavailable');
+                    $('#nuclio-scale-meta').text('Nuclio status API unavailable');
+                    $('#nuclio-invocation-mode').text('Unavailable');
+                    $('#nuclio-endpoints').html('<div class="nuclio-status-section-note">Invocation endpoints unavailable.</div>');
                 });
             }, 2400);
 
@@ -980,6 +1010,8 @@ rev /dev/stdin
             delete this.configeditor;
             this.statusPoller.stop();
             delete this.statusPoller;
+            $('#dialog-form').off('.nuclioFunctionDirty');
+            delete this.nuclioEditorDirty;
 
             node.env_vars = collectKeyValueList("#node-config-input-env_vars-x");
             delete this.envList;
@@ -1000,6 +1032,8 @@ rev /dev/stdin
             delete this.configeditor;
             this.statusPoller.stop();
             delete this.statusPoller;
+            $('#dialog-form').off('.nuclioFunctionDirty');
+            delete this.nuclioEditorDirty;
             this.name = this.originalName;
             delete this.envList;
             delete this.secretList;
@@ -1135,8 +1169,8 @@ rev /dev/stdin
                     </div>
                     <div class="nuclio-status-actions">
                         <a id="nuclio-dashboard-link" href="about:blank" target="_blank" rel="noopener noreferrer">Dashboard</a>
-                        <button type="button" id="nuclio-rebuild" title="Re-fetch the source and rebuild the image (picks up new commits behind an unchanged git/archive URL)">Rebuild</button>
-                        <button type="button" id="nuclio-redeploy">Redeploy</button>
+                        <button type="button" id="nuclio-rebuild" title="Re-fetch the source and rebuild the image (picks up new commits behind an unchanged git/archive URL)">Rebuild image</button>
+                        <button type="button" id="nuclio-redeploy" title="Redeploy the last saved configuration using the existing image">Redeploy existing image</button>
                     </div>
                 </div>
                 <div id="nuclio-action-feedback" class="nuclio-action-feedback nuclio-hidden" role="status" aria-live="polite"></div>

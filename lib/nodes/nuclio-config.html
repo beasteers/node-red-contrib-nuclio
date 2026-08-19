@@ -25,7 +25,8 @@
             internalInvocationServiceHost: { value: '' },
             internalInvocationServiceHostType: { value: 'str' },
             externalInvocationProtocol: { value: 'https' },
-            // Connection + polling cadence (blank = NUCLIO_* env, then default).
+            // Shared connection, timeout, and reconciliation settings
+            // (blank = NUCLIO_* env, then default).
             requestTimeoutMs: { value: '' }, requestTimeoutMsType: { value: 'num' },
             deployTimeoutMs:  { value: '' }, deployTimeoutMsType:  { value: 'num' },
             pollMs:           { value: '' }, pollMsType:           { value: 'num' },
@@ -53,6 +54,14 @@
             // Tuning fields: numeric literal or an env-var reference, resolved on deploy.
             ['requestTimeoutMs','deployTimeoutMs','pollMs','readyPollMs','backoffMs','backoffMaxMs','startStaggerMs']
                 .forEach(function(f){ $('#node-config-input-'+f).typedInput({ default: this[f+'Type'] || 'num', types: ['num','env'] }); }.bind(this));
+
+            const updateInvocationOptionVisibility = function () {
+                const preference = $('#node-config-input-invocationUrlPreference').val();
+                $('#nuclio-service-host-row').toggle(preference === 'service');
+                $('#nuclio-external-protocol-row').toggle(preference === 'external');
+            };
+            $('#node-config-input-invocationUrlPreference').on('change', updateInvocationOptionVisibility);
+            updateInvocationOptionVisibility();
         },
     });
 
@@ -79,24 +88,24 @@
         </div>
     </div>
     <div class="form-row">
-        <label for="node-config-input-invocationUrlPreference">Invocation URL</label>
+        <label for="node-config-input-invocationUrlPreference">Invocation endpoint source</label>
         <select id="node-config-input-invocationUrlPreference" class="form-control">
-            <option value="service">Service Name</option>
-            <option value="internal">Internal URL</option>
-            <option value="external">External URL</option>
+            <option value="service">Stable service hostname</option>
+            <option value="internal">Nuclio-reported internal URL</option>
+            <option value="external">Nuclio-reported external URL</option>
         </select>
         <div>
-            <small>Choose exactly which endpoint source to use. Service Name avoids stale container or pod IP metadata.</small>
+            <small>Choose exactly which endpoint source Node-RED should call. A stable service hostname avoids stale container or pod IP metadata.</small>
         </div>
     </div>
-    <div class="form-row">
-        <label for="node-config-input-internalInvocationServiceHost">Service hostname template</label>
-        <input type="text" id="node-config-input-internalInvocationServiceHost" placeholder="nuclio-{function}" />
+    <div class="form-row" id="nuclio-service-host-row">
+        <label for="node-config-input-internalInvocationServiceHost">Stable service hostname template</label>
+        <input type="text" id="node-config-input-internalInvocationServiceHost" placeholder="nuclio-{function} (Kubernetes default)" />
         <div>
-            <small>Used by Service Name and Auto. Use <code>{function}</code> for the function name. Kubernetes typically uses <code>nuclio-{function}</code>; this Docker Compose setup uses <code>nuclio-nuclio-{function}</code>. Blank uses <code>NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST</code>, then the Kubernetes-style default.</small>
+            <small>Used only with Stable service hostname. Use <code>{function}</code> for the function name. Leave blank to use <code>NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST</code>, then the Kubernetes default <code>nuclio-{function}</code>. Docker Compose commonly needs <code>nuclio-nuclio-{function}</code>.</small>
         </div>
     </div>
-    <div class="form-row">
+    <div class="form-row" id="nuclio-external-protocol-row">
         <label for="node-config-input-externalInvocationProtocol">External URL protocol</label>
         <select id="node-config-input-externalInvocationProtocol" class="form-control">
             <option value="https">HTTPS</option>
@@ -107,12 +116,12 @@
         </div>
     </div>
 
-    <!-- ------------------------------- Tuning ------------------------------- -->
+    <!-- ------------------------- Reconciliation / timeouts ------------------------- -->
 
     <details style="margin-top: 12px;">
-        <summary style="cursor: pointer; font-weight: 600;">Tuning (optional)</summary>
+        <summary style="cursor: pointer; font-weight: 600;">Reconciliation (optional)</summary>
         <div style="margin-top: 8px;">
-            <small>Leave blank to use the <code>NUCLIO_*</code> environment variable, then the built-in default. Changing a value takes effect on the next Deploy &mdash; no Node-RED restart needed. All shared by every function on this server.</small>
+            <small>Controls how Node-RED polls and recovers functions on this server. Leave blank to use the <code>NUCLIO_*</code> environment variable, then the built-in default. These values are shared by every function using this server.</small>
         </div>
         <div class="form-row" style="margin-top: 10px;">
             <label for="node-config-input-pollMs">Poll interval (ms)</label>
@@ -134,7 +143,14 @@
             <label for="node-config-input-startStaggerMs">Start stagger (ms)</label>
             <input type="text" id="node-config-input-startStaggerMs" placeholder="2000 ms (built-in default)" />
         </div>
-        <div class="form-row">
+    </details>
+
+    <details style="margin-top: 8px;">
+        <summary style="cursor: pointer; font-weight: 600;">Timeouts (optional)</summary>
+        <div style="margin-top: 8px;">
+            <small>Controls HTTP and deployment request deadlines. Leave blank to use the <code>NUCLIO_*</code> environment variable, then the built-in default. These values are shared by every function using this server.</small>
+        </div>
+        <div class="form-row" style="margin-top: 10px;">
             <label for="node-config-input-requestTimeoutMs">Request timeout (ms)</label>
             <input type="text" id="node-config-input-requestTimeoutMs" placeholder="10000 ms (built-in default)" />
         </div>
@@ -153,8 +169,8 @@
         <dd>Address reachable by Node-RED (typically <code>http://host:8070</code>).</dd>
         <dt>Public Nuclio Dashboard URL</dt>
         <dd>Optional public address used for links in the editor.</dd>
-        <dt>Invocation URL</dt>
-        <dd>Choose Service Name, Internal URL, or External URL. Service Name uses the configured stable service hostname template.</dd>
+        <dt>Invocation endpoint source</dt>
+        <dd>Choose a stable service hostname or a Nuclio-reported internal or external URL.</dd>
         <dt>External URL protocol</dt>
         <dd>Scheme used for scheme-less external URLs reported by Nuclio. Explicit schemes are preserved.</dd>
     </dl>
