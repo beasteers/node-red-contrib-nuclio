@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getInvocationUrl, getInvocationUrls, serviceInvocationUrl } = require('../lib/nuclio-reconcile');
+const { getInvocationUrl, getInvocationUrls, serviceInvocationUrl } = require('../lib/nuclio-invocation-urls');
 
 
 test('internal preference uses the reported internal url', () => {
@@ -54,7 +54,6 @@ test('service preference accepts a Docker hostname template', () => {
 
 test('internal preference preserves the reported internal URL', () => {
     const urls = getInvocationUrls({ status: { internalInvocationUrls: ['172.18.0.9:8080'] } }, {
-        name: 'dewlit-logic',
         server: { invocationUrlPreference: 'internal' },
     });
     assert.deepEqual(urls, ['http://172.18.0.9:8080']);
