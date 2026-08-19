@@ -64,8 +64,7 @@ field blank reproduces the old env-only behavior, so existing deployments are un
 
 | Field / Variable | Default | Purpose |
 | --- | --- | --- |
-| Invocation URL | `auto` | Prefer the internal function URL; fall back to external on connection failure. Use `external` when Node-RED runs outside the Nuclio cluster. |
-| Internal endpoint source / `NUCLIO_INTERNAL_INVOCATION_MODE` | `dashboard` | `dashboard` trusts Nuclio's reported internal URLs; `service` uses a stable service hostname template. The template is configured by `NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST`; Kubernetes commonly uses `nuclio-{function}`, while Compose sets `nuclio-nuclio-{function}`. |
+| Invocation URL / `NUCLIO_INVOCATION_URL_PREFERENCE` | `service` | Choose `service`, `internal`, or `external`. The service template is configured by `NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST`; Kubernetes commonly uses `nuclio-{function}`, while Compose sets `nuclio-nuclio-{function}`. |
 | External URL protocol | `https` | Scheme for scheme-less external URLs. Explicit `http://` or `https://` URLs are preserved. |
 | Poll interval / `NUCLIO_POLL_MS` | `1000` | Poll interval while a function is building/transitioning. |
 | Ready poll / `NUCLIO_READY_POLL_MS` | `5000` | Poll interval once a function is healthy. |

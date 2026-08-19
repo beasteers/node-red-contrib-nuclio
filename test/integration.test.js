@@ -29,7 +29,7 @@ const FN = 'test-fn';
 
 // default flow: server config + function config + invoke node + output helpers
 const baseFlow = (mock, fn = {}, inv = {}) => [
-    { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str' },
+    { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str', invocationUrlPreference: 'internal' },
     { id: 'fn', type: 'nuclio-function', server: 'srv', name: FN, runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [], secret_vars: [], ...fn },
     { id: 'inv', type: 'nuclio', function: 'fn', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1'], ['out2']], ...inv },
     { id: 'out1', type: 'helper' },
@@ -371,7 +371,7 @@ test('transient connectivity errors warn only - no Catch trigger', async () => {
     assert.equal(inv.warn.callCount, 1);
 });
 
-test('auto invocation falls back from an unreachable internal URL to external HTTP', async () => {
+test('internal invocation does not fall back to external HTTP', async () => {
     mock = await startMockNuclio();
     mock.invokeAddress = '127.0.0.1:1';
     mock.externalInvocationUrls = [`http://127.0.0.1:${mock.port}`];
@@ -380,11 +380,11 @@ test('auto invocation falls back from an unreachable internal URL to external HT
     await load(flow);
     await waitReady(helper.getNode('fn'));
 
-    const reply = nextMsg(helper.getNode('out1'));
+    const reply = nextMsg(helper.getNode('out2'));
     helper.getNode('inv').receive({ payload: 'hi' });
     const msg = await reply;
-    assert.deepEqual(msg.payload, { echo: 'hi' });
-    assert.equal(helper.getNode('fn').invocationUrl, `http://127.0.0.1:${mock.port}`);
+    assert.equal(msg.error.code, 'ECONNREFUSED');
+    assert.equal(helper.getNode('fn').invocationUrl, 'http://127.0.0.1:1');
 });
 
 test('transient HTTP failures are retried until success', async () => {
@@ -855,7 +855,7 @@ test('non-JSON 404 (proxy) backoffs instead of deploying', async () => {
 test('multiple functions deploy independently on the same server', async () => {
     mock = await startMockNuclio();
     const flow = [
-        { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str' },
+        { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str', invocationUrlPreference: 'internal' },
         { id: 'fnA', type: 'nuclio-function', server: 'srv', name: 'fn-a', runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [], secret_vars: [] },
         { id: 'fnB', type: 'nuclio-function', server: 'srv', name: 'fn-b', runtime: 'golang', code: 'y = 1', configCode: '', env_vars: [], secret_vars: [] },
         { id: 'invA', type: 'nuclio', function: 'fnA', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1A'], ['out2A']] },

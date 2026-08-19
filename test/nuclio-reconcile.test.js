@@ -3,15 +3,17 @@ const assert = require('node:assert/strict');
 const { getInvocationUrl, getInvocationUrls, serviceInvocationUrl } = require('../lib/nuclio-reconcile');
 
 
-test('getInvocationUrl prefers the internal url', () => {
+test('internal preference uses the reported internal url', () => {
     const url = getInvocationUrl({
         status: { internalInvocationUrls: ['10.0.0.1:8080'], externalInvocationUrls: ['fn.example.com'] },
-    }, {});
+    }, { server: { invocationUrlPreference: 'internal' } });
     assert.equal(url, 'http://10.0.0.1:8080');
 });
 
-test('getInvocationUrl falls back to the external url', () => {
-    const url = getInvocationUrl({ status: { externalInvocationUrls: ['fn.example.com'] } }, {});
+test('external preference uses the reported external url', () => {
+    const url = getInvocationUrl({ status: { externalInvocationUrls: ['fn.example.com'] } }, {
+        server: { invocationUrlPreference: 'external' },
+    });
     assert.equal(url, 'https://fn.example.com');
 });
 
@@ -32,8 +34,8 @@ test('getInvocationUrls applies the configured protocol to scheme-less external 
     assert.deepEqual(urls, ['http://fn.example.com']);
 });
 
-test('service mode uses stable function DNS instead of dashboard IPs', () => {
-    const server = { invocationUrlPreference: 'internal', internalInvocationMode: 'service' };
+test('service preference uses stable function DNS instead of dashboard IPs', () => {
+    const server = { invocationUrlPreference: 'service' };
     const urls = getInvocationUrls({ status: { internalInvocationUrls: ['172.18.0.9:8080'] } }, {
         name: 'dewlit-logic',
         server,
@@ -42,24 +44,26 @@ test('service mode uses stable function DNS instead of dashboard IPs', () => {
     assert.equal(serviceInvocationUrl('endless-api', server), 'http://nuclio-endless-api:8080');
 });
 
-test('service mode accepts a Docker hostname template', () => {
+test('service preference accepts a Docker hostname template', () => {
     const server = {
-        invocationUrlPreference: 'internal',
-        internalInvocationMode: 'service',
+        invocationUrlPreference: 'service',
         internalInvocationServiceHost: 'nuclio-nuclio-{function}',
     };
     assert.equal(serviceInvocationUrl('endless-api', server), 'http://nuclio-nuclio-endless-api:8080');
 });
 
-test('dashboard mode preserves the reported internal URL', () => {
+test('internal preference preserves the reported internal URL', () => {
     const urls = getInvocationUrls({ status: { internalInvocationUrls: ['172.18.0.9:8080'] } }, {
         name: 'dewlit-logic',
-        server: { invocationUrlPreference: 'internal', internalInvocationMode: 'dashboard' },
+        server: { invocationUrlPreference: 'internal' },
     });
     assert.deepEqual(urls, ['http://172.18.0.9:8080']);
 });
 
 test('getInvocationUrl keeps the last known url when none reported', () => {
-    const url = getInvocationUrl({ status: {} }, { invocationUrl: 'http://10.0.0.9:8080' });
+    const url = getInvocationUrl({ status: {} }, {
+        invocationUrl: 'http://10.0.0.9:8080',
+        server: { invocationUrlPreference: 'service' },
+    });
     assert.equal(url, 'http://10.0.0.9:8080');
 });

@@ -669,8 +669,7 @@ rev /dev/stdin
             addressType: { value: 'env' },
             publicAddress: { value: 'http://localhost:8070', required: false },
             publicAddressType: { value: 'str' },
-            invocationUrlPreference: { value: 'auto' },
-            internalInvocationMode: { value: 'auto' },
+            invocationUrlPreference: { value: 'service' },
             internalInvocationServiceHost: { value: '' },
             internalInvocationServiceHostType: { value: 'str' },
             externalInvocationProtocol: { value: 'https' },
@@ -982,9 +981,14 @@ rev /dev/stdin
                 const state = status.state || 'unknown';
                 const tone = statusTone(state);
                 const server = RED.nodes.node(node.server);
-                const preference = invocation.preference || server?.invocationUrlPreference || 'auto';
-                const source = invocation.mode === 'service' ? 'Service DNS' : invocation.mode === 'dashboard' ? 'Dashboard URL' : 'Environment / dashboard';
-                const mode = preference === 'internal' ? 'Internal first' : preference === 'external' ? 'External only' : 'Auto · internal first';
+                const preference = invocation.preference || server?.invocationUrlPreference || 'service';
+                const mode = preference === 'service'
+                    ? 'Service name'
+                    : preference === 'internal'
+                        ? 'Dashboard internal URL'
+                        : preference === 'external'
+                            ? 'External URL'
+                            : 'Service name';
                 const scaleMin = spec.minReplicas ?? '—';
                 const scaleMax = spec.maxReplicas ?? '—';
 
@@ -998,7 +1002,7 @@ rev /dev/stdin
                 $('#nuclio-runtime-meta').text(spec.handler ? `Handler: ${spec.handler}` : 'Handler not reported');
                 $('#nuclio-scale-value').text(`${scaleMin}–${scaleMax}`);
                 $('#nuclio-scale-meta').text(status.readyReplicas !== undefined ? `${status.readyReplicas} ready replica(s)` : 'Configured replicas');
-                $('#nuclio-invocation-mode').text(`${source} · ${mode}`);
+                $('#nuclio-invocation-mode').text(mode);
                 if (canUpdateElement(statusElement('nuclio-status'))) {
                     const signals = { ...status };
                     delete signals.state;
@@ -1186,28 +1190,16 @@ rev /dev/stdin
             <option value="service">Service Name</option>
             <option value="internal">Internal URL</option>
             <option value="external">External URL</option>
-            <option value="auto">Auto (internal, then external on connection failure)</option>
         </select>
         <div>
-            <small>Use External when Node-RED runs outside the Nuclio cluster. Auto keeps the internal URL unless it is unreachable.</small>
-        </div>
-    </div>
-    <div class="form-row">
-        <label for="node-config-input-internalInvocationMode">Internal endpoint source</label>
-        <select id="node-config-input-internalInvocationMode" class="form-control">
-            <option value="auto">Environment / dashboard</option>
-            <option value="dashboard">Nuclio dashboard URL</option>
-            <option value="service">Service DNS</option>
-        </select>
-        <div>
-            <small>Service DNS avoids stale container IP metadata. The hostname template below is used when this is set to Service DNS.</small>
+            <small>Choose exactly which endpoint source to use. Service Name avoids stale container or pod IP metadata.</small>
         </div>
     </div>
     <div class="form-row">
         <label for="node-config-input-internalInvocationServiceHost">Service hostname template</label>
         <input type="text" id="node-config-input-internalInvocationServiceHost" placeholder="nuclio-{function}" />
         <div>
-            <small>Use <code>{function}</code> for the function name. Kubernetes typically uses <code>nuclio-{function}</code>; this Docker Compose setup uses <code>nuclio-nuclio-{function}</code>. Blank uses <code>NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST</code>, then the Kubernetes-style default.</small>
+            <small>Used by Service Name and Auto. Use <code>{function}</code> for the function name. Kubernetes typically uses <code>nuclio-{function}</code>; this Docker Compose setup uses <code>nuclio-nuclio-{function}</code>. Blank uses <code>NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST</code>, then the Kubernetes-style default.</small>
         </div>
     </div>
     <div class="form-row">
@@ -1618,7 +1610,7 @@ rev /dev/stdin
         <dt>Public Nuclio Dashboard URL</dt>
         <dd>Optional public address used for links in the editor.</dd>
         <dt>Invocation URL</dt>
-        <dd>Auto prefers the internal function URL and falls back to an external URL on connection failure. Choose External when Node-RED runs outside the Nuclio cluster.</dd>
+        <dd>Choose Service Name, Internal URL, or External URL. Service Name uses the configured stable service hostname template.</dd>
         <dt>External URL protocol</dt>
         <dd>Scheme used for scheme-less external URLs reported by Nuclio. Explicit schemes are preserved.</dd>
     </dl>
