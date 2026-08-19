@@ -7,7 +7,7 @@ const { test, before, after, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const helper = require('node-red-node-test-helper');
 const nuclioNodes = require('../lib/nuclio.js');
-const { HASH_ANNOTATION, BUILD_HASH_ANNOTATION } = require('../lib/nuclio-api.js');
+const { HASH_ANNOTATION, BUILD_HASH_ANNOTATION } = require('../lib/nuclio-deploy.js');
 const { startMockNuclio } = require('./helpers/mock-nuclio');
 
 helper.init(require.resolve('node-red'), { logging: { console: { level: 'off' } } });

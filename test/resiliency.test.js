@@ -1,7 +1,7 @@
 const { test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { reconcileStep } = require('../lib/nuclio-reconcile');
-const { deployFunction } = require('../lib/nuclio-api');
+const { deployFunction } = require('../lib/nuclio-deploy');
 const { startMockNuclio } = require('./helpers/mock-nuclio');
 
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
