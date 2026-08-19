@@ -241,6 +241,26 @@ test('status API redacts encrypted secrets', async () => {
     assert.equal(res.body.spec.build.codeEntryAttributes.s3SecretAccessKey, '[redacted]');
 });
 
+test('status summary and details are selectively returned', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock), {
+        fn: { secret_vars: JSON.stringify([{ name: 'spec.build.codeEntryAttributes.s3SecretAccessKey', type: 'cred', value: 'shh-cred' }]) },
+    });
+    await waitReady(helper.getNode('fn'));
+
+    const summary = await helper.request().get('/nuclio/api/functions?id=fn&view=summary').expect(200);
+    assert.equal(summary.body.metadata.name, FN);
+    assert.equal(summary.body.status.state, 'ready');
+    assert.equal(summary.body.spec.build, undefined);
+    assert.equal(summary.body.spec.runtime, 'python:3.12');
+
+    const spec = await helper.request().get('/nuclio/api/functions?id=fn&view=spec').expect(200);
+    assert.equal(spec.body.spec.build.codeEntryAttributes.s3SecretAccessKey, '[redacted]');
+
+    const logs = await helper.request().get('/nuclio/api/functions?id=fn&view=logs').expect(200);
+    assert.deepEqual(logs.body, { logs: [] });
+});
+
 test('legacy plaintext secret_vars still deploy (pre-1.2 flows)', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {

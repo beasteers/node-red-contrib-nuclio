@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getInvocationUrl, getInvocationUrls } = require('../lib/nuclio-reconcile');
+const { getInvocationUrl, getInvocationUrls, serviceInvocationUrl } = require('../lib/nuclio-reconcile');
 
 
 test('getInvocationUrl prefers the internal url', () => {
@@ -30,6 +30,33 @@ test('getInvocationUrls applies the configured protocol to scheme-less external 
         server: { invocationUrlPreference: 'external', externalInvocationProtocol: 'http' },
     });
     assert.deepEqual(urls, ['http://fn.example.com']);
+});
+
+test('service mode uses stable function DNS instead of dashboard IPs', () => {
+    const server = { invocationUrlPreference: 'internal', internalInvocationMode: 'service' };
+    const urls = getInvocationUrls({ status: { internalInvocationUrls: ['172.18.0.9:8080'] } }, {
+        name: 'dewlit-logic',
+        server,
+    });
+    assert.deepEqual(urls, ['http://nuclio-dewlit-logic:8080']);
+    assert.equal(serviceInvocationUrl('endless-api', server), 'http://nuclio-endless-api:8080');
+});
+
+test('service mode accepts a Docker hostname template', () => {
+    const server = {
+        invocationUrlPreference: 'internal',
+        internalInvocationMode: 'service',
+        internalInvocationServiceHost: 'nuclio-nuclio-{function}',
+    };
+    assert.equal(serviceInvocationUrl('endless-api', server), 'http://nuclio-nuclio-endless-api:8080');
+});
+
+test('dashboard mode preserves the reported internal URL', () => {
+    const urls = getInvocationUrls({ status: { internalInvocationUrls: ['172.18.0.9:8080'] } }, {
+        name: 'dewlit-logic',
+        server: { invocationUrlPreference: 'internal', internalInvocationMode: 'dashboard' },
+    });
+    assert.deepEqual(urls, ['http://172.18.0.9:8080']);
 });
 
 test('getInvocationUrl keeps the last known url when none reported', () => {

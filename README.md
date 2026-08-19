@@ -34,6 +34,16 @@ Smoke test (spins up docker-compose, deploys a real Nuclio function, invokes it)
 ```bash
 npm run smoke
 ```
+Redeploy diagnostic (snapshots Docker, Nuclio, Node-RED, and in-network probes before
+and after a targeted redeploy):
+```bash
+node scripts/diagnose-redeploy.js --function dewlit-logic --duration 90
+```
+The script discovers the Node-RED function node, triggers its normal redeploy route,
+prints state changes, and writes a JSON timeline. Use `--rebuild` to test a rebuild,
+`--node-id <id>` when flow discovery is unavailable, or `--report <path>` to choose
+the report location. It requires the running `nodered-nuclio`, `nuclio`, and function
+containers to be reachable through Docker.
 You can access: 
  * Node-Red dashboard [here](http://localhost:1882). 
  * The Nuclio dashboard can be found [here](http://localhost:8072).
@@ -55,6 +65,7 @@ field blank reproduces the old env-only behavior, so existing deployments are un
 | Field / Variable | Default | Purpose |
 | --- | --- | --- |
 | Invocation URL | `auto` | Prefer the internal function URL; fall back to external on connection failure. Use `external` when Node-RED runs outside the Nuclio cluster. |
+| Internal endpoint source / `NUCLIO_INTERNAL_INVOCATION_MODE` | `dashboard` | `dashboard` trusts Nuclio's reported internal URLs; `service` uses a stable service hostname template. The template is configured by `NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST`; Kubernetes commonly uses `nuclio-{function}`, while Compose sets `nuclio-nuclio-{function}`. |
 | External URL protocol | `https` | Scheme for scheme-less external URLs. Explicit `http://` or `https://` URLs are preserved. |
 | Poll interval / `NUCLIO_POLL_MS` | `1000` | Poll interval while a function is building/transitioning. |
 | Ready poll / `NUCLIO_READY_POLL_MS` | `5000` | Poll interval once a function is healthy. |

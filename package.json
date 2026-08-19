@@ -10,7 +10,8 @@
   "scripts": {
     "test": "node --test",
     "lint": "eslint",
-    "smoke": "bash scripts/smoke-test.sh"
+    "smoke": "bash scripts/smoke-test.sh",
+    "diagnose:redeploy": "node scripts/diagnose-redeploy.js"
   },
   "node-red": {
     "version": ">=3.0.0",
