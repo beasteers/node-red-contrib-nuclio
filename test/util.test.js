@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, redactPaths, stableStringify, hashConfig, retryBackoff } = require('../lib/util');
+const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, redactPaths, stableStringify, hashConfig, retryBackoff, isTransientErrorCode, isTransientHttpStatus, isTransientError } = require('../lib/util');
 
 
 /* ----------------------------------- diff ---------------------------------- */
@@ -125,4 +125,17 @@ test('retryBackoff doubles per attempt, caps, and honors Retry-After', () => {
     assert.equal(retryBackoff(3, 500, '1'), 2000);    // ...but not when smaller
     assert.equal(retryBackoff(1, 500, '999'), 30000); // Retry-After capped too
     assert.equal(retryBackoff(1, 500, 'garbage'), 500);  // bogus header ignored
+});
+
+/* -------------------------- transient classification -------------------------- */
+
+test('classifies transient connection errors and HTTP statuses consistently', () => {
+    assert.equal(isTransientErrorCode('ECONNRESET'), true);
+    assert.equal(isTransientErrorCode('EINVAL'), false);
+    assert.equal(isTransientHttpStatus(503), true);
+    assert.equal(isTransientHttpStatus(504), true);
+    assert.equal(isTransientHttpStatus(500), false);
+    assert.equal(isTransientError({ code: 'ETIMEDOUT' }), true);
+    assert.equal(isTransientError({ response: { status: 429 } }), true);
+    assert.equal(isTransientError({ response: { status: 400 } }), false);
 });
