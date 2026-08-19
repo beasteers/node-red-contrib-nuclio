@@ -2,7 +2,7 @@
   "name": "@bea.steers/node-red-contrib-nuclio",
   "version": "1.5.0",
   "description": "Deploy Nuclio functions from Node-RED",
-  "main": "lib/nuclio.js",
+  "main": "lib/nodes/nuclio.js",
   "files": [
     "lib",
     "scripts/migrate-nuclio-config.js"
@@ -17,7 +17,6 @@
     "version": ">=3.0.0",
     "nodes": {
       "nuclio": "lib/nodes/nuclio.js",
-      "nuclio-admin": "lib/nodes/nuclio-admin.js",
       "nuclio-config": "lib/nodes/nuclio-config.js",
       "nuclio-project": "lib/nodes/nuclio-project.js",
       "nuclio-function": "lib/nodes/nuclio-function.js"

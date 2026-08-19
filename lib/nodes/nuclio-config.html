@@ -1,0 +1,161 @@
+<style>
+    .node_label_monospace {
+        font-family: monospace;
+        font-size: 0.82em;
+        font-weight: 900;
+    }
+
+    .form-row small {
+        max-width: 600px;
+    }
+
+    </style>
+
+<script type="text/javascript">/* ------------------------------ Nuclio Server ----------------------------- */
+
+    RED.nodes.registerType('nuclio-config', {
+        category: 'config',
+        icon: "nuclio.io.ico",
+        defaults: {
+            address: { value: 'NUCLIO_ADDRESS', required: true },
+            addressType: { value: 'env' },
+            publicAddress: { value: 'http://localhost:8070', required: false },
+            publicAddressType: { value: 'str' },
+            invocationUrlPreference: { value: 'service' },
+            internalInvocationServiceHost: { value: '' },
+            internalInvocationServiceHostType: { value: 'str' },
+            externalInvocationProtocol: { value: 'https' },
+            // Connection + polling cadence (blank = NUCLIO_* env, then default).
+            requestTimeoutMs: { value: '' }, requestTimeoutMsType: { value: 'num' },
+            deployTimeoutMs:  { value: '' }, deployTimeoutMsType:  { value: 'num' },
+            pollMs:           { value: '' }, pollMsType:           { value: 'num' },
+            readyPollMs:      { value: '' }, readyPollMsType:      { value: 'num' },
+            backoffMs:        { value: '' }, backoffMsType:        { value: 'num' },
+            backoffMaxMs:     { value: '' }, backoffMaxMsType:     { value: 'num' },
+            startStaggerMs:   { value: '' }, startStaggerMsType:   { value: 'num' },
+        },
+        label: function () {
+            return this.publicAddress || this.address || 'Nuclio Server';
+        },
+        oneditprepare: function () {
+            $('#node-config-input-address').typedInput({
+                default: this.addressType,
+                types: ['str', 'global', 'env'],
+            });
+            $('#node-config-input-publicAddress').typedInput({
+                default: this.publicAddressType,
+                types: ['str', 'global', 'env'],
+            });
+            $('#node-config-input-internalInvocationServiceHost').typedInput({
+                default: this.internalInvocationServiceHostType || 'str',
+                types: ['str', 'env'],
+            });
+            // Tuning fields: numeric literal or an env-var reference, resolved on deploy.
+            ['requestTimeoutMs','deployTimeoutMs','pollMs','readyPollMs','backoffMs','backoffMaxMs','startStaggerMs']
+                .forEach(function(f){ $('#node-config-input-'+f).typedInput({ default: this[f+'Type'] || 'num', types: ['num','env'] }); }.bind(this));
+        },
+    });
+
+    
+</script>
+
+<script type="text/html" data-template-name="nuclio-config">
+    <div class="form-row">
+        <label for="node-config-input-address">
+            <span>Nuclio Dashboard URL:</span>
+        </label>
+        <input type="text" id="node-config-input-address" placeholder="http://localhost:8070" />
+        <div>
+            <small>The address that node-red can reach nuclio at. (typically port 8070)</small>
+        </div>
+    </div>    
+    <div class="form-row">
+        <label for="node-config-input-publicAddress">
+            <span>Public Nuclio Dashboard URL (optional)</span>
+        </label>
+        <input type="text" id="node-config-input-publicAddress" placeholder="http://localhost:8070" />
+        <div>
+            <small>The address that YOU (and your browser) can reach nuclio by. This is just used for links to the nuclio dashboard and is not critical to operation. This could just be your local port forward address for simplicity.</small>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-invocationUrlPreference">Invocation URL</label>
+        <select id="node-config-input-invocationUrlPreference" class="form-control">
+            <option value="service">Service Name</option>
+            <option value="internal">Internal URL</option>
+            <option value="external">External URL</option>
+        </select>
+        <div>
+            <small>Choose exactly which endpoint source to use. Service Name avoids stale container or pod IP metadata.</small>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-internalInvocationServiceHost">Service hostname template</label>
+        <input type="text" id="node-config-input-internalInvocationServiceHost" placeholder="nuclio-{function}" />
+        <div>
+            <small>Used by Service Name and Auto. Use <code>{function}</code> for the function name. Kubernetes typically uses <code>nuclio-{function}</code>; this Docker Compose setup uses <code>nuclio-nuclio-{function}</code>. Blank uses <code>NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST</code>, then the Kubernetes-style default.</small>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-externalInvocationProtocol">External URL protocol</label>
+        <select id="node-config-input-externalInvocationProtocol" class="form-control">
+            <option value="https">HTTPS</option>
+            <option value="http">HTTP</option>
+        </select>
+        <div>
+            <small>Used only when Nuclio reports an external host without a scheme. Explicit http:// or https:// URLs are preserved.</small>
+        </div>
+    </div>
+
+    <!-- ------------------------------- Tuning ------------------------------- -->
+
+    <details style="margin-top: 12px;">
+        <summary style="cursor: pointer; font-weight: 600;">Tuning (optional)</summary>
+        <div style="margin-top: 8px;">
+            <small>Leave blank to use the <code>NUCLIO_*</code> environment variable, then the built-in default. Changing a value takes effect on the next Deploy &mdash; no Node-RED restart needed. All shared by every function on this server.</small>
+        </div>
+        <div class="form-row" style="margin-top: 10px;">
+            <label for="node-config-input-pollMs">Poll interval (ms)</label>
+            <input type="text" id="node-config-input-pollMs" placeholder="1000 ms (built-in default)" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-readyPollMs">Ready poll (ms)</label>
+            <input type="text" id="node-config-input-readyPollMs" placeholder="5000 ms (built-in default)" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-backoffMs">Backoff (ms)</label>
+            <input type="text" id="node-config-input-backoffMs" placeholder="5000 ms (built-in default)" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-backoffMaxMs">Backoff max (ms)</label>
+            <input type="text" id="node-config-input-backoffMaxMs" placeholder="60000 ms (built-in default)" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-startStaggerMs">Start stagger (ms)</label>
+            <input type="text" id="node-config-input-startStaggerMs" placeholder="2000 ms (built-in default)" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-requestTimeoutMs">Request timeout (ms)</label>
+            <input type="text" id="node-config-input-requestTimeoutMs" placeholder="10000 ms (built-in default)" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-deployTimeoutMs">Deploy timeout (ms)</label>
+            <input type="text" id="node-config-input-deployTimeoutMs" placeholder="60000 ms (built-in default)" />
+        </div>
+    </details>
+</script>
+
+<script type="text/html" data-help-name="nuclio-config">
+    <p>Defines the Nuclio dashboard address used by Node-RED.</p>
+    <h3>Fields</h3>
+    <dl class="message-properties">
+        <dt>Nuclio Dashboard URL</dt>
+        <dd>Address reachable by Node-RED (typically <code>http://host:8070</code>).</dd>
+        <dt>Public Nuclio Dashboard URL</dt>
+        <dd>Optional public address used for links in the editor.</dd>
+        <dt>Invocation URL</dt>
+        <dd>Choose Service Name, Internal URL, or External URL. Service Name uses the configured stable service hostname template.</dd>
+        <dt>External URL protocol</dt>
+        <dd>Scheme used for scheme-less external URLs reported by Nuclio. Explicit schemes are preserved.</dd>
+    </dl>
+</script>

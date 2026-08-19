@@ -1,0 +1,53 @@
+<style>
+    .node_label_monospace {
+        font-family: monospace;
+        font-size: 0.82em;
+        font-weight: 900;
+    }
+
+    .form-row small {
+        max-width: 600px;
+    }
+
+    </style>
+
+<script type="text/javascript">/* ----------------------------- Nuclio Project ----------------------------- */
+
+    RED.nodes.registerType('nuclio-project', {
+        category: 'config',
+        icon: "nuclio.io.ico",
+        defaults: {
+            name: { value: 'default' },
+            nameType: { value: 'str' },
+        },
+        label: function () {
+            return this.name || 'default';
+        },
+        oneditprepare: function () {
+            $('#node-project-input-name').typedInput({
+                default: this.nameType,
+                types: ['str', 'global', 'env'],
+            });
+        },
+    });
+
+    
+</script>
+
+<script type="text/html" data-template-name="nuclio-project">
+    <div class="form-row">
+        <label for="node-project-input-name">
+            <span>Nuclio Project Name</span>
+        </label>
+        <input type="text" id="node-project-input-name" placeholder="default" />
+    </div>
+</script>
+
+<script type="text/html" data-help-name="nuclio-project">
+    <p>Defines the Nuclio project name used for deployment.</p>
+    <h3>Fields</h3>
+    <dl class="message-properties">
+        <dt>Nuclio Project Name</dt>
+        <dd>Project to create or update functions within. Defaults to <code>default</code>.</dd>
+    </dl>
+</script>
