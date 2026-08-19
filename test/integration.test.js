@@ -6,7 +6,12 @@ process.env.NUCLIO_BACKOFF_MAX_MS = '400';
 const { test, before, after, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const helper = require('node-red-node-test-helper');
-const nuclioNodes = require('../lib/nuclio.js');
+const nuclioNodes = [
+    require('../lib/nuclio-config.js'),
+    require('../lib/nuclio-project.js'),
+    require('../lib/nuclio-function.js'),
+    require('../lib/nuclio.js'),
+];
 const { HASH_ANNOTATION, BUILD_HASH_ANNOTATION } = require('../lib/nuclio-deploy.js');
 const { startMockNuclio } = require('./helpers/mock-nuclio');
 

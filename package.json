@@ -16,7 +16,11 @@
   "node-red": {
     "version": ">=3.0.0",
     "nodes": {
-      "nuclio": "lib/nuclio.js"
+      "nuclio": "lib/nodes/nuclio.js",
+      "nuclio-admin": "lib/nodes/nuclio-admin.js",
+      "nuclio-config": "lib/nodes/nuclio-config.js",
+      "nuclio-project": "lib/nodes/nuclio-project.js",
+      "nuclio-function": "lib/nodes/nuclio-function.js"
     }
   },
   "repository": {
