@@ -1375,16 +1375,6 @@ rev /dev/stdin
                 <input type="text" id="node-config-input-project" placeholder="default" />
             </div>
             <div class="form-row">
-                <label for="node-config-input-deploymentMode">Deployment mode</label>
-                <select id="node-config-input-deploymentMode" class="form-control">
-                    <option value="eager">Eager</option>
-                    <option value="lazy">Lazy</option>
-                </select>
-                <div>
-                    <small><b>Eager</b> deploys when Node-RED starts. <b>Lazy</b> waits for an input command such as <code>deploy</code>; ordinary messages are gated until the function is ready.</small>
-                </div>
-            </div>
-            <div class="form-row">
                 <h2>Function Config [<a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/function-configuration-reference.html" title="">docs</a>]:</h2>
                 <p>
                 </p>
@@ -1409,6 +1399,16 @@ rev /dev/stdin
                     <small>Specify secret paths such as <code>spec.build.codeEntryAttributes.s3SecretAccessKey</code>. Values are stored in Node-RED credentials.</small>
                 </p>
                 <ol id="node-config-input-secret_vars-x"></ol>
+            </div>
+            <div class="form-row">
+                <label for="node-config-input-deploymentMode">Deployment mode</label>
+                <select id="node-config-input-deploymentMode" class="form-control">
+                    <option value="eager">Eager</option>
+                    <option value="lazy">Lazy</option>
+                </select>
+                <div>
+                    <small><b>Eager</b> deploys when Node-RED starts. <b>Lazy</b> waits for an input command such as <code>deploy</code>; ordinary messages are gated until the function is ready.</small>
+                </div>
             </div>
 
             <div class="form-row">
