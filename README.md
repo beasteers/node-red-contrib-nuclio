@@ -22,6 +22,13 @@ The test matrix covers Node.js 22/26 with Node-RED 4.0.0/5.0.4.
 In order to use this node, you must have the Nuclio dashboard running. It doesn't need to be public, it just needs to be accessible by Node-Red.
 
 Using the Docker Compose test install below will give you a fully functioning system to experiment with. It is a development fixture, not required by an installed package.
+The Compose fixture requires an architecture-specific dashboard image. For example:
+
+```bash
+NUCLIO_ARCH=amd64 \
+NUCLIO_DASHBOARD_IMAGE=quay.io/nuclio/dashboard:1.17.5-amd64 \
+docker compose up -d --build
+```
 
 ## Test Install
 To test/develop
@@ -159,8 +166,8 @@ guards below keep node-red from reacting to flaky verdicts:
 
 All dashboard interaction is isolated in `lib/nuclio-client.js` (endpoints, headers,
 and request shapes); state names are isolated in `lib/nuclio-states.js`. The Compose
-fixture uses dashboard **1.17.5-arm64** by default. Set `NUCLIO_DASHBOARD_IMAGE`
-and `NUCLIO_ARCH` when running it on another architecture. State handling is open-world: node-red
+fixture requires explicit `NUCLIO_DASHBOARD_IMAGE` and `NUCLIO_ARCH` values because the
+dashboard image is architecture-specific. State handling is open-world: node-red
 acts on the small known set (`ready`, `error`, `unhealthy`, `scaledToZero`, 404) and
 treats any other state as "in transition — show it and wait," so unknown future states
 degrade to observation rather than breakage. If a Nuclio release changes the API, that

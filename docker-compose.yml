@@ -16,8 +16,10 @@ services:
       - .:/usr/src/node-red/node-red-contrib-nuclio
 
   nuclio-dashboard:
-    # Override NUCLIO_DASHBOARD_IMAGE for another architecture or tag.
-    image: ${NUCLIO_DASHBOARD_IMAGE:-quay.io/nuclio/dashboard:1.17.5-arm64}
+    # Set these explicitly for the host architecture. The dashboard image is
+    # architecture-specific; failing closed avoids silently pulling arm64 on
+    # an amd64 host.
+    image: ${NUCLIO_DASHBOARD_IMAGE:?Set NUCLIO_DASHBOARD_IMAGE to an architecture-appropriate image}
     container_name: nuclio
     restart: unless-stopped
     ports:
@@ -25,7 +27,7 @@ services:
     environment:
       NUCLIO_CHECK_FUNCTION_CONTAINERS_HEALTHINESS: "true"  # not sure if this is helping
       # DOCKER_BUILDKIT: "1"
-      NUCLIO_ARCH: ${NUCLIO_ARCH:-arm64}
+      NUCLIO_ARCH: ${NUCLIO_ARCH:?Set NUCLIO_ARCH to amd64 or arm64}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config/platform.yaml:/etc/nuclio/config/platform/platform.yaml  # for the network name

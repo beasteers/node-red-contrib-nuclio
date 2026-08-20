@@ -18,6 +18,20 @@ NUCLIO_URL="http://localhost:8072"
 TIMEOUT=120  # seconds to wait for the function to become ready
 POLL_INTERVAL=3
 
+# Compose requires an explicit architecture so a production-like smoke test
+# cannot accidentally pull the ARM64 dashboard image on an x86 host.
+if [ -z "${NUCLIO_ARCH:-}" ]; then
+    case "$(uname -m)" in
+        aarch64|arm64) NUCLIO_ARCH=arm64 ;;
+        amd64|x86_64) NUCLIO_ARCH=amd64 ;;
+        *) echo "Unsupported host architecture: $(uname -m)" >&2; exit 2 ;;
+    esac
+    export NUCLIO_ARCH
+fi
+if [ -z "${NUCLIO_DASHBOARD_IMAGE:-}" ]; then
+    export NUCLIO_DASHBOARD_IMAGE="quay.io/nuclio/dashboard:1.17.5-${NUCLIO_ARCH}"
+fi
+
 cleanup() {
     echo ""
     echo -e "${YELLOW}==> Tearing down docker-compose...${NC}"

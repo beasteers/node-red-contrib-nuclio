@@ -200,6 +200,19 @@ test('numeric-only config change deploys via PUT, skipping the build', async () 
     assert.equal(put.body.metadata.annotations['skip-build'], 'true');
 });
 
+test('removing a managed spec field removes it from the update body', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, { configCode: 'spec:\n  minReplicas: 2\n' }));
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    await helper.unload();
+
+    mock.requests.length = 0;
+    await load(baseFlow(mock));
+    const put = await mock.waitFor(r => r.method === 'PUT');
+    assert.equal(put.body.spec.minReplicas, undefined);
+    assert.ok(put.body.metadata.annotations['nuclio.io/node-red-managed-spec-paths']);
+});
+
 test('deploys stamp config + build hash annotations', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));
@@ -328,6 +341,17 @@ test('status summary and details are selectively returned', async () => {
 
     const logs = await helper.request().get('/nuclio/api/functions?id=fn&view=logs').expect(200);
     assert.deepEqual(logs.body, { logs: [] });
+});
+
+test('admin errors do not expose dashboard response bodies', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    mock.failStatus = 500;
+    const res = await helper.request().get('/nuclio/api/functions?id=fn').expect(500);
+    assert.deepEqual(res.body, { error: 'Nuclio dashboard returned HTTP 500' });
+    assert.equal(JSON.stringify(res.body).includes('simulated 500'), false);
 });
 
 test('legacy plaintext secret_vars still deploy (pre-1.2 flows)', async () => {
