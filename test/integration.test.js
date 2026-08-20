@@ -386,6 +386,64 @@ test('invokes the function and returns the response on output 1', async () => {
     assert.equal(call.headers['content-type'], 'application/json');
 });
 
+test('lazy functions wait for a deploy command before accepting invocations', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, { deploymentMode: 'lazy' }));
+
+    assert.deepEqual(mock.requests, []);
+    const statusReply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ nuclio: { command: 'status' }, payload: 'control' });
+    const status = await statusReply;
+    assert.deepEqual(status.nuclio.result, {
+        state: null,
+        ready: false,
+        deploying: false,
+        deploymentMode: 'lazy',
+        activated: false,
+    });
+    assert.deepEqual(mock.requests, []);
+
+    const fallback = nextMsg(helper.getNode('out2'));
+    helper.getNode('inv').receive({ payload: 'before-deploy' });
+    const blocked = await fallback;
+    assert.equal(blocked.payload, 'before-deploy');
+    assert.deepEqual(mock.requests, []);
+
+    const deployReply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ nuclio: { command: 'deploy' }, payload: 'control' });
+    const deployed = await deployReply;
+    assert.equal(deployed.nuclio.command, 'deploy');
+    assert.equal(deployed.nuclio.result.accepted, true);
+    assert.equal(deployed.nuclio.result.ready, true);
+    assert.ok(mock.requests.some(r => r.method === 'POST' && r.url === '/api/functions'));
+
+    const invocationReply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ payload: 'after-deploy' });
+    const invocation = await invocationReply;
+    assert.deepEqual(invocation.payload, { echo: 'after-deploy' });
+});
+
+test('invoke lifecycle commands map to idempotent deploy, redeploy, and rebuild operations', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    for (const command of ['deploy', 'redeploy', 'rebuild']) {
+        mock.requests.length = 0;
+        const reply = nextMsg(helper.getNode('out1'));
+        helper.getNode('inv').receive({ nuclio: { command }, payload: command });
+        const result = await reply;
+        assert.equal(result.nuclio.command, command);
+        assert.equal(result.nuclio.result.accepted, true);
+        assert.equal(result.nuclio.result.ready, true);
+        if (command === 'rebuild') {
+            const put = mock.requests.find(r => r.method === 'PUT');
+            assert.ok(put, 'rebuild should update the function');
+            assert.equal(put.body.metadata.annotations['skip-build'], undefined);
+        }
+    }
+});
+
 test('function errors route to the fallback output with response details', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));
@@ -784,6 +842,12 @@ test('disabled deployment policy prevents startup writes and manual deploys', as
 
     const response = await helper.request().post('/nuclio/api/functions/deploy?id=fn').expect(409);
     assert.match(response.body.error, /deployment is disabled/i);
+    assert.deepEqual(mock.requests, []);
+
+    const fallback = nextMsg(helper.getNode('out2'));
+    helper.getNode('inv').receive({ nuclio: { command: 'deploy' }, payload: 'control' });
+    const command = await fallback;
+    assert.match(command.error.message, /deployment is disabled/i);
     assert.deepEqual(mock.requests, []);
 });
 

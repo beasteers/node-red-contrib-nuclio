@@ -86,6 +86,7 @@ should read from Node-RED's environment.
 
 | Field | Default | Purpose |
 | --- | --- | --- |
+| Deployment mode | `eager` | `eager` deploys on Node-RED startup; `lazy` waits for an explicit `deploy` input command. |
 | Self-heal attempts | `5` | Auto-redeploys of an unhealthy function before giving up. |
 | Redeploy deadline | `120000` | How long a redeploy may run before it's treated as failed. |
 | Auto-redeploy on error | `false` | Also auto-redeploy functions in Nuclio's `error` state. |
@@ -93,6 +94,19 @@ should read from Node-RED's environment.
 The invoke node's per-call **Timeout**, **Concurrency Cap**, **Retries**, and **Retry
 Delay** are set on the `nuclio` node itself. Each can use a numeric literal, the built-in
 default, or a typed environment value.
+
+The invoke node also accepts lifecycle commands in `msg.nuclio.command`:
+
+```js
+msg.nuclio = { command: 'deploy' }     // converge/create; activates lazy mode
+msg.nuclio = { command: 'redeploy' }   // reuse the existing image
+msg.nuclio = { command: 'rebuild' }    // force a full build
+msg.nuclio = { command: 'status' }     // return cached state without deploying
+```
+
+Command acknowledgements use the result output; command failures use the fallback
+output. Ordinary messages sent to a lazy function are gated until a deploy command
+completes successfully.
 
 Transient failures — connection errors and `429`/`502`/`503`/`504` responses (a function
 scaling or redeploying) — only log a warning (they never trigger Catch nodes), and are

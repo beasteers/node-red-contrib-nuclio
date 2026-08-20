@@ -176,6 +176,10 @@
     <dl class="message-properties">
         <dt>payload</dt>
         <dd>Request body sent to the function.</dd>
+        <dt>nuclio.command</dt>
+        <dd>Optional lifecycle command: <code>deploy</code>, <code>redeploy</code>,
+        <code>rebuild</code>, or <code>status</code>. Command messages are handled
+        by Node-RED and are never sent to the function.</dd>
     </dl>
     <h3>Outputs</h3>
     <ol class="node-ports">
@@ -221,4 +225,8 @@
     <p><b>Note:</b> header values are stored with the flow (the credential type
     only masks the input). For sensitive headers, use the <code>env</code> type
     and provide the value via an environment variable.</p>
+    <p>Commands are acknowledged on the result output and failures are sent to the
+    fallback output. <code>deploy</code> is idempotent and activates a Lazy function;
+    <code>redeploy</code> reuses the existing image; <code>rebuild</code> forces a full
+    build; <code>status</code> returns the cached lifecycle state without deploying.</p>
 </script>

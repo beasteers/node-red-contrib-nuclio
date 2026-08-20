@@ -771,6 +771,7 @@ rev /dev/stdin
             code: { value: SAMPLES.python.code },
             configCode: { value: SAMPLES.python.config },
             env_vars: { value: [] },
+            deploymentMode: { value: 'eager' },
             // legacy plaintext secrets - migrated into credentials on save
             secret_vars: { value: [] },
             // Recovery policy (blank = built-in default).
@@ -1349,6 +1350,16 @@ rev /dev/stdin
                 <input type="text" id="node-config-input-project" placeholder="default" />
             </div>
             <div class="form-row">
+                <label for="node-config-input-deploymentMode">Deployment mode</label>
+                <select id="node-config-input-deploymentMode" class="form-control">
+                    <option value="eager">Eager</option>
+                    <option value="lazy">Lazy</option>
+                </select>
+                <div>
+                    <small><b>Eager</b> deploys when Node-RED starts. <b>Lazy</b> waits for an input command such as <code>deploy</code>; ordinary messages are gated until the function is ready.</small>
+                </div>
+            </div>
+            <div class="form-row">
                 <h2>Function Config [<a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/function-configuration-reference.html" title="">docs</a>]:</h2>
                 <p>
                 </p>
@@ -1506,6 +1517,8 @@ rev /dev/stdin
     </dl>
     <h3>Details</h3>
     <p>This config node owns deployment and reconciliation. It creates or updates the
-    Nuclio function in the selected project and keeps status refreshed while open.</p>
+    Nuclio function in the selected project and keeps status refreshed while open.
+    In <b>Lazy</b> deployment mode, send a <code>deploy</code> command through a
+    connected <b>Nuclio Invoke</b> node to activate deployment.</p>
     <p>Use a separate <b>Nuclio Invoke</b> node to call the function at runtime.</p>
 </script>
