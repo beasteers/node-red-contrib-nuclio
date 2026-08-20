@@ -73,6 +73,7 @@ should read from Node-RED's environment.
 | Invocation endpoint source | `service` | Choose a stable service hostname, a Nuclio-reported internal URL, or a Nuclio-reported external URL. |
 | Stable service hostname template | `nuclio-{function}` | Leave blank for the Kubernetes default. Docker Compose commonly uses `nuclio-nuclio-{function}`. |
 | External URL protocol | `https` | Scheme for scheme-less external URLs. Explicit `http://` or `https://` URLs are preserved. |
+| Deployment policy | `managed` | Use `disabled` to prevent function creates, updates, and self-healing in this environment. Existing remote functions are left untouched. |
 | Poll interval | `1000` | Poll interval while a function is building/transitioning. |
 | Ready poll | `5000` | Poll interval once a function is healthy. |
 | Backoff | `5000` | First retry delay after a dashboard error (doubles each failure). |

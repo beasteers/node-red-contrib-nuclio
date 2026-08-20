@@ -25,6 +25,8 @@
             internalInvocationServiceHost: { value: '' },
             internalInvocationServiceHostType: { value: 'str' },
             externalInvocationProtocol: { value: 'https' },
+            deploymentPolicy: { value: 'managed' },
+            deploymentPolicyType: { value: 'str' },
             // Shared connection, timeout, and reconciliation settings
             // (blank = built-in default).
             requestTimeoutMs: { value: '' }, requestTimeoutMsType: { value: 'num' },
@@ -49,6 +51,10 @@
             });
             $('#node-config-input-internalInvocationServiceHost').typedInput({
                 default: this.internalInvocationServiceHostType || 'str',
+                types: ['str', 'env'],
+            });
+            $('#node-config-input-deploymentPolicy').typedInput({
+                default: this.deploymentPolicyType || 'str',
                 types: ['str', 'env'],
             });
             // Shared settings: numeric literal or an env-var reference, resolved on deploy.
@@ -116,6 +122,14 @@
         </div>
     </div>
 
+    <div class="form-row">
+        <label for="node-config-input-deploymentPolicy">Deployment policy</label>
+        <input type="text" id="node-config-input-deploymentPolicy" placeholder="managed (default)" />
+        <div>
+            <small>Use <code>managed</code> to create, update, and self-heal functions. Use <code>disabled</code> to prevent writes in this environment. Existing remote functions are not deleted.</small>
+        </div>
+    </div>
+
     <!-- ------------------------- Reconciliation / timeouts ------------------------- -->
 
     <details style="margin-top: 12px;">
@@ -173,5 +187,7 @@
         <dd>Choose a stable service hostname or a Nuclio-reported internal or external URL.</dd>
         <dt>External URL protocol</dt>
         <dd>Scheme used for scheme-less external URLs reported by Nuclio. Explicit schemes are preserved.</dd>
+        <dt>Deployment policy</dt>
+        <dd><code>managed</code> (the default) allows deployment and self-healing. <code>disabled</code> prevents writes and leaves existing remote functions untouched. The value can use the <code>env</code> type.</dd>
     </dl>
 </script>

@@ -769,6 +769,40 @@ test('an env-typed config field reads the named env var at deploy time', async (
     }
 });
 
+test('disabled deployment policy prevents startup writes and manual deploys', async () => {
+    mock = await startMockNuclio();
+    const flow = baseFlow(mock);
+    Object.assign(flow[0], { deploymentPolicy: 'disabled', deploymentPolicyType: 'str' });
+    await load(flow);
+
+    const server = helper.getNode('srv');
+    const fn = helper.getNode('fn');
+    assert.equal(server.deploymentPolicy, 'disabled');
+    assert.equal(server.deploymentEnabled, false);
+    assert.equal(fn.lastStatus.text, 'Deployment disabled');
+    assert.deepEqual(mock.requests, []);
+
+    const response = await helper.request().post('/nuclio/api/functions/deploy?id=fn').expect(409);
+    assert.match(response.body.error, /deployment is disabled/i);
+    assert.deepEqual(mock.requests, []);
+});
+
+test('deployment policy can be disabled by an explicitly typed environment value', async () => {
+    process.env.MY_DEPLOYMENT_POLICY = 'disabled';
+    try {
+        mock = await startMockNuclio();
+        const flow = baseFlow(mock);
+        Object.assign(flow[0], { deploymentPolicy: 'MY_DEPLOYMENT_POLICY', deploymentPolicyType: 'env' });
+        await load(flow);
+
+        assert.equal(helper.getNode('srv').deploymentPolicy, 'disabled');
+        assert.equal(helper.getNode('fn').lastStatus.text, 'Deployment disabled');
+        assert.deepEqual(mock.requests, []);
+    } finally {
+        delete process.env.MY_DEPLOYMENT_POLICY;
+    }
+});
+
 test('invoke numeric settings can explicitly reference environment variables', async () => {
     Object.assign(process.env, {
         MY_TIMEOUT: '4321',
