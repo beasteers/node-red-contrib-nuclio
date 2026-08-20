@@ -10,8 +10,6 @@ services:
       - 1882:1880
     environment:
       NUCLIO_ADDRESS: http://nuclio-dashboard:8070
-      NUCLIO_INVOCATION_URL_PREFERENCE: service
-      NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST: nuclio-nuclio-{function}
     volumes:
       - ./data:/data
       - ./config/settings.js:/data/settings.js

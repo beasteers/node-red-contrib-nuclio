@@ -74,9 +74,13 @@
                 required: true,
             },
             timeoutMs: { value: '' },
+            timeoutMsType: { value: 'num' },
             maxInFlight: { value: '' },
+            maxInFlightType: { value: 'num' },
             retries: { value: '' },
+            retriesType: { value: 'num' },
             retryDelayMs: { value: '' },
+            retryDelayMsType: { value: 'num' },
             headers: { value: [] },
         },
         label: function () {
@@ -84,6 +88,12 @@
             return fn?.name || 'nuclio invoke';
         },
         oneditprepare: function() {
+            ['timeoutMs', 'maxInFlight', 'retries', 'retryDelayMs'].forEach(function(field) {
+                $('#node-input-' + field).typedInput({
+                    default: this[field + 'Type'] || 'num',
+                    types: ['num', 'env'],
+                });
+            }.bind(this));
             this.headersList = nuclioInvokeInitKeyValueList("#node-input-headers", this.headers, {
                 placeholder: 'Header',
                 defaultType: 'str',
@@ -117,7 +127,7 @@
             <span>Timeout (ms)</span>
         </label>
         <input type="text" id="node-input-timeoutMs" inputmode="numeric" min="0" aria-describedby="node-input-timeoutMs-help" placeholder="30000" />
-        <small id="node-input-timeoutMs-help">Function call timeout in milliseconds. Blank uses <code>NUCLIO_INVOCATION_TIMEOUT_MS</code>, then <b>30,000 ms</b>.</small>
+        <small id="node-input-timeoutMs-help">Function call timeout in milliseconds. Blank uses the built-in default of <b>30,000 ms</b>.</small>
         <div>
         </div>
     </div>
@@ -135,7 +145,7 @@
             <span>Retries</span>
         </label>
         <input type="text" id="node-input-retries" inputmode="numeric" min="0" aria-describedby="node-input-retries-help" placeholder="0 = no retry" />
-        <small id="node-input-retries-help">Transient failures are retried this many times. Blank uses <code>NUCLIO_INVOKE_RETRIES</code>, then <b>0</b>. Retries are at-least-once.</small>
+        <small id="node-input-retries-help">Transient failures are retried this many times. Blank uses the built-in default of <b>0</b>. Retries are at-least-once.</small>
         <div>
         </div>
     </div>
@@ -144,7 +154,7 @@
             <span>Retry Delay (ms)</span>
         </label>
         <input type="text" id="node-input-retryDelayMs" inputmode="numeric" min="0" aria-describedby="node-input-retryDelayMs-help" placeholder="500 ms" />
-        <small id="node-input-retryDelayMs-help">First retry delay; doubles on each retry (capped at 10s). Blank uses <code>NUCLIO_INVOKE_RETRY_DELAY_MS</code>, then <b>500 ms</b>. A numeric <code>Retry-After</code> wins when larger.</small>
+        <small id="node-input-retryDelayMs-help">First retry delay; doubles on each retry (capped at 10s). Blank uses the built-in default of <b>500 ms</b>. A numeric <code>Retry-After</code> wins when larger.</small>
         <div>
         </div>
     </div>

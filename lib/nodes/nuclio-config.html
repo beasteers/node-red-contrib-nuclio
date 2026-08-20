@@ -51,7 +51,7 @@
                 default: this.internalInvocationServiceHostType || 'str',
                 types: ['str', 'env'],
             });
-            // Tuning fields: numeric literal or an env-var reference, resolved on deploy.
+            // Shared settings: numeric literal or an env-var reference, resolved on deploy.
             ['requestTimeoutMs','deployTimeoutMs','pollMs','readyPollMs','backoffMs','backoffMaxMs','startStaggerMs']
                 .forEach(function(f){ $('#node-config-input-'+f).typedInput({ default: this[f+'Type'] || 'num', types: ['num','env'] }); }.bind(this));
 
@@ -102,7 +102,7 @@
         <label for="node-config-input-internalInvocationServiceHost">Stable service hostname template</label>
         <input type="text" id="node-config-input-internalInvocationServiceHost" placeholder="nuclio-{function} (Kubernetes default)" />
         <div>
-            <small>Used only with Stable service hostname. Use <code>{function}</code> for the function name. Leave blank to use <code>NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST</code>, then the Kubernetes default <code>nuclio-{function}</code>. Docker Compose commonly needs <code>nuclio-nuclio-{function}</code>.</small>
+            <small>Used only with Stable service hostname. Use <code>{function}</code> for the function name. Leave blank to use the Kubernetes default <code>nuclio-{function}</code>. Docker Compose commonly needs <code>nuclio-nuclio-{function}</code>.</small>
         </div>
     </div>
     <div class="form-row" id="nuclio-external-protocol-row">
@@ -121,7 +121,7 @@
     <details style="margin-top: 12px;">
         <summary style="cursor: pointer; font-weight: 600;">Reconciliation (optional)</summary>
         <div style="margin-top: 8px;">
-            <small>Controls how Node-RED polls and recovers functions on this server. Leave blank to use the <code>NUCLIO_*</code> environment variable, then the built-in default. These values are shared by every function using this server.</small>
+            <small>Controls how Node-RED polls and recovers functions on this server. Leave blank to use the built-in default. These values are shared by every function using this server.</small>
         </div>
         <div class="form-row" style="margin-top: 10px;">
             <label for="node-config-input-pollMs">Poll interval (ms)</label>
@@ -148,7 +148,7 @@
     <details style="margin-top: 8px;">
         <summary style="cursor: pointer; font-weight: 600;">Timeouts (optional)</summary>
         <div style="margin-top: 8px;">
-            <small>Controls HTTP and deployment request deadlines. Leave blank to use the <code>NUCLIO_*</code> environment variable, then the built-in default. These values are shared by every function using this server.</small>
+            <small>Controls HTTP and deployment request deadlines. Leave blank to use the built-in default. These values are shared by every function using this server.</small>
         </div>
         <div class="form-row" style="margin-top: 10px;">
             <label for="node-config-input-requestTimeoutMs">Request timeout (ms)</label>

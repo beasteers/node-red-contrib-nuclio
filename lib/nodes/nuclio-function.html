@@ -38,6 +38,52 @@
         width: 100%;
     }
 
+    .nuclio-source-card {
+        margin-bottom: 16px;
+        padding: 16px;
+        border: 1px solid #e1e4ea;
+        border-radius: 4px;
+        background: #ffffff;
+    }
+    .nuclio-source-grid {
+        display: grid;
+        grid-template-columns: minmax(170px, 1fr) minmax(150px, .75fr) minmax(190px, 1.25fr);
+        gap: 14px;
+    }
+    .nuclio-source-control label,
+    .nuclio-source-fields label {
+        display: block;
+        margin: 0 0 6px;
+        color: #4d465f;
+        font-size: 15px;
+    }
+    .nuclio-source-control select,
+    .nuclio-source-control input,
+    .nuclio-source-fields input {
+        width: 100%;
+        min-height: 36px;
+        box-sizing: border-box;
+    }
+    .nuclio-source-control input[readonly] {
+        color: #4d465f;
+        background: #ffffff;
+    }
+    .nuclio-source-note {
+        max-width: none;
+        margin: 14px 0 0;
+        color: #3d3a40;
+        font-size: 13px;
+    }
+    .nuclio-source-fields {
+        margin-top: 14px;
+    }
+    .nuclio-source-fields label + input {
+        margin-bottom: 12px;
+    }
+    .nuclio-required {
+        color: #e5204f;
+    }
+
 
     /* Editable List */
 
@@ -82,30 +128,30 @@
         max-width: 100%;
         overflow: hidden;
         border: 1px solid #dce4eb;
-        border-radius: 8px;
+        border-radius: 6px;
         background: #f7f9fb;
     }
     .nuclio-status-header {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 12px 14px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 10px 12px;
         border-bottom: 1px solid #e1e7ed;
         background: #ffffff;
     }
     .nuclio-status-left {
         min-width: 0;
         display: flex;
-        align-items: center;
-        gap: 8px;
         flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
     }
     .nuclio-status-heading {
         min-width: 0;
         display: flex;
-        flex-direction: column;
-        gap: 1px;
+        align-items: baseline;
+        gap: 7px;
     }
     .nuclio-status-label,
     .nuclio-card-title {
@@ -114,20 +160,22 @@
         text-transform: uppercase;
         color: #6b7a86;
     }
+    .nuclio-status-label { white-space: nowrap; }
     .nuclio-status-function-name {
-        max-width: 260px;
+        max-width: 250px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 600;
     }
     .nuclio-status-chip {
         display: inline-flex;
         align-items: center;
-        padding: 4px 9px;
+        flex: 0 0 auto;
+        padding: 3px 8px;
         border-radius: 999px;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         background: #eef1f4;
         border: 1px solid #d7dde4;
@@ -141,30 +189,34 @@
     .nuclio-status-chip[data-tone="idle"] { background: #eef1f4; border-color: #d7dde4; color: #4b5b66; }
     .nuclio-status-chip[data-tone="unknown"] { background: #f3f4f6; border-color: #dfe3e8; color: #6b7a86; }
     .nuclio-status-meta {
-        font-size: 11px;
+        flex: 0 0 auto;
+        font-size: 10px;
         color: #6b7a86;
+        white-space: nowrap;
     }
     .nuclio-status-actions {
         display: flex;
-        flex: 0 0 auto;
         flex-wrap: wrap;
-        gap: 6px;
+        justify-content: flex-end;
+        gap: 5px;
         align-items: center;
     }
     .nuclio-status-actions a,
     .nuclio-status-actions button,
     .nuclio-detail-toolbar button {
         border-radius: 5px;
-        padding: 5px 9px;
+        padding: 4px 7px;
         border: 1px solid #cbd6df;
         background: #ffffff;
         color: #1d2a33;
         text-decoration: none;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         cursor: pointer;
+        white-space: nowrap;
     }
     .nuclio-status-actions button { background: #1d2a33; color: #ffffff; border-color: #1d2a33; }
+    #nuclio-rebuild { background: #ffffff; color: #1d2a33; }
     .nuclio-status-actions button:disabled,
     .nuclio-detail-toolbar button:disabled { opacity: 0.55; cursor: wait; }
     .nuclio-action-feedback {
@@ -182,13 +234,13 @@
         display: flex;
         min-width: 0;
         flex-direction: column;
-        gap: 10px;
-        padding: 12px 14px 14px;
+        gap: 8px;
+        padding: 10px 12px 12px;
     }
     .nuclio-status-summary-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 6px;
     }
     .nuclio-status-card,
     .nuclio-status-endpoints,
@@ -199,27 +251,27 @@
         border-radius: 6px;
         background: #ffffff;
     }
-    .nuclio-status-card { padding: 10px; }
+    .nuclio-status-card { padding: 8px 10px; }
     .nuclio-status-card-value {
-        margin-top: 4px;
+        margin-top: 3px;
         overflow-wrap: anywhere;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 600;
     }
     .nuclio-status-card-meta {
         margin-top: 2px;
         overflow-wrap: anywhere;
         color: #6b7a86;
-        font-size: 11px;
+        font-size: 10px;
     }
     .nuclio-status-endpoints,
-    .nuclio-status-signals { padding: 10px; }
+    .nuclio-status-signals { padding: 9px 10px; }
     .nuclio-status-section-heading {
         display: flex;
         align-items: baseline;
         justify-content: space-between;
         gap: 8px;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
     .nuclio-status-section-note { color: #6b7a86; font-size: 11px; }
     .nuclio-endpoint-list { display: grid; gap: 6px; }
@@ -268,9 +320,9 @@
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        padding: 9px 10px;
+        padding: 8px 10px;
         cursor: pointer;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         list-style-position: inside;
     }
@@ -323,8 +375,18 @@
         display: block;
     }
 
-    @media (max-width: 560px) {
-        .nuclio-status-header { align-items: flex-start; flex-direction: column; }
+    #nuclio-generate-name {
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 0;
+    }
+
+    @media (max-width: 720px) {
+        .nuclio-source-grid { grid-template-columns: 1fr; }
+        .nuclio-status-header { grid-template-columns: 1fr; align-items: flex-start; }
+        .nuclio-status-left { width: 100%; }
         .nuclio-status-actions { width: 100%; }
         .nuclio-status-actions a,
         .nuclio-status-actions button { flex: 1 1 auto; text-align: center; }
@@ -448,6 +510,41 @@ rev /dev/stdin
         nodejs: 'javascript',
         shell: 'shell',
     })[`${runtime}`.split(':')[0]];
+
+    const SOURCE_TYPE_LABELS = {
+        sourceCode: 'Source code',
+        image: 'Image',
+        git: 'Git',
+        archive: 'Archive',
+    };
+
+    const yamlScalar = (text, key) => {
+        const match = `${text || ''}`.match(new RegExp(`^\\s+${key}:\\s*["']?([^"'\\n#]+?)["']?\\s*$`, 'm'));
+        return match ? match[1].trim() : '';
+    };
+
+    const sourceFromConfigCode = (text) => {
+        const codeEntryType = yamlScalar(text, 'codeEntryType');
+        const normalizedType = codeEntryType === 'github' ? 'git' : codeEntryType;
+        if (SOURCE_TYPE_LABELS[normalizedType]) {
+            return {
+                type: normalizedType,
+                path: yamlScalar(text, 'path'),
+                branch: yamlScalar(text, 'branch'),
+                tag: yamlScalar(text, 'tag'),
+                reference: yamlScalar(text, 'reference'),
+                username: yamlScalar(text, 'username'),
+                workDir: yamlScalar(text, 'workDir'),
+            };
+        }
+        const image = yamlScalar(text, 'image');
+        return image ? { type: 'image', path: image } : { type: 'sourceCode' };
+    };
+
+    const defaultHandlerFor = (runtime) => {
+        const base = `${runtime || ''}`.split(':')[0];
+        return base === 'nodejs' ? 'handler:handler' : base === 'golang' ? 'main:Handler' : 'main:handler';
+    };
 </script>
 
 <script type="text/javascript">
@@ -640,6 +737,13 @@ rev /dev/stdin
                 return !getUniqueValues(this, n=>n.name)[v];
             } },
             runtime: { value: 'python:3.12' },
+            sourceType: { value: 'sourceCode' },
+            codeEntryPath: { value: '' },
+            codeEntryBranch: { value: '' },
+            codeEntryTag: { value: '' },
+            codeEntryReference: { value: '' },
+            codeEntryUsername: { value: '' },
+            codeEntryWorkDir: { value: '' },
             code: { value: SAMPLES.python.code },
             configCode: { value: SAMPLES.python.config },
             env_vars: { value: [] },
@@ -652,6 +756,7 @@ rev /dev/stdin
         },
         credentials: {
             secret_vars: { type: "text" },  // JSON list of { name, type, value }
+            codeEntryPassword: { type: "password" },
         },
         label: function () {
             return this.name || 'nuclio fn';
@@ -711,7 +816,7 @@ rev /dev/stdin
                     const message = e?.responseJSON?.error || e?.statusText || 'Redeploy failed.';
                     setActionFeedback(`Redeploy failed: ${message}`, 'error');
                 }).always(() => {
-                    btn.prop('disabled', false).text('Redeploy existing image');
+                    btn.prop('disabled', false).text('Redeploy');
                 });
             });
             $('#nuclio-rebuild').on('click', function() {
@@ -728,7 +833,7 @@ rev /dev/stdin
                     const message = e?.responseJSON?.error || e?.statusText || 'Rebuild failed.';
                     setActionFeedback(`Rebuild failed: ${message}`, 'error');
                 }).always(() => {
-                    btn.prop('disabled', false).text('Rebuild image');
+                    btn.prop('disabled', false).text('Rebuild');
                 });
             });
             $('#nuclio-generate-name').on('click', function() {
@@ -756,6 +861,43 @@ rev /dev/stdin
                 value: this.configCode || "",
                 focus: true,
             });
+
+            const legacySource = sourceFromConfigCode(this.configCode);
+            const sourceType = this.sourceType || legacySource.type || 'sourceCode';
+            $('#node-config-input-sourceType').val(sourceType);
+            $('#node-config-input-codeEntryPath').val(this.codeEntryPath || legacySource.path || '');
+            $('#node-config-input-codeEntryBranch').val(this.codeEntryBranch || legacySource.branch || '');
+            $('#node-config-input-codeEntryTag').val(this.codeEntryTag || legacySource.tag || '');
+            $('#node-config-input-codeEntryReference').val(this.codeEntryReference || legacySource.reference || '');
+            $('#node-config-input-codeEntryUsername').val(this.codeEntryUsername || legacySource.username || '');
+            $('#node-config-input-codeEntryWorkDir').val(this.codeEntryWorkDir || legacySource.workDir || '');
+            $('#node-config-input-codeEntryPassword').val(this.credentials?.codeEntryPassword || '');
+
+            const updateSourceFields = () => {
+                const selected = $('#node-config-input-sourceType').val() || 'sourceCode';
+                $('.nuclio-source-fields').addClass('nuclio-hidden');
+                $(`#nuclio-source-fields-${selected}`).removeClass('nuclio-hidden');
+                const external = selected !== 'sourceCode';
+                $('#nuclio-source-path-field').toggleClass('nuclio-hidden', !external);
+                $('#nuclio-source-workdir-field').toggleClass('nuclio-hidden', !['git', 'archive'].includes(selected));
+                $('#nuclio-source-path-label').html(selected === 'image'
+                    ? 'Image name'
+                    : 'URL <span class="nuclio-required">*</span>');
+                $('#node-config-input-codeEntryPath').attr('placeholder', selected === 'image'
+                    ? 'For example: mydockeruser/my-func:latest'
+                    : selected === 'git'
+                        ? 'For example: https://github.com/my-organization/my-repository.git'
+                        : 'For example: https://example.com/my-function.zip');
+                $('#nuclio-inline-code-note').toggleClass('nuclio-hidden', selected === 'sourceCode');
+                $('#node-config-input-nuclio-editor').toggleClass('nuclio-hidden', external);
+                $('#nuclio-handler-preview').val(defaultHandlerFor($('#node-config-input-runtime').val()));
+            };
+
+            $('#node-config-input-sourceType').on('change', function() {
+                updateSourceFields();
+                markEditorDirty();
+            });
+            updateSourceFields();
             this.editor.on('change', markEditorDirty);
             this.configeditor.on('change', markEditorDirty);
 
@@ -777,6 +919,7 @@ rev /dev/stdin
                     node.configeditor.setValue(SAMPLES[runtimeBase].config);
                 }
                 node.editor.setMode(`ace/mode/${lang}`);
+                $('#nuclio-handler-preview').val(defaultHandlerFor(runtime));
             });
 
             /* ---------------------------------- Settings --------------------------------- */
@@ -1013,6 +1156,19 @@ rev /dev/stdin
             $('#dialog-form').off('.nuclioFunctionDirty');
             delete this.nuclioEditorDirty;
 
+            this.sourceType = $('#node-config-input-sourceType').val() || 'sourceCode';
+            this.codeEntryPath = $('#node-config-input-codeEntryPath').val() || '';
+            this.codeEntryBranch = $('#node-config-input-codeEntryBranch').val() || '';
+            this.codeEntryTag = $('#node-config-input-codeEntryTag').val() || '';
+            this.codeEntryReference = $('#node-config-input-codeEntryReference').val() || '';
+            this.codeEntryUsername = $('#node-config-input-codeEntryUsername').val() || '';
+            this.codeEntryWorkDir = $('#node-config-input-codeEntryWorkDir').val() || '';
+            node.credentials = node.credentials || {};
+            const codeEntryPassword = $('#node-config-input-codeEntryPassword').val() || '';
+            if (codeEntryPassword) node.credentials.codeEntryPassword = codeEntryPassword;
+            else delete node.credentials.codeEntryPassword;
+            delete node.credentials.codeEntryToken;
+
             node.env_vars = collectKeyValueList("#node-config-input-env_vars-x");
             delete this.envList;
 
@@ -1049,6 +1205,66 @@ rev /dev/stdin
     </div>
     <div id="nuclio-tabs-content">
         <div id="nuclio-tab-app" style="display:none">
+            <section class="nuclio-source-card" aria-labelledby="nuclio-source-heading">
+                <div class="nuclio-source-grid">
+                    <div class="nuclio-source-control">
+                        <label for="node-config-input-sourceType">Code entry type</label>
+                        <select id="node-config-input-sourceType" class="form-control">
+                            <option value="sourceCode">Online code</option>
+                            <option value="image">Image</option>
+                            <option value="git">Git</option>
+                            <option value="archive">Archive</option>
+                        </select>
+                    </div>
+                    <div class="nuclio-source-control">
+                        <label for="node-config-input-runtime">Runtime</label>
+                        <select id="node-config-input-runtime" class="form-control">
+                            <option value="python:3.12">Python 3.12</option>
+                            <option value="python:3.11">Python 3.11</option>
+                            <option value="python:3.10">Python 3.10</option>
+                            <option value="python:3.9">Python 3.9</option>
+                            <option value="golang">Go</option>
+                            <option value="nodejs">Node.js</option>
+                            <option value="shell">Shell</option>
+                        </select>
+                    </div>
+                    <div class="nuclio-source-control">
+                        <label for="nuclio-handler-preview">Handler</label>
+                        <input id="nuclio-handler-preview" class="form-control" type="text" readonly />
+                    </div>
+                </div>
+                <p id="nuclio-source-heading" class="nuclio-source-note">
+                    <b>Note:</b> Source settings here override matching source fields in the function configuration.
+                </p>
+
+                <div id="nuclio-source-path-field" class="nuclio-source-fields nuclio-hidden">
+                    <label id="nuclio-source-path-label" for="node-config-input-codeEntryPath">URL <span class="nuclio-required">*</span></label>
+                    <input id="node-config-input-codeEntryPath" class="form-control" type="text" />
+                </div>
+                <div id="nuclio-source-fields-image" class="nuclio-source-fields nuclio-hidden"></div>
+                <div id="nuclio-source-fields-git" class="nuclio-source-fields nuclio-hidden">
+                    <label for="node-config-input-codeEntryBranch">Branch</label>
+                    <input id="node-config-input-codeEntryBranch" class="form-control" type="text" placeholder="For example: main" />
+                    <label for="node-config-input-codeEntryTag">Tag</label>
+                    <input id="node-config-input-codeEntryTag" class="form-control" type="text" placeholder="Enter tag" />
+                    <label for="node-config-input-codeEntryReference">Reference</label>
+                    <input id="node-config-input-codeEntryReference" class="form-control" type="text" placeholder="Enter reference" />
+                    <label for="node-config-input-codeEntryUsername">Username</label>
+                    <input id="node-config-input-codeEntryUsername" class="form-control" type="text" placeholder="Enter username" />
+                    <label for="node-config-input-codeEntryPassword">Password</label>
+                    <input id="node-config-input-codeEntryPassword" class="form-control" type="password" placeholder="Enter password" autocomplete="new-password" />
+                </div>
+                <div id="nuclio-source-fields-archive" class="nuclio-source-fields nuclio-hidden">
+                </div>
+                <div id="nuclio-source-workdir-field" class="nuclio-source-fields nuclio-hidden">
+                    <label for="node-config-input-codeEntryWorkDir">Work directory</label>
+                    <input id="node-config-input-codeEntryWorkDir" class="form-control" type="text" placeholder="For example: /nuclio-functions/myfunc" />
+                </div>
+                <p id="nuclio-inline-code-note" class="nuclio-source-note nuclio-hidden">
+                    Online code is disabled for this source type. The repository or image above is deployed instead.
+                </p>
+            </section>
+
             <div class="form-row">
                 <div class="nuclio-doc-links">
                     <h2 style="display: inline-block; margin-top: 0;">
@@ -1065,31 +1281,17 @@ rev /dev/stdin
             </div>
 
             <div class="form-row">
-                <div>
+                <div style="display: flex; align-items: center;">
                     <label for="node-config-input-name">
-                        <span>Function Name</span>
+                        <span>Function <br/>Name</span>
                     </label>
-                    <input type="text" id="node-config-input-name" placeholder="What should the URL endpoint be?" title="This is the URL that nodered will call to run this function." />
-                    <button type="button" id="nuclio-generate-name" class="btn btn-default" title="Generate a random name" aria-label="Generate a random function name">🔀</button>
+                    <div style="position:relative;display: inline-block;flex: 1;">
+                        <input type="text" id="node-config-input-name" style="width: 100%;" placeholder="What should the URL endpoint be?" title="This is the URL that nodered will call to run this function." />
+                        <button type="button" id="nuclio-generate-name" class="btn btn-default" title="Generate a random name" aria-label="Generate a random function name">🔀</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="form-row">
-                <div>
-                    <label for="node-config-input-runtime">
-                        <span>Runtime [<a target="_blank" href="https://docs.nuclio.io/en/stable/reference/runtimes/index.html" title="">docs</a>]:</span>
-                    </label>
-                    <select id="node-config-input-runtime" class="form-control">
-                        <option value="python:3.12">python:3.12 (entrypoint: handler)</option>
-                        <option value="python:3.11">python:3.11 (entrypoint: handler)</option>
-                        <option value="python:3.10">python:3.10 (entrypoint: handler)</option>
-                        <option value="python:3.9">python:3.9 (entrypoint: handler)</option>
-                        <option value="golang">golang (entrypoint: Handler)</option>
-                        <option value="nodejs">nodejs (entrypoint: handler)</option>
-                        <option value="shell">shell (stdin/stdout)</option>
-                    </select>
-                </div>
-            </div>
             <div style="min-height:150px;" class="node-text-editor" id="node-config-input-nuclio-editor" ></div>
         </div>
 
@@ -1135,7 +1337,7 @@ rev /dev/stdin
             <div class="form-row">
                 <h2>Recovery</h2>
                 <p>
-                    <small>How this function self-heals. Leave blank to use the <code>NUCLIO_*</code> environment variable, then the built-in default. Takes effect on the next Deploy.</small>
+                    <small>How this function self-heals. Leave blank to use the built-in default. Takes effect on the next Deploy.</small>
                 </p>
             </div>
             <div class="form-row">
@@ -1169,8 +1371,8 @@ rev /dev/stdin
                     </div>
                     <div class="nuclio-status-actions">
                         <a id="nuclio-dashboard-link" href="about:blank" target="_blank" rel="noopener noreferrer">Dashboard</a>
-                        <button type="button" id="nuclio-rebuild" title="Re-fetch the source and rebuild the image (picks up new commits behind an unchanged git/archive URL)">Rebuild image</button>
-                        <button type="button" id="nuclio-redeploy" title="Redeploy the last saved configuration using the existing image">Redeploy existing image</button>
+                        <button type="button" id="nuclio-rebuild" title="Re-fetch the source and rebuild the image (picks up new commits behind an unchanged git/archive URL)">Rebuild</button>
+                        <button type="button" id="nuclio-redeploy" title="Redeploy the last saved configuration using the existing image">Redeploy</button>
                     </div>
                 </div>
                 <div id="nuclio-action-feedback" class="nuclio-action-feedback nuclio-hidden" role="status" aria-live="polite"></div>

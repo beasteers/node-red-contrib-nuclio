@@ -21,6 +21,15 @@ test('source code is base64 encoded; empty code is omitted', () => {
     assert.equal(buildFunctionConfig({ ...base, code: '  ' }).spec.build.functionSourceCode, undefined);
 });
 
+test('image changes participate in the build fingerprint', () => {
+    const a = buildFunctionConfig({ ...base, code: '  ', config: { spec: { image: 'example/function:one' } } });
+    const b = buildFunctionConfig({ ...base, code: '  ', config: { spec: { image: 'example/function:two' } } });
+    assert.notEqual(
+        a.metadata.annotations['nuclio.io/node-red-build-hash'],
+        b.metadata.annotations['nuclio.io/node-red-build-hash'],
+    );
+});
+
 test('project label and generated-by annotation are always set', () => {
     const body = buildFunctionConfig({ ...base, project: 'proj', annotations: { a: '1' } });
     assert.equal(body.metadata.labels['nuclio.io/project-name'], 'proj');

@@ -1,8 +1,3 @@
-// Fast, deterministic cadence (read at module load; node --test isolates files per process)
-process.env.NUCLIO_START_STAGGER_MS = '0';
-process.env.NUCLIO_BACKOFF_MS = '150';
-process.env.NUCLIO_BACKOFF_MAX_MS = '400';
-
 const { test, before, after, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const helper = require('node-red-node-test-helper');
@@ -31,10 +26,19 @@ afterEach(async () => {
 });
 
 const FN = 'test-fn';
+const TEST_SERVER_DEFAULTS = {
+    requestTimeoutMs: '10000',
+    deployTimeoutMs: '60000',
+    pollMs: '1000',
+    readyPollMs: '5000',
+    backoffMs: '150',
+    backoffMaxMs: '400',
+    startStaggerMs: '0',
+};
 
 // default flow: server config + function config + invoke node + output helpers
 const baseFlow = (mock, fn = {}, inv = {}) => [
-    { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str', invocationUrlPreference: 'internal' },
+    { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str', invocationUrlPreference: 'internal', ...TEST_SERVER_DEFAULTS },
     { id: 'fn', type: 'nuclio-function', server: 'srv', name: FN, runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [], secret_vars: [], ...fn },
     { id: 'inv', type: 'nuclio', function: 'fn', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1'], ['out2']], ...inv },
     { id: 'out1', type: 'helper' },
@@ -88,6 +92,35 @@ test('deploys a new function: project + full spec', async () => {
     // the default project pre-exists in the mock (real nuclio always has one)
     assert.ok(!mock.requests.some(r => r.method === 'POST' && r.url === '/api/projects'));
     // and the function settles to ready
+    await waitReady(helper.getNode('fn'));
+});
+
+test('external Git source suppresses online code and emits Nuclio source fields', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        sourceType: 'git',
+        codeEntryPath: 'https://github.com/example/functions.git',
+        codeEntryBranch: 'main',
+        codeEntryTag: 'v1.0.0',
+        codeEntryReference: 'refs/heads/main',
+        codeEntryUsername: 'git-user',
+        codeEntryWorkDir: '/python/function',
+    }), {
+        fn: { codeEntryPassword: 'git-password' },
+    });
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(req.body.spec.build.functionSourceCode, undefined);
+    assert.equal(req.body.spec.build.codeEntryType, 'git');
+    assert.equal(req.body.spec.build.path, 'https://github.com/example/functions.git');
+    assert.deepEqual(req.body.spec.build.codeEntryAttributes, {
+        branch: 'main',
+        tag: 'v1.0.0',
+        reference: 'refs/heads/main',
+        username: 'git-user',
+        workDir: '/python/function',
+        password: 'git-password',
+    });
     await waitReady(helper.getNode('fn'));
 });
 
@@ -643,16 +676,46 @@ test('server cadence + function recovery resolve from node config', async () => 
     assert.equal(fn.autoRedeployOnError, true);
 });
 
-test('blank config fields fall back to NUCLIO_* env, then default', async () => {
-    process.env.NUCLIO_POLL_MS = '1234';  // env fallback for a blank field
+test('blank config fields use built-in defaults, not process environment fallbacks', async () => {
+    const envFallbacks = {
+        NUCLIO_POLL_MS: '1234',
+        NUCLIO_INTERNAL_INVOCATION_SERVICE_HOST: 'from-process',
+        NUCLIO_INVOCATION_URL_PREFERENCE: 'external',
+        NUCLIO_PROJECT_NAME: 'from-process',
+        NUCLIO_MAX_SELF_HEAL_ATTEMPTS: '99',
+        NUCLIO_REDEPLOY_DEADLINE_MS: '1',
+        NUCLIO_AUTO_REDEPLOY_ON_ERROR: 'true',
+        NUCLIO_INVOCATION_TIMEOUT_MS: '99',
+        NUCLIO_INVOKE_RETRIES: '3',
+        NUCLIO_INVOKE_RETRY_DELAY_MS: '1',
+    };
+    const previous = Object.fromEntries(Object.keys(envFallbacks).map(key => [key, process.env[key]]));
+    Object.assign(process.env, envFallbacks);
     try {
         mock = await startMockNuclio();
-        await load(baseFlow(mock));  // no tuning fields set on the flow
+        const flow = baseFlow(mock);
+        for (const field of Object.keys(TEST_SERVER_DEFAULTS)) delete flow[0][field];
+        delete flow[0].invocationUrlPreference;
+        delete flow[0].internalInvocationServiceHost;
+        await load(flow);
         const srv = helper.getNode('srv');
-        assert.equal(srv.pollMs, 1234);        // from env
-        assert.equal(srv.readyPollMs, 5000);   // hardcoded default (no env, no config)
+        assert.equal(srv.pollMs, 1000);
+        assert.equal(srv.readyPollMs, 5000);
+        assert.equal(srv.invocationUrlPreference, 'service');
+        assert.equal(srv.internalInvocationServiceHost, 'nuclio-{function}');
+        assert.equal(helper.getNode('fn').project.name, 'default');
+        assert.equal(helper.getNode('fn').maxSelfHealAttempts, 5);
+        assert.equal(helper.getNode('fn').redeployDeadlineMs, 120000);
+        assert.equal(helper.getNode('fn').autoRedeployOnError, false);
+        assert.equal(helper.getNode('inv').timeoutMs, 30000);
+        assert.equal(helper.getNode('inv').maxInFlight, 0);
+        assert.equal(helper.getNode('inv').retries, 0);
+        assert.equal(helper.getNode('inv').retryDelayMs, 500);
     } finally {
-        delete process.env.NUCLIO_POLL_MS;
+        for (const [key, value] of Object.entries(previous)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
     }
 });
 
@@ -666,6 +729,34 @@ test('an env-typed config field reads the named env var at deploy time', async (
         assert.equal(helper.getNode('srv').backoffMs, 4321);
     } finally {
         delete process.env.MY_BACKOFF;
+    }
+});
+
+test('invoke numeric settings can explicitly reference environment variables', async () => {
+    Object.assign(process.env, {
+        MY_TIMEOUT: '4321',
+        MY_MAX_IN_FLIGHT: '7',
+        MY_RETRIES: '2',
+        MY_RETRY_DELAY: '17',
+    });
+    try {
+        mock = await startMockNuclio();
+        await load(baseFlow(mock, {}, {
+            timeoutMs: 'MY_TIMEOUT', timeoutMsType: 'env',
+            maxInFlight: 'MY_MAX_IN_FLIGHT', maxInFlightType: 'env',
+            retries: 'MY_RETRIES', retriesType: 'env',
+            retryDelayMs: 'MY_RETRY_DELAY', retryDelayMsType: 'env',
+        }));
+        const inv = helper.getNode('inv');
+        assert.equal(inv.timeoutMs, 4321);
+        assert.equal(inv.maxInFlight, 7);
+        assert.equal(inv.retries, 2);
+        assert.equal(inv.retryDelayMs, 17);
+    } finally {
+        delete process.env.MY_TIMEOUT;
+        delete process.env.MY_MAX_IN_FLIGHT;
+        delete process.env.MY_RETRIES;
+        delete process.env.MY_RETRY_DELAY;
     }
 });
 
