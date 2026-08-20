@@ -650,6 +650,18 @@ test('POST /nuclio/api/functions/deploy forces a redeploy', async () => {
     assert.ok(mock.requests.some(r => r.method === 'PATCH'));
 });
 
+test('manual deploy accepts an asynchronous function visibility window', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    mock.requests.length = 0;
+    mock.hideFunctionAfterWrite = true;
+    const res = await helper.request().post('/nuclio/api/functions/deploy?id=fn').expect(202);
+    assert.equal(res.body.accepted, true);
+    assert.equal(res.body.metadata.name, FN);
+});
+
 test('POST /nuclio/api/functions/deploy?rebuild=true forces a rebuild PUT', async () => {
     // unchanged config, but rebuild must PUT without skip-build so Nuclio
     // re-fetches the source (e.g. new commits behind an unchanged git URL)

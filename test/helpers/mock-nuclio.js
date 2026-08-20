@@ -13,6 +13,7 @@ const http = require('http');
 //   mock.nextFnStates   per-fn queue of states to cycle through on GET polls
 //   mock.failDeploys    POST/PUT /api/functions return 500
 //   mock.functionCreateConflict  POST /api/functions stores then returns 409 once
+//   mock.hideFunctionAfterWrite  next function GET after a write returns 404
 //   mock.failStatus     if set, GET /api/functions/* returns this status code
 //   mock.fn404ContentType  if set, 404s use this content-type instead of JSON
 //   mock.invoke         (body, req) -> { status, body } for invocations
@@ -51,13 +52,15 @@ const deepMergeDefaults = (spec) => {
     return merged;
 };
 
-const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflict = false, functionCreateConflict = false } = {}) => new Promise((resolveServer) => {
+const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflict = false, functionCreateConflict = false, hideFunctionAfterWrite = false } = {}) => new Promise((resolveServer) => {
     const waiters = [];
     const mock = {
         functions,
         state,
         projectCreateConflict,
         functionCreateConflict,
+        hideFunctionAfterWrite,
+        hiddenFunctionReads: 0,
         functionStates: {},
         nextFnStates: {},
         failDeploys: false,
@@ -172,6 +175,10 @@ const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflic
                     return send(mock.failStatus, { error: `simulated ${mock.failStatus}` });
                 }
                 const fn = mock.functions[fnMatch[1]];
+                if (mock.hiddenFunctionReads > 0) {
+                    mock.hiddenFunctionReads -= 1;
+                    return send(404, { error: 'Function not yet readable' });
+                }
                 if (!fn) {
                     if (mock.fn404ContentType) {
                         res.writeHead(404, { 'Content-Type': mock.fn404ContentType });
@@ -196,9 +203,11 @@ const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflic
             if (req.method === 'PUT' && fnMatch) {
                 if (mock.failDeploys) return send(500, { error: 'deploy failed' });
                 storeFunction(fnMatch[1], body);
+                if (mock.hideFunctionAfterWrite) mock.hiddenFunctionReads = 1;
                 return send(202, body);
             }
             if (req.method === 'PATCH' && fnMatch) {
+                if (mock.hideFunctionAfterWrite) mock.hiddenFunctionReads = 1;
                 return send(200, {});
             }
 

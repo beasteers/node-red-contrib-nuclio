@@ -397,9 +397,11 @@
     </style>
 
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-runtime-metadata.js"></script>
+<script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-validation.js"></script>
 
 <script type="text/javascript">
     const RUNTIME_METADATA = window.NUCLIO_RUNTIME_METADATA || [];
+    const VALIDATION = window.NUCLIO_VALIDATION || {};
 
     // Starter YAML shown in the Config editor (shared by all runtime samples).
     const configCode = `
@@ -753,11 +755,14 @@ rev /dev/stdin
                     }
                     this.name = v;
                 }
+                if (VALIDATION.validateFunctionName?.(v)) return false;
                 return !getUniqueValues(this, n=>n.name)[v];
             } },
             runtime: { value: 'python:3.12' },
             sourceType: { value: 'sourceCode' },
-            codeEntryPath: { value: '' },
+            codeEntryPath: { value: '', validate: function(v) {
+                return !VALIDATION.validateSourcePath?.(this.sourceType || 'sourceCode', v);
+            } },
             codeEntryBranch: { value: '' },
             codeEntryTag: { value: '' },
             codeEntryReference: { value: '' },
@@ -768,7 +773,7 @@ rev /dev/stdin
             env_vars: { value: [] },
             // legacy plaintext secrets - migrated into credentials on save
             secret_vars: { value: [] },
-            // Recovery policy (blank = NUCLIO_* env, then default).
+            // Recovery policy (blank = built-in default).
             maxSelfHealAttempts: { value: '' }, maxSelfHealAttemptsType: { value: 'num' },
             redeployDeadlineMs:  { value: '' }, redeployDeadlineMsType:  { value: 'num' },
             autoRedeployOnError: { value: 'false' }, autoRedeployOnErrorType: { value: 'bool' },

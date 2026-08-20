@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, redactPaths, stableStringify, hashConfig, retryBackoff, isTransientErrorCode, isTransientHttpStatus, isTransientError, numSetting } = require('../lib/util');
+const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, redactPaths, stableStringify, hashConfig, retryBackoff, isTransientErrorCode, isTransientHttpStatus, isTransientError, numSetting, validateFunctionName, validateSourcePath } = require('../lib/util');
 
 
 /* ----------------------------------- diff ---------------------------------- */
@@ -121,6 +121,18 @@ test('numSetting rejects negative and partially numeric values', () => {
     assert.equal(numSetting(RED, node, { value: '-1' }, 'value', 5), 5);
     assert.equal(numSetting(RED, node, { value: '100ms' }, 'value', 5), 5);
     assert.equal(numSetting(RED, node, { value: '2.9' }, 'value', 5), 2);
+});
+
+test('validates Nuclio function names and source paths', () => {
+    assert.equal(validateFunctionName('warm-matrix'), null);
+    assert.match(validateFunctionName('Warm_Matrix'), /lowercase/);
+    assert.match(validateFunctionName('-warm-matrix'), /start and end/);
+    assert.match(validateFunctionName(' warm-matrix '), /lowercase/);
+    assert.match(validateFunctionName('a'.repeat(64)), /63/);
+    assert.equal(validateSourcePath('sourceCode', ''), null);
+    assert.match(validateSourcePath('git', ''), /required/);
+    assert.match(validateSourcePath('image', 'registry/image tag'), /whitespace/);
+    assert.equal(validateSourcePath('archive', 'https://example.test/function.zip'), null);
 });
 
 /* ------------------------------ stable hashing ------------------------------ */
