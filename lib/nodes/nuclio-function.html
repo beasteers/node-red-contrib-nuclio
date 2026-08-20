@@ -609,19 +609,34 @@ rev /dev/stdin
         constructor(fn, interval) {
             this.fn = fn;
             this.interval = interval;
-            this.pollInterval = null;
+            this.timer = null;
+            this.running = false;
+            this.inFlight = false;
         }
 
         start() {
-            if (this.pollInterval) return;
-            this.fn();
-            this.pollInterval = setInterval(this.fn, this.interval);
+            if (this.running) return;
+            this.running = true;
+            this.tick();
+        }
+
+        async tick() {
+            if (!this.running || this.inFlight) return;
+            this.inFlight = true;
+            try {
+                await this.fn();
+            } catch {
+                // The poll callback owns its display of request failures.
+            } finally {
+                this.inFlight = false;
+                if (this.running) this.timer = setTimeout(() => this.tick(), this.interval);
+            }
         }
 
         stop() {
-            if (!this.pollInterval) return;
-            clearInterval(this.pollInterval);
-            this.pollInterval = null;
+            this.running = false;
+            if (this.timer) clearTimeout(this.timer);
+            this.timer = null;
         }
     }
 
@@ -1166,7 +1181,7 @@ rev /dev/stdin
                     node.statusPoller?.stop();
                     return;
                 }
-                ajaxJson({
+                return ajaxJson({
                     url: `/nuclio/api/functions?id=${this.id}&view=summary`,
                     method: 'GET',
                 }).done(renderSummary).fail((e) => {

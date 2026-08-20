@@ -311,11 +311,17 @@ test('status summary and details are selectively returned', async () => {
     });
     await waitReady(helper.getNode('fn'));
 
+    const statusReadsBeforeSummary = mock.requests.filter(r => r.method === 'GET' && r.url === `/api/functions/${FN}`).length;
     const summary = await helper.request().get('/nuclio/api/functions?id=fn&view=summary').expect(200);
+    await helper.request().get('/nuclio/api/functions?id=fn&view=summary').expect(200);
     assert.equal(summary.body.metadata.name, FN);
     assert.equal(summary.body.status.state, 'ready');
     assert.equal(summary.body.spec.build, undefined);
     assert.equal(summary.body.spec.runtime, 'python:3.12');
+    assert.equal(
+        mock.requests.filter(r => r.method === 'GET' && r.url === `/api/functions/${FN}`).length,
+        statusReadsBeforeSummary,
+    );
 
     const spec = await helper.request().get('/nuclio/api/functions?id=fn&view=spec').expect(200);
     assert.equal(spec.body.spec.build.codeEntryAttributes.s3SecretAccessKey, '[redacted]');

@@ -1,7 +1,7 @@
 const { test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { reconcileStep } = require('../lib/nuclio-reconcile');
-const { deployFunction } = require('../lib/nuclio-deploy');
+const { deployFunction, ensureProject } = require('../lib/nuclio-deploy');
 const { startMockNuclio } = require('./helpers/mock-nuclio');
 
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
@@ -42,6 +42,32 @@ let mock;
 afterEach(async () => { if (mock) { await mock.close(); mock = null; } });
 
 const UNREACHABLE = 'http://127.0.0.1:1';  // port 1 -> immediate ECONNREFUSED
+
+test('project discovery is coalesced and cached per server', async () => {
+    const node = makeNode('http://example.test');
+    let listCalls = 0;
+    let createCalls = 0;
+    const client = {
+        listProjects: async () => {
+            listCalls++;
+            await delay(5);
+            return { data: { default: { metadata: { name: 'default' } } } };
+        },
+        createProject: async () => {
+            createCalls++;
+            return { status: 201, statusText: 'Created', config: { url: '/api/projects' } };
+        },
+    };
+
+    await Promise.all([
+        ensureProject(node, client, 'default'),
+        ensureProject(node, client, 'default'),
+    ]);
+    await ensureProject(node, client, 'default');
+
+    assert.equal(listCalls, 1);
+    assert.equal(createCalls, 0);
+});
 
 
 /* -------------------------------- Idle poll -------------------------------- */
