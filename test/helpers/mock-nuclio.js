@@ -50,11 +50,12 @@ const deepMergeDefaults = (spec) => {
     return merged;
 };
 
-const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promise((resolveServer) => {
+const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflict = false } = {}) => new Promise((resolveServer) => {
     const waiters = [];
     const mock = {
         functions,
         state,
+        projectCreateConflict,
         functionStates: {},
         nextFnStates: {},
         failDeploys: false,
@@ -148,6 +149,10 @@ const startMockNuclio = ({ functions = {}, state = 'ready' } = {}) => new Promis
                 return send(200, projectRegistry);
             }
             if (req.method === 'POST' && req.url === '/api/projects') {
+                if (mock.projectCreateConflict) {
+                    mock.projectCreateConflict = false;
+                    return send(409, { error: 'project already exists' });
+                }
                 const name = body?.metadata?.name;
                 if (name) projectRegistry[name] = { metadata: { name } };
                 return send(201, body);

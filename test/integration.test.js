@@ -881,6 +881,20 @@ test('project creation happens only when project does not exist', async () => {
     await waitReady(helper.getNode('fn'));
 });
 
+test('concurrent project creation conflict does not block function deployment', async () => {
+    mock = await startMockNuclio({ projectCreateConflict: true });
+    const CUSTOM = 'racing-project';
+    const flow = baseFlow(mock);
+    flow[1].project = 'proj-node';
+    flow[2] = { id: 'proj-node', type: 'nuclio-project', name: CUSTOM, nameType: 'str' };
+    await load(flow);
+
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/projects');
+    const functionCreate = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(functionCreate.body.metadata.labels['nuclio.io/project-name'], CUSTOM);
+    await waitReady(helper.getNode('fn'));
+});
+
 test('scaledToZero polls at the scaledToZero interval without self-healing', async () => {
     mock = await startMockNuclio({ functions: { [FN]: { metadata: { name: FN }, spec: {} } }, state: 'scaledToZero' });
     await load(baseFlow(mock));
