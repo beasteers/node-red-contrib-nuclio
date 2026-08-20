@@ -25,7 +25,7 @@ services:
     environment:
       NUCLIO_CHECK_FUNCTION_CONTAINERS_HEALTHINESS: "true"  # not sure if this is helping
       # DOCKER_BUILDKIT: "1"
-      NUCLIO_ARCH: "arm64"
+      NUCLIO_ARCH: ${NUCLIO_ARCH:-arm64}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config/platform.yaml:/etc/nuclio/config/platform/platform.yaml  # for the network name

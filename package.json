@@ -6,7 +6,7 @@
   "files": [
     "lib",
     "resources",
-    "scripts/migrate-nuclio-config.js"
+    "scripts"
   ],
   "scripts": {
     "test": "node --test",

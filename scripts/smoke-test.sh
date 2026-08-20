@@ -55,7 +55,7 @@ EOFLOW
 
 # ------ Step 1: start the stack ------------------------------------------
 
-echo -e "${YELLOW}==> Building and starting docker-compose...${NC}"
+echo -e "${YELLOW}==> Building and starting Docker Compose...${NC}"
 docker compose -f "$PROJECT_DIR/docker-compose.yml" down --volumes 2>/dev/null || true
 docker compose -f "$PROJECT_DIR/docker-compose.yml" up -d --build
 

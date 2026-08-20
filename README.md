@@ -16,9 +16,12 @@ The **nuclio** node then acts as an HTTP request node, making requests to that f
 npm i @bea.steers/node-red-contrib-nuclio
 ```
 
+Runtime requirements are Node.js **22 or newer** and Node-RED **4.0.0 or newer**.
+The test matrix covers Node.js 22/26 with Node-RED 4.0.0/5.0.4.
+
 In order to use this node, you must have the Nuclio dashboard running. It doesn't need to be public, it just needs to be accessible by Node-Red.
 
-Using the docker-compose test install below will give you a fully functioning system to experiment with.
+Using the Docker Compose test install below will give you a fully functioning system to experiment with. It is a development fixture, not required by an installed package.
 
 ## Test Install
 To test/develop
@@ -30,7 +33,7 @@ Unit tests and lint:
 npm test
 npm run lint
 ```
-Smoke test (spins up docker-compose, deploys a real Nuclio function, invokes it):
+Smoke test (from a repository checkout; spins up Docker Compose, deploys a real Nuclio function, and invokes it):
 ```bash
 npm run smoke
 ```
@@ -44,6 +47,8 @@ prints state changes, and writes a JSON timeline. Use `--rebuild` to test a rebu
 `--node-id <id>` when flow discovery is unavailable, or `--report <path>` to choose
 the report location. It requires the running `nodered-nuclio`, `nuclio`, and function
 containers to be reachable through Docker.
+The smoke test and redeploy diagnostic are repository-development tools; the published
+package contains their scripts but does not include this Compose fixture.
 You can access: 
  * Node-Red dashboard [here](http://localhost:1882). 
  * The Nuclio dashboard can be found [here](http://localhost:8072).
@@ -127,8 +132,9 @@ guards below keep node-red from reacting to flaky verdicts:
 ## Nuclio compatibility
 
 All dashboard interaction is isolated in `lib/nuclio-client.js` (endpoints, headers,
-and request shapes); state names are isolated in `lib/nuclio-states.js`. The compose
-fixture uses dashboard **1.17.5-arm64**. State handling is open-world: node-red
+and request shapes); state names are isolated in `lib/nuclio-states.js`. The Compose
+fixture uses dashboard **1.17.5-arm64** by default. Set `NUCLIO_DASHBOARD_IMAGE`
+and `NUCLIO_ARCH` when running it on another architecture. State handling is open-world: node-red
 acts on the small known set (`ready`, `error`, `unhealthy`, `scaledToZero`, 404) and
 treats any other state as "in transition — show it and wait," so unknown future states
 degrade to observation rather than breakage. If a Nuclio release changes the API, that
