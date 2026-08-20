@@ -11,6 +11,27 @@
 
     /* ------------------------- Nuclio Function editor ------------------------ */
 
+    /* Use Node-RED's theme tokens so custom panels work in light and dark
+       themes. System colors keep the fallback legible when a host theme omits
+       one of these optional tokens. */
+    #nuclio-tabs-content {
+        --nuclio-background: var(--red-ui-secondary-background, Canvas);
+        --nuclio-surface: var(--red-ui-tertiary-background, Canvas);
+        --nuclio-text: var(--red-ui-primary-text-color, CanvasText);
+        --nuclio-muted: var(--red-ui-secondary-text-color, GrayText);
+        --nuclio-border: var(--red-ui-secondary-border-color, ButtonBorder);
+        --nuclio-border-subtle: var(--red-ui-tertiary-border-color, ButtonBorder);
+        --nuclio-input-background: var(--red-ui-form-input-background, Field);
+        --nuclio-input-text: var(--red-ui-form-text-color, FieldText);
+        --nuclio-link: var(--red-ui-text-color-link, LinkText);
+        --nuclio-error: var(--red-ui-text-color-error, LinkText);
+        --nuclio-warning: var(--red-ui-text-color-warning, CanvasText);
+        --nuclio-success: var(--red-ui-text-color-success, CanvasText);
+        --nuclio-success-border: var(--red-ui-border-color-success, ButtonBorder);
+        --nuclio-warning-border: var(--red-ui-border-color-warning, ButtonBorder);
+        --nuclio-error-border: var(--red-ui-border-color-error, ButtonBorder);
+    }
+
     #nuclio-tabs-content {
         height: auto;
         min-height: 0;
@@ -41,9 +62,9 @@
     .nuclio-source-card {
         margin-bottom: 16px;
         padding: 16px;
-        border: 1px solid #e1e4ea;
+        border: 1px solid var(--nuclio-border);
         border-radius: 4px;
-        background: #ffffff;
+        background: var(--nuclio-background);
     }
     .nuclio-source-grid {
         display: grid;
@@ -54,7 +75,7 @@
     .nuclio-source-fields label {
         display: block;
         margin: 0 0 6px;
-        color: #4d465f;
+        color: var(--nuclio-text);
         font-size: 15px;
     }
     .nuclio-source-control select,
@@ -65,13 +86,13 @@
         box-sizing: border-box;
     }
     .nuclio-source-control input[readonly] {
-        color: #4d465f;
-        background: #ffffff;
+        color: var(--nuclio-input-text);
+        background: var(--nuclio-input-background);
     }
     .nuclio-source-note {
         max-width: none;
         margin: 14px 0 0;
-        color: #3d3a40;
+        color: var(--nuclio-text);
         font-size: 13px;
     }
     .nuclio-source-fields {
@@ -81,7 +102,7 @@
         margin-bottom: 12px;
     }
     .nuclio-required {
-        color: #e5204f;
+        color: var(--nuclio-error);
     }
 
 
@@ -120,16 +141,16 @@
     /* Status tab */
     #nuclio-tab-status {
         min-width: 0;
-        color: #1d2a33;
+        color: var(--nuclio-text);
         line-height: 1.4;
     }
     .nuclio-status-shell {
         min-width: 0;
         max-width: 100%;
         overflow: hidden;
-        border: 1px solid #dce4eb;
+        border: 1px solid var(--nuclio-border);
         border-radius: 6px;
-        background: #f7f9fb;
+        background: var(--nuclio-surface);
     }
     .nuclio-status-header {
         display: flex;
@@ -137,8 +158,8 @@
         align-items: stretch;
         gap: 10px;
         padding: 10px 12px;
-        border-bottom: 1px solid #e1e7ed;
-        background: #ffffff;
+        border-bottom: 1px solid var(--nuclio-border);
+        background: var(--nuclio-background);
     }
     .nuclio-status-left {
         min-width: 0;
@@ -158,7 +179,7 @@
         font-size: 11px;
         letter-spacing: 0.07em;
         text-transform: uppercase;
-        color: #6b7a86;
+        color: var(--nuclio-muted);
     }
     .nuclio-status-label { white-space: nowrap; }
     .nuclio-status-function-name {
@@ -177,21 +198,21 @@
         border-radius: 999px;
         font-size: 11px;
         font-weight: 600;
-        background: #eef1f4;
-        border: 1px solid #d7dde4;
-        color: #4b5b66;
+        background: var(--nuclio-surface);
+        border: 1px solid var(--nuclio-border-subtle);
+        color: var(--nuclio-muted);
     }
-    .nuclio-status-chip[data-tone="ok"] { background: #e7f7ee; border-color: #b9e7cd; color: #147a42; }
-    .nuclio-status-chip[data-tone="working"] { background: #fff3da; border-color: #f0d29b; color: #9a6b15; }
-    .nuclio-status-chip[data-tone="warn"] { background: #fff0e6; border-color: #f2c7aa; color: #a34811; }
-    .nuclio-status-chip[data-tone="error"] { background: #ffe6e6; border-color: #f3b2b2; color: #b21c1c; }
-    .nuclio-status-chip[data-tone="unavailable"] { background: #e9f1f8; border-color: #b9ccdc; color: #315d7d; }
-    .nuclio-status-chip[data-tone="idle"] { background: #eef1f4; border-color: #d7dde4; color: #4b5b66; }
-    .nuclio-status-chip[data-tone="unknown"] { background: #f3f4f6; border-color: #dfe3e8; color: #6b7a86; }
+    .nuclio-status-chip[data-tone="ok"] { border-color: var(--nuclio-success-border); color: var(--nuclio-success); }
+    .nuclio-status-chip[data-tone="working"] { border-color: var(--nuclio-warning-border); color: var(--nuclio-warning); }
+    .nuclio-status-chip[data-tone="warn"] { border-color: var(--nuclio-warning-border); color: var(--nuclio-warning); }
+    .nuclio-status-chip[data-tone="error"] { border-color: var(--nuclio-error-border); color: var(--nuclio-error); }
+    .nuclio-status-chip[data-tone="unavailable"] { border-color: var(--nuclio-border); color: var(--nuclio-link); }
+    .nuclio-status-chip[data-tone="idle"] { border-color: var(--nuclio-border-subtle); color: var(--nuclio-muted); }
+    .nuclio-status-chip[data-tone="unknown"] { border-color: var(--nuclio-border-subtle); color: var(--nuclio-muted); }
     .nuclio-status-meta {
         flex: 0 0 auto;
         font-size: 10px;
-        color: #6b7a86;
+        color: var(--nuclio-muted);
         white-space: nowrap;
     }
     .nuclio-status-actions {
@@ -206,30 +227,34 @@
     .nuclio-detail-toolbar button {
         border-radius: 5px;
         padding: 4px 7px;
-        border: 1px solid #cbd6df;
-        background: #ffffff;
-        color: #1d2a33;
+        border: 1px solid var(--nuclio-border);
+        background: var(--red-ui-form-button-background, var(--nuclio-surface));
+        color: var(--nuclio-text);
         text-decoration: none;
         font-size: 11px;
         font-weight: 600;
         cursor: pointer;
         white-space: nowrap;
     }
-    .nuclio-status-actions button { background: #1d2a33; color: #ffffff; border-color: #1d2a33; }
-    #nuclio-rebuild { background: #ffffff; color: #1d2a33; }
+    .nuclio-status-actions button {
+        background: var(--red-ui-workspace-button-background-primary, var(--nuclio-text));
+        color: var(--red-ui-workspace-button-color-primary, var(--nuclio-background));
+        border-color: var(--red-ui-workspace-button-background-primary, var(--nuclio-text));
+    }
+    #nuclio-rebuild { background: var(--red-ui-form-button-background, var(--nuclio-surface)); color: var(--nuclio-text); }
     .nuclio-status-actions button:disabled,
     .nuclio-detail-toolbar button:disabled { opacity: 0.55; cursor: wait; }
     .nuclio-action-feedback {
         margin: 10px 14px 0;
         padding: 7px 9px;
         border-radius: 5px;
-        background: #eef3f7;
-        color: #40515d;
+        background: var(--nuclio-surface);
+        color: var(--nuclio-text);
         font-size: 12px;
     }
-    .nuclio-action-feedback[data-tone="working"] { background: #fff3da; color: #8a6114; }
-    .nuclio-action-feedback[data-tone="ok"] { background: #e7f7ee; color: #147a42; }
-    .nuclio-action-feedback[data-tone="error"] { background: #ffe6e6; color: #a51d1d; }
+    .nuclio-action-feedback[data-tone="working"] { color: var(--nuclio-warning); }
+    .nuclio-action-feedback[data-tone="ok"] { color: var(--nuclio-success); }
+    .nuclio-action-feedback[data-tone="error"] { color: var(--nuclio-error); }
     .nuclio-status-main {
         display: flex;
         min-width: 0;
@@ -247,9 +272,9 @@
     .nuclio-status-signals,
     .nuclio-status-details {
         min-width: 0;
-        border: 1px solid #dfe6ec;
+        border: 1px solid var(--nuclio-border);
         border-radius: 6px;
-        background: #ffffff;
+        background: var(--nuclio-background);
     }
     .nuclio-status-card { padding: 8px 10px; }
     .nuclio-status-card-value {
@@ -261,7 +286,7 @@
     .nuclio-status-card-meta {
         margin-top: 2px;
         overflow-wrap: anywhere;
-        color: #6b7a86;
+        color: var(--nuclio-muted);
         font-size: 10px;
     }
     .nuclio-status-endpoints,
@@ -273,7 +298,7 @@
         gap: 8px;
         margin-bottom: 6px;
     }
-    .nuclio-status-section-note { color: #6b7a86; font-size: 11px; }
+    .nuclio-status-section-note { color: var(--nuclio-muted); font-size: 11px; }
     .nuclio-endpoint-list { display: grid; gap: 6px; }
     .nuclio-endpoint-row {
         display: grid;
@@ -281,11 +306,11 @@
         align-items: center;
         gap: 6px;
         padding: 4px 0;
-        border-top: 1px solid #edf1f4;
+        border-top: 1px solid var(--nuclio-border-subtle);
         font-size: 11px;
     }
     .nuclio-endpoint-row:first-child { border-top: 0; }
-    .nuclio-endpoint-label { color: #5a6a76; }
+    .nuclio-endpoint-label { color: var(--nuclio-muted); }
     .nuclio-endpoint-value {
         min-width: 0;
         overflow: hidden;
@@ -301,12 +326,12 @@
         max-width: 100%;
         padding: 4px 7px;
         border-radius: 4px;
-        background: #f3f6f9;
-        border: 1px solid #e0e6ee;
+        background: var(--nuclio-surface);
+        border: 1px solid var(--nuclio-border-subtle);
         font-size: 11px;
-        color: #1d2a33;
+        color: var(--nuclio-text);
     }
-    .nuclio-chip-key { color: #5a6a76; }
+    .nuclio-chip-key { color: var(--nuclio-muted); }
     .nuclio-chip-value {
         max-width: 100%;
         overflow-wrap: anywhere;
@@ -314,7 +339,7 @@
         font-weight: 600;
     }
     .nuclio-status-details { overflow: hidden; }
-    .nuclio-status-details details + details { border-top: 1px solid #dfe6ec; }
+    .nuclio-status-details details + details { border-top: 1px solid var(--nuclio-border); }
     .nuclio-status-details summary {
         display: flex;
         align-items: center;
@@ -326,7 +351,7 @@
         font-weight: 600;
         list-style-position: inside;
     }
-    .nuclio-status-details summary::marker { color: #6b7a86; }
+    .nuclio-status-details summary::marker { color: var(--nuclio-muted); }
     .nuclio-detail-body { padding: 0 10px 10px; }
     .nuclio-detail-toolbar {
         display: flex;
@@ -334,7 +359,7 @@
         justify-content: space-between;
         gap: 8px;
         margin-bottom: 6px;
-        color: #6b7a86;
+        color: var(--nuclio-muted);
         font-size: 11px;
     }
     .nuclio-logbox {
@@ -345,9 +370,9 @@
         margin: 0;
         padding: 9px;
         overflow: auto;
-        border: 1px solid #e1e7ed;
+        border: 1px solid var(--nuclio-border);
         border-radius: 5px;
-        background: #f7f9fb;
+        background: var(--nuclio-surface);
         white-space: pre-wrap;
         word-break: break-word;
         overflow-wrap: anywhere;
@@ -360,7 +385,7 @@
         text-wrap: nowrap;
     }
     .nuclio-log-entry + .nuclio-log-entry { margin-top: 8px; }
-    .nuclio-log-level { color: #536875; }
+    .nuclio-log-level { color: var(--nuclio-muted); }
     #nuclio-logs, #nuclio-deploy-logs, #nuclio-status, #nuclio-spec {
         font-family: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
         font-size: 12px;
