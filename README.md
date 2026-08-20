@@ -23,7 +23,7 @@ Using the docker-compose test install below will give you a fully functioning sy
 ## Test Install
 To test/develop
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 Unit tests and lint:
 ```bash
@@ -54,12 +54,12 @@ Cadence and self-healing behavior is configurable **in the node editor** — con
 and polling cadence on the **Nuclio Server** config node, recovery policy on the
 **Nuclio Function** node. Each field resolves:
 
-> node config (numeric literal, or set the field type to `env` to reference a variable)
+> node config (numeric literal or typed value)
 > → the built-in default.
 
 Editing a field takes effect on the next **Deploy** — no Node-RED restart. Blank fields
-use the built-in defaults; environment variables are used only when explicitly selected
-as the field's `env` type.
+use the built-in defaults. Typed values such as `env` can be used when a deployment
+should read from Node-RED's environment.
 
 **Server node (per dashboard):**
 
@@ -127,8 +127,8 @@ guards below keep node-red from reacting to flaky verdicts:
 ## Nuclio compatibility
 
 All dashboard interaction is isolated in `lib/nuclio-client.js` (endpoints, headers,
-request shapes, and the function state names). Tested against dashboard **1.15.x**
-(see the pinned image in `docker-compose.yml`). State handling is open-world: node-red
+and request shapes); state names are isolated in `lib/nuclio-states.js`. The compose
+fixture uses dashboard **1.17.5-arm64**. State handling is open-world: node-red
 acts on the small known set (`ready`, `error`, `unhealthy`, `scaledToZero`, 404) and
 treats any other state as "in transition — show it and wait," so unknown future states
 degrade to observation rather than breakage. If a Nuclio release changes the API, that

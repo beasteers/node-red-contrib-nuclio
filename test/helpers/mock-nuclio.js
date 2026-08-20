@@ -12,6 +12,7 @@ const http = require('http');
 //   mock.functionStates per-fn current state (overrides mock.state)
 //   mock.nextFnStates   per-fn queue of states to cycle through on GET polls
 //   mock.failDeploys    POST/PUT /api/functions return 500
+//   mock.functionCreateConflict  POST /api/functions stores then returns 409 once
 //   mock.failStatus     if set, GET /api/functions/* returns this status code
 //   mock.fn404ContentType  if set, 404s use this content-type instead of JSON
 //   mock.invoke         (body, req) -> { status, body } for invocations
@@ -50,12 +51,13 @@ const deepMergeDefaults = (spec) => {
     return merged;
 };
 
-const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflict = false } = {}) => new Promise((resolveServer) => {
+const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflict = false, functionCreateConflict = false } = {}) => new Promise((resolveServer) => {
     const waiters = [];
     const mock = {
         functions,
         state,
         projectCreateConflict,
+        functionCreateConflict,
         functionStates: {},
         nextFnStates: {},
         failDeploys: false,
@@ -185,6 +187,10 @@ const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflic
                 if (mock.failDeploys) return send(500, { error: 'deploy failed' });
                 const name = body?.metadata?.name;
                 storeFunction(name, body);
+                if (mock.functionCreateConflict) {
+                    mock.functionCreateConflict = false;
+                    return send(409, { error: 'function already exists' });
+                }
                 return send(202, body);
             }
             if (req.method === 'PUT' && fnMatch) {

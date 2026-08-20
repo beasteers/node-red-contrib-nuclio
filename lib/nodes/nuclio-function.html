@@ -525,27 +525,41 @@ rev /dev/stdin
         advanced: 'Advanced configuration',
     };
 
-    const yamlScalar = (text, key) => {
-        const match = `${text || ''}`.match(new RegExp(`^\\s+${key}:\\s*["']?([^"'\\n#]+?)["']?\\s*$`, 'm'));
-        return match ? match[1].trim() : '';
+    const yamlScalarInPath = (text, parentPath, key) => {
+        const stack = [];
+        const lines = `${text || ''}`.split(/\\r?\\n/);
+        for (const line of lines) {
+            const match = line.match(/^(\\s*)([A-Za-z0-9_.-]+):\\s*(.*?)\\s*$/);
+            if (!match) continue;
+            const indent = match[1].replace(/\\t/g, '    ').length;
+            while (stack.length && indent <= stack[stack.length - 1].indent) stack.pop();
+            const currentPath = stack.map(item => item.key);
+            let value = match[3].replace(/\\s+#.*$/, '').trim();
+            if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+                value = value.slice(1, -1);
+            }
+            if (match[2] === key && currentPath.join('.') === parentPath.join('.')) return value;
+            if (!value) stack.push({ key: match[2], indent });
+        }
+        return '';
     };
 
     const sourceFromConfigCode = (text) => {
-        const codeEntryType = yamlScalar(text, 'codeEntryType');
+        const codeEntryType = yamlScalarInPath(text, ['spec', 'build'], 'codeEntryType');
         const normalizedType = codeEntryType === 'github' ? 'git' : codeEntryType;
         if (SOURCE_TYPE_LABELS[normalizedType]) {
             return {
                 type: normalizedType,
-                path: yamlScalar(text, 'path'),
-                branch: yamlScalar(text, 'branch'),
-                tag: yamlScalar(text, 'tag'),
-                reference: yamlScalar(text, 'reference'),
-                username: yamlScalar(text, 'username'),
-                workDir: yamlScalar(text, 'workDir'),
+                path: yamlScalarInPath(text, ['spec', 'build'], 'path'),
+                branch: yamlScalarInPath(text, ['spec', 'build'], 'branch'),
+                tag: yamlScalarInPath(text, ['spec', 'build'], 'tag'),
+                reference: yamlScalarInPath(text, ['spec', 'build'], 'reference'),
+                username: yamlScalarInPath(text, ['spec', 'build'], 'username'),
+                workDir: yamlScalarInPath(text, ['spec', 'build'], 'workDir'),
             };
         }
-        if (codeEntryType || yamlScalar(text, 'path')) return { type: 'advanced' };
-        const image = yamlScalar(text, 'image');
+        if (codeEntryType || yamlScalarInPath(text, ['spec', 'build'], 'path')) return { type: 'advanced' };
+        const image = yamlScalarInPath(text, ['spec'], 'image');
         return image ? { type: 'image', path: image } : { type: 'sourceCode' };
     };
 
@@ -1351,7 +1365,7 @@ rev /dev/stdin
                     Secret Overrides
                 </label>
                 <p>
-                    <small>Specify secret paths such as <code>build.codeEntryAttributes.s3SecretAccessKey</code>. Values are stored in Node-RED credentials.</small>
+                    <small>Specify secret paths such as <code>spec.build.codeEntryAttributes.s3SecretAccessKey</code>. Values are stored in Node-RED credentials.</small>
                 </p>
                 <ol id="node-config-input-secret_vars-x"></ol>
             </div>

@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # Smoke test: deploys a Nuclio function through Node-RED against a real
-# Nuclio dashboard and invokes it.  Requires docker & docker-compose.
+# Nuclio dashboard and invokes it. Requires Docker Compose v2.
 # ---------------------------------------------------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -21,7 +21,7 @@ POLL_INTERVAL=3
 cleanup() {
     echo ""
     echo -e "${YELLOW}==> Tearing down docker-compose...${NC}"
-    docker-compose -f "$PROJECT_DIR/docker-compose.yml" down --volumes 2>/dev/null || true
+    docker compose -f "$PROJECT_DIR/docker-compose.yml" down --volumes 2>/dev/null || true
     if [ -f "$FLOWS_BACKUP" ]; then
         echo -e "${YELLOW}==> Restoring original flows.json${NC}"
         mv "$FLOWS_BACKUP" "$FLOWS_FILE"
@@ -56,8 +56,8 @@ EOFLOW
 # ------ Step 1: start the stack ------------------------------------------
 
 echo -e "${YELLOW}==> Building and starting docker-compose...${NC}"
-docker-compose -f "$PROJECT_DIR/docker-compose.yml" down --volumes 2>/dev/null || true
-docker-compose -f "$PROJECT_DIR/docker-compose.yml" up -d --build
+docker compose -f "$PROJECT_DIR/docker-compose.yml" down --volumes 2>/dev/null || true
+docker compose -f "$PROJECT_DIR/docker-compose.yml" up -d --build
 
 # ------ Step 2: wait for services ----------------------------------------
 

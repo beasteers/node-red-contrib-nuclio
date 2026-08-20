@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, redactPaths, stableStringify, hashConfig, retryBackoff, isTransientErrorCode, isTransientHttpStatus, isTransientError } = require('../lib/util');
+const { diff, merge, parseIntFallback, asString, splitByDotWithEscape, nestedAssign, redactPaths, stableStringify, hashConfig, retryBackoff, isTransientErrorCode, isTransientHttpStatus, isTransientError, numSetting } = require('../lib/util');
 
 
 /* ----------------------------------- diff ---------------------------------- */
@@ -84,6 +84,16 @@ test('nestedAssign honors escaped dots in keys', () => {
     assert.deepEqual(obj, { metadata: { annotations: { 'nuclio.io/x': 'v' } } });
 });
 
+test('legacy secret paths are rooted under spec while metadata paths stay rooted', () => {
+    const obj = {};
+    nestedAssign(obj, 'build.codeEntryAttributes.password', 'secret');
+    nestedAssign(obj, 'metadata.annotations.example', 'value');
+    assert.deepEqual(obj, {
+        spec: { build: { codeEntryAttributes: { password: 'secret' } } },
+        metadata: { annotations: { example: 'value' } },
+    });
+});
+
 test('nestedAssign rejects prototype-chain keys instead of polluting', () => {
     assert.throws(() => nestedAssign({}, '__proto__.polluted', 'yes'), /Unsafe key/);
     assert.throws(() => nestedAssign({}, 'a.__proto__.polluted', 'yes'), /Unsafe key/);
@@ -98,6 +108,19 @@ test('redactPaths copies and redacts escaped nested paths', () => {
     assert.equal(redacted.spec.env[0].value, '[redacted]');
     assert.equal(redacted.spec['a.b'].value, '[redacted]');
     assert.equal(source.spec.env[0].value, 'secret');
+});
+
+test('redactPaths supports legacy spec-relative paths', () => {
+    const redacted = redactPaths({ spec: { build: { token: 'secret' } } }, ['build.token']);
+    assert.equal(redacted.spec.build.token, '[redacted]');
+});
+
+test('numSetting rejects negative and partially numeric values', () => {
+    const RED = { util: { evaluateNodeProperty: value => value } };
+    const node = {};
+    assert.equal(numSetting(RED, node, { value: '-1' }, 'value', 5), 5);
+    assert.equal(numSetting(RED, node, { value: '100ms' }, 'value', 5), 5);
+    assert.equal(numSetting(RED, node, { value: '2.9' }, 'value', 5), 2);
 });
 
 /* ------------------------------ stable hashing ------------------------------ */

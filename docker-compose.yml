@@ -16,7 +16,8 @@ services:
       - .:/usr/src/node-red/node-red-contrib-nuclio
 
   nuclio-dashboard:
-    image: quay.io/nuclio/dashboard:1.17.5-arm64
+    # Override NUCLIO_DASHBOARD_IMAGE for another architecture or tag.
+    image: ${NUCLIO_DASHBOARD_IMAGE:-quay.io/nuclio/dashboard:1.17.5-arm64}
     container_name: nuclio
     restart: unless-stopped
     ports:

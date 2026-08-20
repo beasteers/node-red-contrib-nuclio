@@ -895,6 +895,15 @@ test('concurrent project creation conflict does not block function deployment', 
     await waitReady(helper.getNode('fn'));
 });
 
+test('concurrent function creation conflict is observed and tolerated', async () => {
+    mock = await startMockNuclio({ functionCreateConflict: true });
+    await load(baseFlow(mock));
+
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    await waitReady(helper.getNode('fn'));
+    assert.equal(mock.requests.filter(r => r.method === 'POST' && r.url === '/api/functions').length, 1);
+});
+
 test('scaledToZero polls at the scaledToZero interval without self-healing', async () => {
     mock = await startMockNuclio({ functions: { [FN]: { metadata: { name: FN }, spec: {} } }, state: 'scaledToZero' });
     await load(baseFlow(mock));
