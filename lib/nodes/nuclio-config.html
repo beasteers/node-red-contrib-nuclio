@@ -19,6 +19,8 @@
         defaults: {
             address: { value: 'NUCLIO_ADDRESS', required: true },
             addressType: { value: 'env' },
+            namespace: { value: 'nuclio' },
+            namespaceType: { value: 'str' },
             publicAddress: { value: 'http://localhost:8070', required: false },
             publicAddressType: { value: 'str' },
             invocationUrlPreference: { value: 'service' },
@@ -47,6 +49,10 @@
             });
             $('#node-config-input-publicAddress').typedInput({
                 default: this.publicAddressType,
+                types: ['str', 'global', 'env'],
+            });
+            $('#node-config-input-namespace').typedInput({
+                default: this.namespaceType || 'str',
                 types: ['str', 'global', 'env'],
             });
             $('#node-config-input-internalInvocationServiceHost').typedInput({
@@ -91,6 +97,15 @@
         <input type="text" id="node-config-input-publicAddress" placeholder="http://localhost:8070" />
         <div>
             <small>The address that YOU (and your browser) can reach nuclio by. This is just used for links to the nuclio dashboard and is not critical to operation. This could just be your local port forward address for simplicity.</small>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-namespace">
+            <span>Nuclio Namespace</span>
+        </label>
+        <input type="text" id="node-config-input-namespace" placeholder="nuclio" />
+        <div>
+            <small>Namespace used to scope function and project requests. Defaults to <code>nuclio</code>.</small>
         </div>
     </div>
     <div class="form-row">
@@ -183,6 +198,8 @@
         <dd>Address reachable by Node-RED (typically <code>http://host:8070</code>).</dd>
         <dt>Public Nuclio Dashboard URL</dt>
         <dd>Optional public address used for links in the editor.</dd>
+        <dt>Nuclio Namespace</dt>
+        <dd>Namespace sent with function and project requests. Defaults to <code>nuclio</code>.</dd>
         <dt>Invocation endpoint source</dt>
         <dd>Choose a stable service hostname or a Nuclio-reported internal or external URL.</dd>
         <dt>External URL protocol</dt>

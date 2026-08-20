@@ -5,8 +5,10 @@ const { createClient } = require('../lib/nuclio-client');
 
 test('Nuclio resource path segments are URI encoded', async () => {
     let requestUrl;
+    let requestHeaders;
     const server = http.createServer((req, res) => {
         requestUrl = req.url;
+        requestHeaders = req.headers;
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({}));
     });
@@ -15,7 +17,7 @@ test('Nuclio resource path segments are URI encoded', async () => {
     try {
         const address = `http://127.0.0.1:${server.address().port}`;
         const client = createClient(
-            { address, requestTimeoutMs: 1000, deployTimeoutMs: 1000 },
+            { address, namespace: 'custom-namespace', requestTimeoutMs: 1000, deployTimeoutMs: 1000 },
             'default',
         );
         await client.getLogs('function/name', 'replica name');
@@ -23,6 +25,7 @@ test('Nuclio resource path segments are URI encoded', async () => {
             requestUrl,
             '/api/functions/function%2Fname/logs/replica%20name?follow=false&tailLines=70',
         );
+        assert.equal(requestHeaders['x-nuclio-function-namespace'], 'custom-namespace');
     } finally {
         await new Promise(resolve => server.close(resolve));
     }

@@ -1137,6 +1137,18 @@ test('multiple functions deploy independently on the same server', async () => {
     await waitReady(fnB);
     assert.equal(fnA.fnState, 'ready');
     assert.equal(fnB.fnState, 'ready');
+    const listReads = mock.requests.filter(r => r.method === 'GET' && r.url === '/api/functions');
+    assert.ok(listReads.length >= 1, 'shared project status should use the function list endpoint');
+    assert.equal(
+        mock.requests.filter(r => r.method === 'GET' && r.url === '/api/functions/fn-a').length,
+        1,
+        'status polling should not add per-function reads once batching is active',
+    );
+    assert.equal(
+        mock.requests.filter(r => r.method === 'GET' && r.url === '/api/functions/fn-b').length,
+        1,
+        'status polling should not add per-function reads once batching is active',
+    );
     // both functions are on the same server so invocation host:port match;
     // verify they're independent by checking runtime/handler and invocation output
 
@@ -1150,6 +1162,33 @@ test('multiple functions deploy independently on the same server', async () => {
     helper.getNode('invB').receive({ payload: { func: 'b' } });
     const msgB = await replyB;
     assert.deepEqual(msgB.payload, { echo: { func: 'b' } });
+});
+
+test('status lookups are isolated by project', async () => {
+    mock = await startMockNuclio();
+    const flow = [
+        { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str', invocationUrlPreference: 'internal' },
+        { id: 'projA', type: 'nuclio-project', name: 'project-a', nameType: 'str' },
+        { id: 'projB', type: 'nuclio-project', name: 'project-b', nameType: 'str' },
+        { id: 'fnA', type: 'nuclio-function', server: 'srv', project: 'projA', name: 'fn-a', runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [], secret_vars: [] },
+        { id: 'fnB', type: 'nuclio-function', server: 'srv', project: 'projB', name: 'fn-b', runtime: 'golang', code: 'y = 1', configCode: '', env_vars: [], secret_vars: [] },
+        { id: 'invA', type: 'nuclio', function: 'fnA', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1A'], ['out2A']] },
+        { id: 'invB', type: 'nuclio', function: 'fnB', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1B'], ['out2B']] },
+        { id: 'out1A', type: 'helper' }, { id: 'out2A', type: 'helper' },
+        { id: 'out1B', type: 'helper' }, { id: 'out2B', type: 'helper' },
+    ];
+    await load(flow);
+    await mock.waitFor(r => r.method === 'POST' && r.body?.metadata?.name === 'fn-a');
+    await mock.waitFor(r => r.method === 'POST' && r.body?.metadata?.name === 'fn-b');
+    await waitReady(helper.getNode('fnA'));
+    await waitReady(helper.getNode('fnB'));
+
+    const projectHeaders = new Set(
+        mock.requests
+            .filter(r => r.method === 'GET' && ['/api/functions/fn-a', '/api/functions/fn-b'].includes(r.url))
+            .map(r => r.headers['x-nuclio-project-name'])
+    );
+    assert.deepEqual(projectHeaders, new Set(['project-a', 'project-b']));
 });
 
 /* -------------------------------------------------------------------------- */

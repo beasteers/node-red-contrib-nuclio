@@ -170,6 +170,15 @@ const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflic
                 const replica = decodeURIComponent(req.url.split('/logs/')[1].split('?')[0]);
                 return send(200, `logs for ${replica}`);
             }
+            if (req.method === 'GET' && req.url === '/api/functions') {
+                const projectName = req.headers['x-nuclio-project-name'] || 'default';
+                const functionsForProject = Object.fromEntries(
+                    Object.entries(mock.functions)
+                        .filter(([, fn]) => fn?.metadata?.labels?.['nuclio.io/project-name'] === projectName)
+                        .map(([name, fn]) => [name, { ...fn, status: fnStatus(name) }])
+                );
+                return send(200, functionsForProject);
+            }
             if (req.method === 'GET' && fnMatch) {
                 if (mock.failStatus) {
                     return send(mock.failStatus, { error: `simulated ${mock.failStatus}` });

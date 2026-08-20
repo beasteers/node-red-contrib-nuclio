@@ -70,6 +70,7 @@ should read from Node-RED's environment.
 
 | Field | Default | Purpose |
 | --- | --- | --- |
+| Nuclio namespace | `nuclio` | Namespace sent with function and project API requests. Use a typed value when the dashboard serves another namespace. |
 | Invocation endpoint source | `service` | Choose a stable service hostname, a Nuclio-reported internal URL, or a Nuclio-reported external URL. |
 | Stable service hostname template | `nuclio-{function}` | Leave blank for the Kubernetes default. Docker Compose commonly uses `nuclio-nuclio-{function}`. |
 | External URL protocol | `https` | Scheme for scheme-less external URLs. Explicit `http://` or `https://` URLs are preserved. |
@@ -81,6 +82,16 @@ should read from Node-RED's environment.
 | Start stagger | `2000` | Window to spread first-deploys across on startup. |
 | Request timeout | `10000` | Status/admin HTTP timeout. |
 | Deploy timeout | `60000` | Create/update HTTP timeout. |
+
+**Projects and status polling:**
+
+Functions are grouped by the selected **Nuclio Project**. The project name is sent
+with every function request and is the ownership and status-isolation boundary. When
+multiple Node-RED functions share a server and project, status reconciliation uses one
+project-scoped `GET /api/functions` snapshot and distributes the matching function
+states locally. A project with only one managed function uses the individual function
+endpoint instead. Nuclio authentication and project permissions must be configured
+separately when the project is also being used as an access-control boundary.
 
 **Function node (per function):**
 
