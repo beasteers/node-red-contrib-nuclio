@@ -396,7 +396,11 @@
 
     </style>
 
+<script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-runtime-metadata.js"></script>
+
 <script type="text/javascript">
+    const RUNTIME_METADATA = window.NUCLIO_RUNTIME_METADATA || [];
+
     // Starter YAML shown in the Config editor (shared by all runtime samples).
     const configCode = `
 apiVersion: "nuclio.io/v1"
@@ -503,19 +507,22 @@ rev /dev/stdin
         return `${sampleList(adjectives)}-${sampleList(nouns)}`;
     };
 
-    // runtime -> ace editor language
-    const langFor = (runtime) => ({
-        python: 'python',
-        golang: 'go',
-        nodejs: 'javascript',
-        shell: 'shell',
-    })[`${runtime}`.split(':')[0]];
+    const runtimeMetadata = (runtime) => {
+        const value = `${runtime || ''}`;
+        const base = value.split(':')[0];
+        return RUNTIME_METADATA.find(item => item.value === value)
+            || RUNTIME_METADATA.find(item => item.base === base)
+            || { value, base, label: value, language: 'text', handler: 'main:handler' };
+    };
+
+    const langFor = runtime => runtimeMetadata(runtime).language;
 
     const SOURCE_TYPE_LABELS = {
         sourceCode: 'Source code',
         image: 'Image',
         git: 'Git',
         archive: 'Archive',
+        advanced: 'Advanced configuration',
     };
 
     const yamlScalar = (text, key) => {
@@ -537,14 +544,12 @@ rev /dev/stdin
                 workDir: yamlScalar(text, 'workDir'),
             };
         }
+        if (codeEntryType || yamlScalar(text, 'path')) return { type: 'advanced' };
         const image = yamlScalar(text, 'image');
         return image ? { type: 'image', path: image } : { type: 'sourceCode' };
     };
 
-    const defaultHandlerFor = (runtime) => {
-        const base = `${runtime || ''}`.split(':')[0];
-        return base === 'nodejs' ? 'handler:handler' : base === 'golang' ? 'main:Handler' : 'main:handler';
-    };
+    const defaultHandlerFor = runtime => runtimeMetadata(runtime).handler;
 </script>
 
 <script type="text/javascript">
@@ -766,6 +771,23 @@ rev /dev/stdin
             node.originalName = node.name;
             node.nuclioEditorDirty = false;
 
+            const runtimeSelect = $('#node-config-input-runtime');
+            const selectedRuntime = this.runtime || 'python:3.12';
+            const runtimeOptions = [...RUNTIME_METADATA];
+            if (selectedRuntime && !runtimeOptions.some(item => item.value === selectedRuntime)) {
+                const [base] = selectedRuntime.split(':');
+                runtimeOptions.push({
+                    value: selectedRuntime,
+                    base,
+                    label: selectedRuntime,
+                    language: 'text',
+                    handler: 'main:handler',
+                });
+            }
+            runtimeSelect.empty();
+            runtimeOptions.forEach(item => $('<option>').val(item.value).text(item.label).appendTo(runtimeSelect));
+            runtimeSelect.val(selectedRuntime);
+
             const markEditorDirty = () => {
                 node.nuclioEditorDirty = true;
             };
@@ -863,7 +885,9 @@ rev /dev/stdin
             });
 
             const legacySource = sourceFromConfigCode(this.configCode);
-            const sourceType = this.sourceType || legacySource.type || 'sourceCode';
+            const sourceType = this.sourceType
+                ? (SOURCE_TYPE_LABELS[this.sourceType] ? this.sourceType : 'advanced')
+                : legacySource.type || 'sourceCode';
             $('#node-config-input-sourceType').val(sourceType);
             $('#node-config-input-codeEntryPath').val(this.codeEntryPath || legacySource.path || '');
             $('#node-config-input-codeEntryBranch').val(this.codeEntryBranch || legacySource.branch || '');
@@ -878,7 +902,8 @@ rev /dev/stdin
                 $('.nuclio-source-fields').addClass('nuclio-hidden');
                 $(`#nuclio-source-fields-${selected}`).removeClass('nuclio-hidden');
                 const external = selected !== 'sourceCode';
-                $('#nuclio-source-path-field').toggleClass('nuclio-hidden', !external);
+                const hasSourceFields = ['image', 'git', 'archive'].includes(selected);
+                $('#nuclio-source-path-field').toggleClass('nuclio-hidden', !hasSourceFields);
                 $('#nuclio-source-workdir-field').toggleClass('nuclio-hidden', !['git', 'archive'].includes(selected));
                 $('#nuclio-source-path-label').html(selected === 'image'
                     ? 'Image name'
@@ -889,6 +914,9 @@ rev /dev/stdin
                         ? 'For example: https://github.com/my-organization/my-repository.git'
                         : 'For example: https://example.com/my-function.zip');
                 $('#nuclio-inline-code-note').toggleClass('nuclio-hidden', selected === 'sourceCode');
+                $('#nuclio-inline-code-note').text(selected === 'advanced'
+                    ? 'Advanced source configuration is controlled in the Config tab.'
+                    : 'Online code is disabled for this source type. The repository or image above is deployed instead.');
                 $('#node-config-input-nuclio-editor').toggleClass('nuclio-hidden', external);
                 $('#nuclio-handler-preview').val(defaultHandlerFor($('#node-config-input-runtime').val()));
             };
@@ -911,12 +939,13 @@ rev /dev/stdin
                 let configCode = node.configeditor.getValue();
                 const codes = Object.values(SAMPLES).map(v => v.code);
                 const configCodes = Object.values(SAMPLES).map(v => v.config);
-                if(code.trim() === '' || codes.includes(code)) {
-                    code = SAMPLES[runtimeBase].code;
+                const sample = SAMPLES[runtimeBase];
+                if (sample && (code.trim() === '' || codes.includes(code))) {
+                    code = sample.code;
                     node.editor.setValue(code);
                 }
-                if(configCode.trim() === '' || configCodes.includes(configCode)) {
-                    node.configeditor.setValue(SAMPLES[runtimeBase].config);
+                if (sample && (configCode.trim() === '' || configCodes.includes(configCode))) {
+                    node.configeditor.setValue(sample.config);
                 }
                 node.editor.setMode(`ace/mode/${lang}`);
                 $('#nuclio-handler-preview').val(defaultHandlerFor(runtime));
@@ -1214,19 +1243,12 @@ rev /dev/stdin
                             <option value="image">Image</option>
                             <option value="git">Git</option>
                             <option value="archive">Archive</option>
+                            <option value="advanced">Advanced configuration</option>
                         </select>
                     </div>
                     <div class="nuclio-source-control">
                         <label for="node-config-input-runtime">Runtime</label>
-                        <select id="node-config-input-runtime" class="form-control">
-                            <option value="python:3.12">Python 3.12</option>
-                            <option value="python:3.11">Python 3.11</option>
-                            <option value="python:3.10">Python 3.10</option>
-                            <option value="python:3.9">Python 3.9</option>
-                            <option value="golang">Go</option>
-                            <option value="nodejs">Node.js</option>
-                            <option value="shell">Shell</option>
-                        </select>
+                        <select id="node-config-input-runtime" class="form-control"></select>
                     </div>
                     <div class="nuclio-source-control">
                         <label for="nuclio-handler-preview">Handler</label>

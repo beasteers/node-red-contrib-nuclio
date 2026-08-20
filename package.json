@@ -5,6 +5,7 @@
   "main": "lib/nodes/nuclio.js",
   "files": [
     "lib",
+    "resources",
     "scripts/migrate-nuclio-config.js"
   ],
   "scripts": {
@@ -14,7 +15,7 @@
     "diagnose:redeploy": "node scripts/diagnose-redeploy.js"
   },
   "node-red": {
-    "version": ">=3.0.0",
+    "version": ">=4.0.0",
     "nodes": {
       "nuclio": "lib/nodes/nuclio.js",
       "nuclio-config": "lib/nodes/nuclio-config.js",
@@ -47,7 +48,7 @@
   "author": "beasteers",
   "license": "MIT",
   "engines": {
-    "node": ">=14"
+    "node": ">=22"
   },
   "homepage": "https://github.com/beasteers/node-red-contrib-nuclio",
   "dependencies": {
@@ -59,7 +60,7 @@
     "@eslint/js": "^10.0.1",
     "bcrypt": "^6.0.0",
     "eslint": "^10.4.1",
-    "node-red": "^5.0.0",
+    "node-red": "^5.0.4",
     "node-red-node-test-helper": "^0.3.6"
   }
 }

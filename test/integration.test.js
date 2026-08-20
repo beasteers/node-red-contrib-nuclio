@@ -122,6 +122,31 @@ test('external Git source suppresses online code and emits Nuclio source fields'
         password: 'git-password',
     });
     await waitReady(helper.getNode('fn'));
+
+    const spec = await helper.request().get('/nuclio/api/functions?id=fn&view=spec').expect(200);
+    assert.equal(spec.body.spec.build.codeEntryAttributes.password, '[redacted]');
+});
+
+test('unknown advanced source configuration is preserved', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        configCode: [
+            'spec:',
+            '  build:',
+            '    codeEntryType: s3',
+            '    path: s3://bucket/function.zip',
+            '    codeEntryAttributes:',
+            '      s3Bucket: bucket',
+            '  minReplicas: 2',
+        ].join('\n'),
+    }));
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(req.body.spec.build.codeEntryType, 's3');
+    assert.equal(req.body.spec.build.path, 's3://bucket/function.zip');
+    assert.equal(req.body.spec.build.codeEntryAttributes.s3Bucket, 'bucket');
+    assert.equal(req.body.spec.minReplicas, 2);
+    assert.equal(req.body.spec.build.functionSourceCode, undefined);
 });
 
 test('a trailing slash on the server address is normalized', async () => {
