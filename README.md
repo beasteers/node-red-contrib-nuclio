@@ -1,225 +1,243 @@
-# Deploy Nuclio Functions with Node-Red.
+# Node-RED Nuclio
 
-Deploy Nuclio Functions directly from a Node-Red script. These are essentially Python, Go, Node.js, or Shell HTTP endpoints that nodered calls.
+Deploy and invoke [Nuclio](https://nuclio.io/) functions from Node-RED.
 
-The **nuclio-function** config node acts essentially like a function node, giving you a
-code editor. Once it is deployed, it deploys the function to Nuclio and keeps it healthy.
-The **nuclio** node then acts as an HTTP request node, making requests to that function.
+The package provides two primary nodes:
 
-> NOTE: The function editor supports online source code, container images, Git repositories, and archive URLs. The selected source fields take precedence over matching fields in the advanced function configuration. Repository downloads are performed by the Nuclio builder, so the builder must be able to reach the repository.
+| Node | Purpose |
+| --- | --- |
+| **Nuclio Function** | Owns a function's source, configuration, deployment, and health reconciliation. |
+| **Nuclio Invoke** | Sends messages to a deployed function and exposes lifecycle commands. |
+
+Functions can be written as Python, Go, Node.js, or Shell handlers. They can run from inline
+source code, a container image, a Git repository, or an archive URL.
+
+## Requirements
+
+- Node.js 22 or newer
+- Node-RED 4.0.0 or newer
+- A reachable Nuclio dashboard
+
+The dashboard does not need to be public, but the Node-RED process must be able to reach it.
+Configure Nuclio authentication and permissions separately when the dashboard is protected.
 
 ## Install
 
-> This project is under active development — I look forward to hearing your experience, feedback, and ideas for improvements.
+Install the package in your Node-RED user directory:
 
 ```bash
-npm i @bea.steers/node-red-contrib-nuclio
+npm install @bea.steers/node-red-contrib-nuclio
 ```
 
-Runtime requirements are Node.js **22 or newer** and Node-RED **4.0.0 or newer**.
-The test matrix covers Node.js 22/26 with Node-RED 4.0.0/5.0.4.
+Restart Node-RED, then add a **Nuclio Server**, **Nuclio Project**, **Nuclio Function**, and
+**Nuclio Invoke** node from the editor.
 
-In order to use this node, you must have the Nuclio dashboard running. It doesn't need to be public, it just needs to be accessible by Node-Red.
+## Quick start
 
-Using the Docker Compose test install below will give you a fully functioning system to experiment with. It is a development fixture, not required by an installed package.
-The Compose fixture requires an architecture-specific dashboard image. For example:
+1. Create a **Nuclio Server** config node and enter the dashboard address.
+2. Optionally create a **Nuclio Project** and attach it to the function. Projects are the
+   ownership and status-isolation boundary for functions.
+3. Create a **Nuclio Function**, choose a runtime, and enter the handler source or external
+   source location.
+4. Connect a **Nuclio Invoke** node to the function and deploy the flow.
+5. Send messages to the invoke node. Successful invocations leave through output 1; invocation
+   failures leave through output 2.
 
-```bash
-NUCLIO_ARCH=amd64 \
-NUCLIO_ARCH_PREFIX= \
-NUCLIO_DASHBOARD_IMAGE=quay.io/nuclio/dashboard:1.17.5-amd64 \
-docker compose up -d --build
+Functions deploy eagerly on Node-RED startup by default. Set **Deployment mode** to **Lazy** if
+a function should not be created until a flow explicitly sends a `deploy` command.
+
+## Function sources
+
+The Function tab supports these source types:
+
+- **Source code**: code entered in the editor.
+- **Image**: an existing container image.
+- **Git**: a repository and optional branch, tag, reference, credentials, and work directory.
+- **Archive**: a downloadable source archive.
+- **Advanced configuration**: source fields controlled entirely by the YAML configuration.
+
+Source fields in the editor override matching source fields in the YAML configuration. For Git
+and archive sources, the Nuclio builder—not Node-RED—downloads the source, so the builder must
+be able to reach the repository or URL.
+
+## Configuration
+
+### Server settings
+
+Connection and reconciliation settings live on the **Nuclio Server** node.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| Namespace | `nuclio` | Namespace sent with dashboard requests. |
+| Invocation source | `service` | Use a stable service hostname or a Nuclio-reported internal/external URL. |
+| Service hostname template | `nuclio-{function}` | Stable function hostname. Docker Compose commonly uses `nuclio-nuclio-{function}`. |
+| External URL protocol | `https` | Protocol for scheme-less external URLs. |
+| Deployment policy | `managed` | Set to `disabled` to prevent creates, updates, and self-healing. Existing functions are left untouched. |
+| Poll interval | `1000` | Poll interval while a function is building or transitioning. |
+| Ready poll | `5000` | Poll interval while a function is healthy. |
+| Backoff / maximum | `5000` / `60000` | Exponential backoff after dashboard errors. |
+| Start stagger | `2000` | Spreads initial deployments across startup. |
+| Request / deploy timeout | `10000` / `60000` | HTTP timeouts for reads and writes. |
+
+Blank settings use the built-in defaults. Settings that support typed input can read a value from
+the Node-RED process environment.
+
+### Function settings
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| Deployment mode | `eager` | Deploy on startup, or wait for an explicit `deploy` command in `lazy` mode. |
+| Self-heal attempts | `5` | Maximum automatic redeploys after unhealthy observations. |
+| Redeploy deadline | `120000` | Maximum time allowed for a redeploy to become healthy. |
+| Auto-redeploy on error | `false` | Whether Nuclio's `error` state should trigger self-healing. |
+
+### Environment variables and deployment variables
+
+These are separate features:
+
+- **Environment Variables** are injected into the function's runtime environment.
+- **Deployment Variables** interpolate values into the function YAML before deployment.
+
+Deployment Variables support literal values, Node-RED process environment variables, and
+encrypted credentials. Credential-backed values are always treated as secret. Literal and
+environment-backed values can be marked secret as well.
+
+Use Bash-style variable references and nested defaults in YAML:
+
+```yaml
+spec:
+  build:
+    baseImage: gcr.io/iguazio/${NUCLIO_ARCH_PREFIX:-arm64v8/}alpine:3.23
 ```
 
-## Test Install
-To test/develop
-```bash
-docker compose up -d --build
+Interpolation is limited to variable references; it never invokes a shell. An undefined
+variable without a default makes the function configuration invalid. Secret-bearing values are
+not logged, and matching fields are redacted from status responses.
+
+## Projects and status
+
+Functions are grouped by the selected Nuclio Project. The project name is sent with every
+function request and scopes status reconciliation. When multiple Node-RED functions share a
+server and project, Node-RED uses one project-scoped function list and distributes the states
+locally.
+
+Use projects to separate ownership between teams, applications, or environments. A project
+does not replace Nuclio authentication; dashboard permissions still determine who can access it.
+
+## Invoking functions
+
+The invoke node sends the incoming message payload to the function. Its **Timeout**,
+**Concurrency Cap**, **Retries**, and **Retry Delay** settings control invocation behavior.
+
+Lifecycle commands are sent in `msg.nuclio.command`:
+
+```js
+msg.nuclio = { command: 'deploy' }     // create or converge; activates lazy mode
+msg.nuclio = { command: 'redeploy' }   // reuse the existing image
+msg.nuclio = { command: 'rebuild' }    // force a full image build
+msg.nuclio = { command: 'status' }     // return current local status
 ```
-Unit tests and lint:
+
+Command acknowledgements leave through output 1. Command failures leave through output 2 with
+the error attached to the message. Ordinary messages sent to a lazy function are routed to the
+fallback output until a deploy command completes successfully.
+
+Transient connection and `429`/`502`/`503`/`504` failures are retried when **Retries** is greater
+than zero. Retries are at-least-once: a dropped connection may still have delivered the request,
+so side-effecting functions should be idempotent.
+
+## Deployment behavior
+
+Node-RED stamps deployed functions with configuration and build fingerprints. Unchanged
+functions are not redeployed. Changes that do not affect the build can update the function with
+`skip-build`; source or image changes trigger a build.
+
+The **Redeploy** action reuses the existing image. **Rebuild** forces a new image build, which is
+useful for picking up new commits behind an unchanged Git URL.
+
+Nuclio reports container health; Node-RED performs reconciliation and self-healing. Status is
+still polled after successful invocations, and self-healing waits for two consecutive unhealthy
+observations before acting.
+
+## Orphaned functions
+
+Orphan cleanup is explicit. Node-RED never automatically deletes functions merely because they
+are absent from the current flow.
+
+To inspect candidates, query the project-scoped admin endpoint using a loaded function node ID:
+
+```text
+GET /nuclio/api/orphans?id=<function-node-id>
+```
+
+A function is eligible only when it is absent from the loaded flow, belongs to the current
+project, and has the `nuclio.io/node-red: true` ownership annotation. To delete a reported
+candidate explicitly:
+
+```js
+msg.nuclio = { command: 'prune', target: 'old-function' }
+```
+
+Pruning is refused for unowned, loaded, cross-project, or ambiguous functions. It is also
+disabled when the server's deployment policy is disabled.
+
+## Troubleshooting
+
+### Function does not become ready
+
+Open the function's **Status** tab and inspect the build logs and run logs. The status panel
+also exposes the raw function specification and the dashboard link. Check that the dashboard,
+builder, and function runtime can reach the required networks and registries.
+
+### Image or architecture errors
+
+Nuclio base and builder images are architecture-specific in many local installations. Keep the
+architecture-specific portion in a Deployment Variable rather than hard-coding it into every
+function. For example, the Compose fixture uses `NUCLIO_ARCH_PREFIX`.
+
+### Git or archive deployment fails
+
+The Nuclio builder must be able to resolve and download the configured source. Verify repository
+credentials, URL access from the builder environment, and the selected branch, tag, or reference.
+
+### Deployment is intentionally disabled
+
+The server's **Deployment policy** can be set to `disabled` for environments where Node-RED may
+invoke existing functions but must not create, update, or self-heal them.
+
+## Migrating from older versions
+
+Since 1.1, function configuration lives on a shared **Nuclio Function** config node instead of
+the invoke node. Convert an older `flows.json` with:
+
 ```bash
+node scripts/migrate-nuclio-config.js path/to/flows.json
+node scripts/migrate-nuclio-config.js path/to/flows.json --in-place
+```
+
+Version 3 removes the deprecated function-level credential override list. Replace those values
+with Deployment Variables before upgrading; the migration script does not convert the old
+override values into credentials.
+
+## Development and testing
+
+This section is for contributors and maintainers. It is not required to use the installed node.
+
+```bash
+npm ci
 npm test
 npm run lint
 ```
-Smoke test (from a repository checkout; spins up Docker Compose, deploys a real Nuclio function, and invokes it):
-```bash
-npm run smoke
-```
-KinD canary (from a repository checkout; creates a disposable Kubernetes cluster, installs Nuclio,
-loads a local function image, and invokes it through Node-RED):
-```bash
-npm run canary:kind
-```
-The canary requires Docker, KinD, `kubectl`, Helm, Python 3, and a completed `npm ci`. It deletes
-the cluster named `nuclio-node-red-canary` when it finishes. Set `KIND_CANARY_KEEP_CLUSTER=1` to
-keep the cluster for inspection. This is a quick integration check, not a production Kubernetes
-installation: it uses a local prebuilt image and the default unauthenticated dashboard.
-Redeploy diagnostic (snapshots Docker, Nuclio, Node-RED, and in-network probes before
-and after a targeted redeploy):
-```bash
-node scripts/diagnose-redeploy.js --function dewlit-logic --duration 90
-```
-The script discovers the Node-RED function node, triggers its normal redeploy route,
-prints state changes, and writes a JSON timeline. Use `--rebuild` to test a rebuild,
-`--node-id <id>` when flow discovery is unavailable, or `--report <path>` to choose
-the report location. It requires the running `nodered-nuclio`, `nuclio`, and function
-containers to be reachable through Docker.
-The smoke test and redeploy diagnostic are repository-development tools; the published
-package contains their scripts but does not include this Compose fixture.
-You can access: 
- * Node-Red dashboard [here](http://localhost:1882). 
- * The Nuclio dashboard can be found [here](http://localhost:8072).
 
-## Tuning
+The repository also contains optional integration fixtures:
 
-Cadence and self-healing behavior is configurable **in the node editor** — connection
-and polling cadence on the **Nuclio Server** config node, recovery policy on the
-**Nuclio Function** node. Each field resolves:
+- `npm run smoke` starts the Docker Compose fixture, deploys a real function, and invokes it.
+- `npm run test:kind` creates a disposable KinD cluster and exercises a Kubernetes deployment.
+  It requires Docker, KinD, `kubectl`, Helm, Python 3, and a completed `npm ci`. The cluster is
+  removed when the test finishes; set `KIND_CANARY_KEEP_CLUSTER=1` to keep it for inspection.
+- `node scripts/diagnose-redeploy.js ...` captures a local Docker/Node-RED/Nuclio timeline when
+  investigating a specific redeploy problem. It is a troubleshooting aid, not part of normal
+  package usage.
 
-> node config (numeric literal or typed value)
-> → the built-in default.
-
-Editing a field takes effect on the next **Deploy** — no Node-RED restart. Blank fields
-use the built-in defaults. Typed values such as `env` can be used when a deployment
-should read from Node-RED's environment.
-
-**Server node (per dashboard):**
-
-| Field | Default | Purpose |
-| --- | --- | --- |
-| Nuclio namespace | `nuclio` | Namespace sent with function and project API requests. Use a typed value when the dashboard serves another namespace. |
-| Invocation endpoint source | `service` | Choose a stable service hostname, a Nuclio-reported internal URL, or a Nuclio-reported external URL. |
-| Stable service hostname template | `nuclio-{function}` | Leave blank for the Kubernetes default. Docker Compose commonly uses `nuclio-nuclio-{function}`. |
-| External URL protocol | `https` | Scheme for scheme-less external URLs. Explicit `http://` or `https://` URLs are preserved. |
-| Deployment policy | `managed` | Use `disabled` to prevent function creates, updates, and self-healing in this environment. Existing remote functions are left untouched. |
-| Poll interval | `1000` | Poll interval while a function is building/transitioning. |
-| Ready poll | `5000` | Poll interval once a function is healthy. |
-| Backoff | `5000` | First retry delay after a dashboard error (doubles each failure). |
-| Backoff max | `60000` | Cap on the exponential backoff. |
-| Start stagger | `2000` | Window to spread first-deploys across on startup. |
-| Request timeout | `10000` | Status/admin HTTP timeout. |
-| Deploy timeout | `60000` | Create/update HTTP timeout. |
-
-**Function node (per function):**
-
-Deployment Variables belong to the **Nuclio Function** config node so each function owns the
-values needed by its own YAML. They support literal values, Node-RED process environment
-variables, and encrypted credentials. Credential values are always secret; literal and
-environment-backed values can be marked secret as well. Interpolation is deliberately limited
-to variable references and nested `:-` defaults; it never invokes a shell. Missing variables
-without a default fail the function configuration. Secret-bearing scalars are excluded from logs
-and redacted from function status responses. The variable list is stored in Node-RED's encrypted
-credential store. The former function-level Credential Overrides are no longer supported;
-use Deployment Variables instead.
-
-The Compose demo passes `NUCLIO_ARCH_PREFIX` into Node-RED so the function YAML can retain the
-image family and version while the deployment supplies its architecture-specific repository
-prefix. The ARM64 default is `arm64v8/`; set `NUCLIO_ARCH_PREFIX=` for the AMD64 Compose setup.
-
-**Projects and status polling:**
-
-Functions are grouped by the selected **Nuclio Project**. The project name is sent
-with every function request and is the ownership and status-isolation boundary. When
-multiple Node-RED functions share a server and project, status reconciliation uses one
-project-scoped `GET /api/functions` snapshot and distributes the matching function
-states locally. A project with only one managed function uses the individual function
-endpoint instead. Nuclio authentication and project permissions must be configured
-separately when the project is also being used as an access-control boundary.
-
-**Function node (per function):**
-
-| Field | Default | Purpose |
-| --- | --- | --- |
-| Deployment mode | `eager` | `eager` deploys on Node-RED startup; `lazy` waits for an explicit `deploy` input command. |
-| Self-heal attempts | `5` | Auto-redeploys of an unhealthy function before giving up. |
-| Redeploy deadline | `120000` | How long a redeploy may run before it's treated as failed. |
-| Auto-redeploy on error | `false` | Also auto-redeploy functions in Nuclio's `error` state. |
-
-The invoke node's per-call **Timeout**, **Concurrency Cap**, **Retries**, and **Retry
-Delay** are set on the `nuclio` node itself. Each can use a numeric literal, the built-in
-default, or a typed environment value.
-
-The invoke node also accepts lifecycle commands in `msg.nuclio.command`:
-
-```js
-msg.nuclio = { command: 'deploy' }     // converge/create; activates lazy mode
-msg.nuclio = { command: 'redeploy' }   // reuse the existing image
-msg.nuclio = { command: 'rebuild' }    // force a full build
-msg.nuclio = { command: 'status' }     // return cached state without deploying
-msg.nuclio = { command: 'prune', target: 'old-function' } // explicitly delete a reported orphan
-```
-
-Command acknowledgements use the result output; command failures use the fallback
-output. Ordinary messages sent to a lazy function are gated until a deploy command
-completes successfully.
-
-`prune` is deliberately conservative: it only deletes a function that is missing
-from the loaded flow, belongs to the current Nuclio project, and has the
-`nuclio.io/node-red: true` ownership annotation. It never deletes an unowned or
-currently loaded function. Orphan discovery and pruning are also stopped when the
-project-scoped function list cannot be read or the loaded flow has configuration
-errors.
-
-Transient failures — connection errors and `429`/`502`/`503`/`504` responses (a function
-scaling or redeploying) — only log a warning (they never trigger Catch nodes), and are
-retried with exponential backoff when **Retries** > 0, honoring a numeric `Retry-After`
-header. Retries are at-least-once: a dropped connection may still have delivered the
-request, so make side-effecting functions idempotent if you enable retries.
-
-## How deploy & health work
-
-**Change detection is hash-based.** Each deploy stamps the function with a fingerprint
-(`nuclio.io/node-red-config-hash`, plus a build-only hash) as annotations. On the next
-deploy, node-red compares fingerprints instead of deep-diffing the live config, so
-server-side defaults never cause churn. If only non-build inputs changed (env, replicas,
-...), the update is pushed with `skip-build` and no image rebuild. Functions deployed by
-older versions are migrated on their first update. Note: edits made **directly in the
-Nuclio dashboard** are not reverted while the fingerprint matches — node-red reasserts
-your config the next time it actually changes.
-
-**Rebuild vs. redeploy.** The status tab's **Redeploy** re-converges the function from
-its existing image (fast, no build). **Rebuild** forces a full image rebuild even when
-the config is unchanged. For `git`/`archive` code entries, that is how you pick
-up new commits behind an unchanged URL — the fingerprint covers your config, not the
-repo's contents, so a plain redeploy would reuse the old image.
-
-**Health is a two-party split.** Nuclio is the *sensor* — it watches container health and
-reports function state, but does not redeploy. Node-RED is the *actuator* — the reconcile
-loop reads state and is the only thing that redeploys (self-heal). They don't fight; the
-guards below keep node-red from reacting to flaky verdicts:
-
- * Status is always polled (at the **Ready poll** cadence when healthy). Succeeding
-   invocations never skip observation — they only slow the poll and suppress self-heal.
- * An invocation success only counts while **fresh** (~30s), so an idle function that
-   served one request an hour ago is still watched.
- * Self-heal waits for **two consecutive** unhealthy readings before redeploying, so a
-   single flaky health verdict doesn't churn a redeploy. Self-heal remains bounded by
-   **Self-heal attempts**, then gives up with an honest status.
-
-## Nuclio compatibility
-
-All dashboard interaction is isolated in `lib/nuclio-client.js` (endpoints, headers,
-and request shapes); state names are isolated in `lib/nuclio-states.js`. The Compose
-fixture requires explicit `NUCLIO_DASHBOARD_IMAGE` and `NUCLIO_ARCH` values because the
-dashboard image is architecture-specific. State handling is open-world: node-red
-acts on the small known set (`ready`, `error`, `unhealthy`, `scaledToZero`, 404) and
-treats any other state as "in transition — show it and wait," so unknown future states
-degrade to observation rather than breakage. If a Nuclio release changes the API, that
-one file is where to look.
-
-## Migrating from 1.0
-
-Since 1.1 the function configuration (code, runtime, env) lives on a shared
-`nuclio-function` config node instead of the invoke node, so several invoke nodes (or
-subflows) can share one function. To convert a pre-1.1 `flows.json`:
-
-```bash
-node scripts/migrate-nuclio-config.js path/to/flows.json            # writes flows.migrated.json
-node scripts/migrate-nuclio-config.js path/to/flows.json --in-place # or overwrite
-```
-
-## Hacks
-[bug](https://github.com/nuclio/nuclio/issues/3968)
-```bash
-docker exec nuclio apk add --no-cache docker-cli-buildx
-```
+The Compose and KinD fixtures use local, unauthenticated dashboards and are integration tests,
+not production deployment recipes.
