@@ -133,6 +133,40 @@
         width: auto;
     }
 
+    #nuclio-tabs-content .nuclio-deployment-variable-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        width: 100%;
+    }
+    #nuclio-tabs-content .nuclio-deployment-variable-row .node-input-key {
+        flex: 0 1 220px;
+        min-width: 120px;
+    }
+    #nuclio-tabs-content .nuclio-deployment-variable-row .red-ui-typedInput,
+    #nuclio-tabs-content .nuclio-deployment-variable-row .red-ui-typedInput-container {
+        flex: 1 1 0;
+        min-width: 160px;
+        width: auto !important;
+    }
+    #nuclio-tabs-content .nuclio-deployment-variable-row .red-ui-typedInput-input {
+        width: 100% !important;
+        box-sizing: border-box;
+    }
+    #nuclio-tabs-content .nuclio-deployment-variable-row .nuclio-deployment-variable-secret {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex: 0 0 auto;
+        white-space: nowrap;
+        color: var(--nuclio-text);
+        font-size: 12px;
+    }
+    #nuclio-tabs-content .nuclio-deployment-variable-row .nuclio-deployment-variable-secret input {
+        width: auto;
+    }
+
     #nuclio-tabs-content a {
         text-decoration: underline;
         color: inherit;
@@ -770,6 +804,43 @@ rev /dev/stdin
         });
         return rows;
     };
+
+    const initDeploymentVariableList = (selector, items) => {
+        const list = $(selector).editableList({
+            addItem: function(row, index, data) {
+                row.addClass('nuclio-deployment-variable-row');
+                $(`<input class='node-input-key' type="text" placeholder="VARIABLE_NAME" aria-label="Variable name" />`)
+                    .appendTo(row).val(data.name || '');
+                $(`<input class='node-input-value' placeholder="value or environment variable name" aria-label="Variable value" />`)
+                    .appendTo(row).val(data.value || '').typedInput({
+                        defaultType: data.type || 'str',
+                        types: ['str', 'env'],
+                    });
+                const secretLabel = $('<label class="nuclio-deployment-variable-secret"><input type="checkbox" aria-label="Treat value as secret" /> secret</label>')
+                    .appendTo(row);
+                secretLabel.find('input').prop('checked', data.secret === true || data.type === 'cred');
+            },
+            removable: true,
+        });
+        for (const data of items || []) list.editableList('addItem', data);
+        return list;
+    };
+
+    const collectDeploymentVariableList = (selector) => {
+        const rows = [];
+        $(selector).editableList('items').each(function() {
+            const name = $(this).find('.node-input-key').val();
+            const input = $(this).find('.node-input-value');
+            const secret = $(this).find('.nuclio-deployment-variable-secret input').prop('checked');
+            if (name) rows.push({
+                name,
+                type: input.typedInput('type'),
+                value: input.typedInput('value'),
+                secret,
+            });
+        });
+        return rows;
+    };
 </script>
 
 <script type="text/javascript">/* ---------------------------- Nuclio Function ----------------------------- */
@@ -811,6 +882,7 @@ rev /dev/stdin
             code: { value: SAMPLES.python.code },
             configCode: { value: SAMPLES.python.config },
             env_vars: { value: [] },
+            deploymentVariables: { value: [] },
             deploymentMode: { value: 'eager' },
             // legacy plaintext secrets - migrated into credentials on save
             secret_vars: { value: [] },
@@ -1013,6 +1085,14 @@ rev /dev/stdin
 
             /* ---------------------------------- Settings --------------------------------- */
 
+            let deploymentVariables = this.deploymentVariables || [];
+            try {
+                if (this.credentials?.deploymentVariables) {
+                    deploymentVariables = JSON.parse(this.credentials.deploymentVariables) || deploymentVariables;
+                }
+            } catch (e) { /* ignore malformed values; runtime validation reports it */ }
+            this.deploymentVariableList = initDeploymentVariableList('#node-config-input-deploymentVariables-x', deploymentVariables);
+
             this.envList = initKeyValueList("#node-config-input-env_vars-x", this.env_vars, {
                 placeholder: 'VAR_NAME',
                 defaultType: 'str',
@@ -1045,7 +1125,7 @@ rev /dev/stdin
             // clearly that they use the last saved node configuration.
             const dialogForm = $('#dialog-form');
             dialogForm.on('input.nuclioFunctionDirty change.nuclioFunctionDirty', 'input, select, textarea', markEditorDirty);
-            dialogForm.on('click.nuclioFunctionDirty', '#node-config-input-env_vars-x button, #node-config-input-secret_vars-x button', markEditorDirty);
+            dialogForm.on('click.nuclioFunctionDirty', '#node-config-input-deploymentVariables-x button, #node-config-input-env_vars-x button, #node-config-input-secret_vars-x button', markEditorDirty);
 
             /* --------------------------------- Status Page -------------------------------- */
 
@@ -1261,6 +1341,12 @@ rev /dev/stdin
             node.env_vars = collectKeyValueList("#node-config-input-env_vars-x");
             delete this.envList;
 
+            node.credentials.deploymentVariables = JSON.stringify(
+                collectDeploymentVariableList('#node-config-input-deploymentVariables-x'),
+            );
+            node.deploymentVariables = [];
+            delete this.deploymentVariableList;
+
             // Secrets go to the encrypted credential store; clear the legacy
             // plaintext property so it drops out of flows.json on this save.
             const secretVars = collectKeyValueList("#node-config-input-secret_vars-x");
@@ -1281,6 +1367,7 @@ rev /dev/stdin
             delete this.nuclioEditorDirty;
             this.name = this.originalName;
             delete this.envList;
+            delete this.deploymentVariableList;
             delete this.secretList;
             delete this.resolvedSecretVars;
         },
@@ -1397,6 +1484,16 @@ rev /dev/stdin
             <div style="min-height:150px;" class="node-text-editor" id="node-config-input-nuclio-config-editor" ></div>
 
             <div class="form-row node-input-list-row">
+                <label for="node-config-input-deploymentVariables-x">
+                    Deployment Variables
+                </label>
+                <p>
+                    <small>Use <code>${VAR}</code> or <code>${VAR:-fallback}</code> in the function YAML. Values can be literal or read from the Node-RED process environment. Check <b>secret</b> when a resolved value must be treated as sensitive; sensitive values are not logged and matching status fields are redacted.</small>
+                </p>
+                <ol id="node-config-input-deploymentVariables-x"></ol>
+            </div>
+
+            <div class="form-row node-input-list-row">
                 <label for="node-config-input-env_vars-x">
                     Environment Variables
                 </label>
@@ -1408,10 +1505,10 @@ rev /dev/stdin
 
             <div class="form-row node-input-list-row">
                 <label for="node-config-input-secret_vars-x">
-                    Secret Overrides
+                    Legacy Credential Overrides (deprecated)
                 </label>
                 <p>
-                    <small>Specify secret paths such as <code>spec.build.codeEntryAttributes.s3SecretAccessKey</code>. Values are stored in Node-RED credentials.</small>
+                    <small>Use Deployment Variables above for new configuration. This legacy path/value list remains available for older flows and is not used by new configuration.</small>
                 </p>
                 <ol id="node-config-input-secret_vars-x"></ol>
             </div>
@@ -1549,11 +1646,16 @@ rev /dev/stdin
         <dd>YAML function configuration applied on deploy.</dd>
         <dt>Environment Variables</dt>
         <dd>Key/value pairs injected into the function environment. Values are
-        stored with the flow - put sensitive values in <b>Secret Overrides</b>
-        (e.g. <code>spec.env.0.value</code>) or use the <code>env</code> type.</dd>
-        <dt>Secret Overrides</dt>
-        <dd>Typed values written into the config at the specified paths.
-        Stored in Node-RED's encrypted credential store, not in the flow file.</dd>
+        stored with the function configuration.</dd>
+        <dt>Deployment Variables</dt>
+        <dd>Function-scoped values interpolated into YAML with <code>${VAR}</code> or
+        nested <code>${VAR:-fallback}</code>. Values can come from a literal or the
+        Node-RED process environment. Mark a variable as secret to prevent logging
+        and redact matching status fields. The variable list is stored in Node-RED's
+        encrypted credential store.</dd>
+        <dt>Legacy Credential Overrides</dt>
+        <dd>Deprecated path/value overrides retained for compatibility with older
+        flows. New flows should use function-scoped Deployment Variables in YAML.</dd>
     </dl>
     <h3>Details</h3>
     <p>This config node owns deployment and reconciliation. It creates or updates the

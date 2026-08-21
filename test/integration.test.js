@@ -857,6 +857,45 @@ test('an env-typed config field reads the named env var at deploy time', async (
     }
 });
 
+test('function deployment variables interpolate YAML and preserve secret paths', async () => {
+    process.env.NUCLIO_TEST_ARCH_PREFIX = 'arm64v8/';
+    try {
+        mock = await startMockNuclio();
+        const flow = baseFlow(mock, {
+            configCode: [
+                'apiVersion: "nuclio.io/v1"',
+                'kind: NuclioFunction',
+                'spec:',
+                '  build:',
+                '    baseImage: gcr.io/iguazio/${ARCH_PREFIX:-arm64v8/}alpine:3.23',
+                '  env:',
+                '    - name: FUNCTION_TOKEN',
+                '      value: ${FUNCTION_TOKEN}',
+            ].join('\n'),
+        });
+        flow[1].deploymentVariables = [
+            { name: 'ARCH_PREFIX', type: 'env', value: 'NUCLIO_TEST_ARCH_PREFIX' },
+            { name: 'FUNCTION_TOKEN', type: 'str', value: 'secret-value', secret: true },
+        ];
+        await load(flow, {
+            fn: {
+                deploymentVariables: JSON.stringify(flow[1].deploymentVariables),
+            },
+        });
+
+        const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+        assert.equal(req.body.spec.build.baseImage, 'gcr.io/iguazio/arm64v8/alpine:3.23');
+        assert.equal(req.body.spec.env.find(entry => entry.name === 'FUNCTION_TOKEN').value, 'secret-value');
+        await waitReady(helper.getNode('fn'));
+
+        const status = await helper.request().get('/nuclio/api/functions?id=fn&view=spec').expect(200);
+        assert.equal(status.body.spec.env.find(entry => entry.name === 'FUNCTION_TOKEN').value, '[redacted]');
+        assert.ok(helper.getNode('fn').secretVarPaths.includes('spec.env.0.value'));
+    } finally {
+        delete process.env.NUCLIO_TEST_ARCH_PREFIX;
+    }
+});
+
 test('disabled deployment policy prevents startup writes and manual deploys', async () => {
     mock = await startMockNuclio();
     const flow = baseFlow(mock);

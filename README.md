@@ -26,6 +26,7 @@ The Compose fixture requires an architecture-specific dashboard image. For examp
 
 ```bash
 NUCLIO_ARCH=amd64 \
+NUCLIO_ARCH_PREFIX= \
 NUCLIO_DASHBOARD_IMAGE=quay.io/nuclio/dashboard:1.17.5-amd64 \
 docker compose up -d --build
 ```
@@ -98,6 +99,21 @@ should read from Node-RED's environment.
 | Start stagger | `2000` | Window to spread first-deploys across on startup. |
 | Request timeout | `10000` | Status/admin HTTP timeout. |
 | Deploy timeout | `60000` | Create/update HTTP timeout. |
+
+**Function node (per function):**
+
+Deployment Variables belong to the **Nuclio Function** config node so each function owns the
+values needed by its own YAML. They support literal values and Node-RED process environment
+variables. Interpolation is deliberately limited to variable references and nested `:-` defaults;
+it never invokes a shell. Missing variables without a default fail the function configuration.
+Mark a variable as secret to keep it out of logs and redact matching scalar fields from function
+status responses. The variable list is stored in Node-RED's encrypted credential store. Legacy
+function-level Credential Overrides remain readable for backward compatibility but should not be
+used for new flows.
+
+The Compose demo passes `NUCLIO_ARCH_PREFIX` into Node-RED so the function YAML can retain the
+image family and version while the deployment supplies its architecture-specific repository
+prefix. The ARM64 default is `arm64v8/`; set `NUCLIO_ARCH_PREFIX=` for the AMD64 Compose setup.
 
 **Projects and status polling:**
 
