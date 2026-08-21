@@ -44,6 +44,15 @@ Smoke test (from a repository checkout; spins up Docker Compose, deploys a real 
 ```bash
 npm run smoke
 ```
+KinD canary (from a repository checkout; creates a disposable Kubernetes cluster, installs Nuclio,
+loads a local function image, and invokes it through Node-RED):
+```bash
+npm run canary:kind
+```
+The canary requires Docker, KinD, `kubectl`, Helm, Python 3, and a completed `npm ci`. It deletes
+the cluster named `nuclio-node-red-canary` when it finishes. Set `KIND_CANARY_KEEP_CLUSTER=1` to
+keep the cluster for inspection. This is a quick integration check, not a production Kubernetes
+installation: it uses a local prebuilt image and the default unauthenticated dashboard.
 Redeploy diagnostic (snapshots Docker, Nuclio, Node-RED, and in-network probes before
 and after a targeted redeploy):
 ```bash

@@ -12,6 +12,7 @@
     "test": "node --test",
     "lint": "eslint",
     "smoke": "bash scripts/smoke-test.sh",
+    "canary:kind": "bash scripts/kind-canary.sh",
     "diagnose:redeploy": "node scripts/diagnose-redeploy.js"
   },
   "node-red": {
