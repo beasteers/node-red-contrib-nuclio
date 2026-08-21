@@ -14,4 +14,6 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
     for (const [index, script] of scripts.entries()) {
         assert.doesNotThrow(() => new Function(script), `inline editor script ${index + 1}`);
     }
+    assert.match(html, /deploymentVariables:\s*\{\s*type:\s*["']text["']/,
+        'deployment variables must be declared in the editor credential definition');
 });

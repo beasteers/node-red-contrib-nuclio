@@ -782,7 +782,7 @@ rev /dev/stdin
             addItem: function(row, index, data) {
                 $(`<input class='node-input-key' type="text" placeholder="${placeholder}" aria-label="Name" />`).appendTo(row).val(data.name)
                 $(`<input class='node-input-value' placeholder="value" aria-label="Value" />`).appendTo(row).attr('value', data.value).typedInput({
-                    defaultType: data.type || defaultType,
+                    default: data.type || defaultType,
                     types: types,
                 });
             },
@@ -813,7 +813,7 @@ rev /dev/stdin
                     .appendTo(row).val(data.name || '');
                 $(`<input class='node-input-value' placeholder="value, environment variable name, or secret" aria-label="Variable value" />`)
                     .appendTo(row).val(data.value || '').typedInput({
-                        defaultType: data.type || 'str',
+                        default: data.type || 'str',
                         types: ['str', 'env', 'cred'],
                     });
                 const secretLabel = $('<label class="nuclio-deployment-variable-secret"><input type="checkbox" aria-label="Treat value as secret" /> secret</label>')
@@ -893,6 +893,7 @@ rev /dev/stdin
         },
         credentials: {
             secret_vars: { type: "text" },  // JSON list of { name, type, value }
+            deploymentVariables: { type: "text" }, // JSON list of { name, type, value, secret }
             codeEntryPassword: { type: "password" },
         },
         label: function () {
@@ -1087,7 +1088,7 @@ rev /dev/stdin
 
             let deploymentVariables = this.deploymentVariables || [];
             try {
-                if (this.credentials?.deploymentVariables) {
+                if (this.credentials?.deploymentVariables && this.credentials.deploymentVariables !== '__PWRD__') {
                     deploymentVariables = JSON.parse(this.credentials.deploymentVariables) || deploymentVariables;
                 }
             } catch (e) { /* ignore malformed values; runtime validation reports it */ }

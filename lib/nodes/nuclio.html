@@ -34,7 +34,7 @@
             addItem: function(row, index, data) {
                 $(`<input class='node-input-key' type="text" placeholder="${placeholder}" aria-label="Name" />`).appendTo(row).val(data.name)
                 $(`<input class='node-input-value' placeholder="value" aria-label="Value" />`).appendTo(row).attr('value', data.value).typedInput({
-                    defaultType: data.type || defaultType,
+                    default: data.type || defaultType,
                     types: types,
                 });
             },

@@ -114,15 +114,9 @@
         "codeEntryUsername": "",
         "codeEntryWorkDir": "",
         "code": "package main\n\nimport (\n    nuclio \"github.com/nuclio/nuclio-sdk-go\"\n)\n\nfunc Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {\n    context.Logger.Info(\"Go demo invoked\")\n    return nuclio.Response{\n        StatusCode:  200,\n        ContentType: \"application/json\",\n        Body:        event.GetBody(),\n    }, nil\n}",
-        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    # The Node-RED deployment supplies the architecture-specific prefix.\n    baseImage: gcr.io/iguazio/${NUCLIO_ARCH_PREFIX}alpine:3.23",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    # The Node-RED deployment supplies the architecture-specific prefix.\n    baseImage: gcr.io/iguazio/${NUCLIO_ARCH_PREFIX}alpine:3.23\n",
         "env_vars": [],
-        "deploymentVariables": [
-            {
-                "name": "NUCLIO_ARCH_PREFIX",
-                "type": "env",
-                "value": "NUCLIO_ARCH_PREFIX"
-            }
-        ],
+        "deploymentVariables": [],
         "deploymentMode": "eager",
         "secret_vars": [],
         "maxSelfHealAttempts": "2",
