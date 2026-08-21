@@ -16,4 +16,6 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
     }
     assert.match(html, /deploymentVariables:\s*\{\s*type:\s*["']text["']/,
         'deployment variables must be declared in the editor credential definition');
+    assert.doesNotMatch(html, /secret_vars|Credential Overrides/,
+        'deprecated credential override fields must not remain in the editor');
 });

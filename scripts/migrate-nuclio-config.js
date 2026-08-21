@@ -43,7 +43,6 @@ const migrated = input.map(node => {
         code: node.code || '',
         configCode: node.configCode || '',
         env_vars: node.env_vars || [],
-        secret_vars: node.secret_vars || [],
         server: node.server,
         project: node.project,
     });
@@ -55,7 +54,6 @@ const migrated = input.map(node => {
     delete updated.code;
     delete updated.configCode;
     delete updated.env_vars;
-    delete updated.secret_vars;
     delete updated.server;
     delete updated.project;
     return updated;

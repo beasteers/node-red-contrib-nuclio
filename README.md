@@ -109,8 +109,8 @@ environment-backed values can be marked secret as well. Interpolation is deliber
 to variable references and nested `:-` defaults; it never invokes a shell. Missing variables
 without a default fail the function configuration. Secret-bearing scalars are excluded from logs
 and redacted from function status responses. The variable list is stored in Node-RED's encrypted
-credential store. Legacy function-level Credential Overrides remain readable for backward
-compatibility but should not be used for new flows.
+credential store. The former function-level Credential Overrides are no longer supported;
+use Deployment Variables instead.
 
 The Compose demo passes `NUCLIO_ARCH_PREFIX` into Node-RED so the function YAML can retain the
 image family and version while the deployment supplies its architecture-specific repository

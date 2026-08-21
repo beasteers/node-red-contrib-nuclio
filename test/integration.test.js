@@ -39,7 +39,7 @@ const TEST_SERVER_DEFAULTS = {
 // default flow: server config + function config + invoke node + output helpers
 const baseFlow = (mock, fn = {}, inv = {}) => [
     { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str', invocationUrlPreference: 'internal', ...TEST_SERVER_DEFAULTS },
-    { id: 'fn', type: 'nuclio-function', server: 'srv', name: FN, runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [], secret_vars: [], ...fn },
+    { id: 'fn', type: 'nuclio-function', server: 'srv', name: FN, runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [], ...fn },
     { id: 'inv', type: 'nuclio', function: 'fn', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1'], ['out2']], ...inv },
     { id: 'out1', type: 'helper' },
     { id: 'out2', type: 'helper' },
@@ -297,30 +297,42 @@ test('build-hash change rebuilds; non-build change after migration skips build',
     assert.deepEqual(put.body.spec.env.find(e => e.name === 'NEW_VAR'), { name: 'NEW_VAR', value: 'v' });
 });
 
-test('secrets from the encrypted credential store land in the deployed spec', async () => {
+test('deployment variable credentials land in the deployed spec', async () => {
     mock = await startMockNuclio();
-    await load(baseFlow(mock), {
-        fn: { secret_vars: JSON.stringify([{ name: 'spec.build.codeEntryAttributes.s3SecretAccessKey', type: 'cred', value: 'shh-cred' }]) },
+    const flow = baseFlow(mock, {
+        deploymentVariables: [{ name: 'S3_SECRET_ACCESS_KEY', type: 'cred', value: 'shh-cred', secret: true }],
+        configCode: 'spec:\n  env:\n    - name: FUNCTION_SECRET\n      value: ${S3_SECRET_ACCESS_KEY}\n',
+    });
+    await load(flow, {
+        fn: { deploymentVariables: JSON.stringify(flow[1].deploymentVariables) },
     });
     const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
-    assert.equal(req.body.spec.build.codeEntryAttributes.s3SecretAccessKey, 'shh-cred');
+    assert.equal(req.body.spec.env[0].value, 'shh-cred');
 });
 
 test('status API redacts encrypted secrets', async () => {
     mock = await startMockNuclio();
-    await load(baseFlow(mock), {
-        fn: { secret_vars: JSON.stringify([{ name: 'spec.build.codeEntryAttributes.s3SecretAccessKey', type: 'cred', value: 'shh-cred' }]) },
+    const flow = baseFlow(mock, {
+        deploymentVariables: [{ name: 'S3_SECRET_ACCESS_KEY', type: 'cred', value: 'shh-cred', secret: true }],
+        configCode: 'spec:\n  env:\n    - name: FUNCTION_SECRET\n      value: ${S3_SECRET_ACCESS_KEY}\n',
+    });
+    await load(flow, {
+        fn: { deploymentVariables: JSON.stringify(flow[1].deploymentVariables) },
     });
     await waitReady(helper.getNode('fn'));
 
     const res = await helper.request().get('/nuclio/api/functions?id=fn').expect(200);
-    assert.equal(res.body.spec.build.codeEntryAttributes.s3SecretAccessKey, '[redacted]');
+    assert.equal(res.body.spec.env[0].value, '[redacted]');
 });
 
 test('status summary and details are selectively returned', async () => {
     mock = await startMockNuclio();
-    await load(baseFlow(mock), {
-        fn: { secret_vars: JSON.stringify([{ name: 'spec.build.codeEntryAttributes.s3SecretAccessKey', type: 'cred', value: 'shh-cred' }]) },
+    const flow = baseFlow(mock, {
+        deploymentVariables: [{ name: 'S3_SECRET_ACCESS_KEY', type: 'cred', value: 'shh-cred', secret: true }],
+        configCode: 'spec:\n  env:\n    - name: FUNCTION_SECRET\n      value: ${S3_SECRET_ACCESS_KEY}\n',
+    });
+    await load(flow, {
+        fn: { deploymentVariables: JSON.stringify(flow[1].deploymentVariables) },
     });
     await waitReady(helper.getNode('fn'));
 
@@ -337,7 +349,7 @@ test('status summary and details are selectively returned', async () => {
     );
 
     const spec = await helper.request().get('/nuclio/api/functions?id=fn&view=spec').expect(200);
-    assert.equal(spec.body.spec.build.codeEntryAttributes.s3SecretAccessKey, '[redacted]');
+    assert.equal(spec.body.spec.env[0].value, '[redacted]');
 
     const logs = await helper.request().get('/nuclio/api/functions?id=fn&view=logs').expect(200);
     assert.deepEqual(logs.body, { logs: [] });
@@ -352,15 +364,6 @@ test('admin errors do not expose dashboard response bodies', async () => {
     const res = await helper.request().get('/nuclio/api/functions?id=fn').expect(500);
     assert.deepEqual(res.body, { error: 'Nuclio dashboard returned HTTP 500' });
     assert.equal(JSON.stringify(res.body).includes('simulated 500'), false);
-});
-
-test('legacy plaintext secret_vars still deploy (pre-1.2 flows)', async () => {
-    mock = await startMockNuclio();
-    await load(baseFlow(mock, {
-        secret_vars: [{ name: 'spec.build.codeEntryAttributes.s3SecretAccessKey', type: 'cred', value: 'shh-legacy' }],
-    }));
-    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
-    assert.equal(req.body.spec.build.codeEntryAttributes.s3SecretAccessKey, 'shh-legacy');
 });
 
 test('failed deploy does not wedge the node (redeploying clears, retries continue)', async () => {
@@ -688,7 +691,7 @@ test('invoke nodes mirror function config errors as status', async () => {
     // no server configured: the config node errors before any invoke node
     // exists - the invoke node must still receive the status on registration
     const flow = [
-        { id: 'fn', type: 'nuclio-function', name: FN, runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [], secret_vars: [] },
+        { id: 'fn', type: 'nuclio-function', name: FN, runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [] },
         { id: 'inv', type: 'nuclio', function: 'fn', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1'], ['out2']] },
         { id: 'out1', type: 'helper' },
         { id: 'out2', type: 'helper' },
@@ -1300,8 +1303,8 @@ test('multiple functions deploy independently on the same server', async () => {
     mock = await startMockNuclio();
     const flow = [
         { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str', invocationUrlPreference: 'internal' },
-        { id: 'fnA', type: 'nuclio-function', server: 'srv', name: 'fn-a', runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [], secret_vars: [] },
-        { id: 'fnB', type: 'nuclio-function', server: 'srv', name: 'fn-b', runtime: 'golang', code: 'y = 1', configCode: '', env_vars: [], secret_vars: [] },
+        { id: 'fnA', type: 'nuclio-function', server: 'srv', name: 'fn-a', runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [] },
+        { id: 'fnB', type: 'nuclio-function', server: 'srv', name: 'fn-b', runtime: 'golang', code: 'y = 1', configCode: '', env_vars: [] },
         { id: 'invA', type: 'nuclio', function: 'fnA', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1A'], ['out2A']] },
         { id: 'invB', type: 'nuclio', function: 'fnB', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1B'], ['out2B']] },
         { id: 'out1A', type: 'helper' }, { id: 'out2A', type: 'helper' },
@@ -1354,8 +1357,8 @@ test('status lookups are isolated by project', async () => {
         { id: 'srv', type: 'nuclio-config', address: mock.url, addressType: 'str', publicAddress: '', publicAddressType: 'str', invocationUrlPreference: 'internal' },
         { id: 'projA', type: 'nuclio-project', name: 'project-a', nameType: 'str' },
         { id: 'projB', type: 'nuclio-project', name: 'project-b', nameType: 'str' },
-        { id: 'fnA', type: 'nuclio-function', server: 'srv', project: 'projA', name: 'fn-a', runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [], secret_vars: [] },
-        { id: 'fnB', type: 'nuclio-function', server: 'srv', project: 'projB', name: 'fn-b', runtime: 'golang', code: 'y = 1', configCode: '', env_vars: [], secret_vars: [] },
+        { id: 'fnA', type: 'nuclio-function', server: 'srv', project: 'projA', name: 'fn-a', runtime: 'python:3.12', code: 'x = 1', configCode: '', env_vars: [] },
+        { id: 'fnB', type: 'nuclio-function', server: 'srv', project: 'projB', name: 'fn-b', runtime: 'golang', code: 'y = 1', configCode: '', env_vars: [] },
         { id: 'invA', type: 'nuclio', function: 'fnA', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1A'], ['out2A']] },
         { id: 'invB', type: 'nuclio', function: 'fnB', timeoutMs: '', maxInFlight: '', headers: [], wires: [['out1B'], ['out2B']] },
         { id: 'out1A', type: 'helper' }, { id: 'out2A', type: 'helper' },

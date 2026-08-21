@@ -775,8 +775,8 @@ rev /dev/stdin
         feedback.classList.toggle('nuclio-hidden', !message);
     };
 
-    // key/value rows: a text key + a typed value. Shared by request headers,
-    // environment variables, and secret overrides.
+    // key/value rows: a text key + a typed value. Shared by request headers
+    // and environment variables.
     const initKeyValueList = (selector, items, { placeholder, defaultType, types }) => {
         const list = $(selector).editableList({
             addItem: function(row, index, data) {
@@ -884,15 +884,12 @@ rev /dev/stdin
             env_vars: { value: [] },
             deploymentVariables: { value: [] },
             deploymentMode: { value: 'eager' },
-            // legacy plaintext secrets - migrated into credentials on save
-            secret_vars: { value: [] },
             // Recovery policy (blank = built-in default).
             maxSelfHealAttempts: { value: '' }, maxSelfHealAttemptsType: { value: 'num' },
             redeployDeadlineMs:  { value: '' }, redeployDeadlineMsType:  { value: 'num' },
             autoRedeployOnError: { value: 'false' }, autoRedeployOnErrorType: { value: 'bool' },
         },
         credentials: {
-            secret_vars: { type: "text" },  // JSON list of { name, type, value }
             deploymentVariables: { type: "text" }, // JSON list of { name, type, value, secret }
             codeEntryPassword: { type: "password" },
         },
@@ -1100,22 +1097,6 @@ rev /dev/stdin
                 types: ['str','num','json','env','cred'],
             });
 
-            // Secrets are stored in Node-RED's encrypted credential store as a
-            // JSON list; fall back to the legacy plaintext property for flows
-            // saved before 1.2 (migrated into credentials on save).
-            let secretVars = [];
-            try {
-                secretVars = JSON.parse(this.credentials?.secret_vars || '[]') || [];
-            } catch (e) { /* ignore, fall back to legacy */ }
-            if (!secretVars.length) secretVars = this.secret_vars || [];
-            node.resolvedSecretVars = secretVars;
-
-            this.secretList = initKeyValueList("#node-config-input-secret_vars-x", secretVars, {
-                placeholder: 'VAR_NAME',
-                defaultType: 'cred',
-                types: ['env','cred'],
-            });
-
             // Recovery policy: numeric literal or env-var reference, resolved on deploy.
             ['maxSelfHealAttempts','redeployDeadlineMs'].forEach(function(f){
                 $('#node-config-input-' + f).typedInput({ default: node[f + 'Type'] || 'num', types: ['num','env'] });
@@ -1126,7 +1107,7 @@ rev /dev/stdin
             // clearly that they use the last saved node configuration.
             const dialogForm = $('#dialog-form');
             dialogForm.on('input.nuclioFunctionDirty change.nuclioFunctionDirty', 'input, select, textarea', markEditorDirty);
-            dialogForm.on('click.nuclioFunctionDirty', '#node-config-input-deploymentVariables-x button, #node-config-input-env_vars-x button, #node-config-input-secret_vars-x button', markEditorDirty);
+            dialogForm.on('click.nuclioFunctionDirty', '#node-config-input-deploymentVariables-x button, #node-config-input-env_vars-x button', markEditorDirty);
 
             /* --------------------------------- Status Page -------------------------------- */
 
@@ -1348,14 +1329,6 @@ rev /dev/stdin
             node.deploymentVariables = [];
             delete this.deploymentVariableList;
 
-            // Secrets go to the encrypted credential store; clear the legacy
-            // plaintext property so it drops out of flows.json on this save.
-            const secretVars = collectKeyValueList("#node-config-input-secret_vars-x");
-            node.credentials = node.credentials || {};
-            node.credentials.secret_vars = JSON.stringify(secretVars);
-            node.secret_vars = [];
-            delete this.secretList;
-            delete this.resolvedSecretVars;
         },
         oneditcancel: function() {
             this.editor.destroy();
@@ -1508,15 +1481,6 @@ rev /dev/stdin
                     <ol id="node-config-input-deploymentVariables-x"></ol>
                 </div>
 
-                <div class="form-row node-input-list-row">
-                    <label for="node-config-input-secret_vars-x">
-                        Legacy Credential Overrides (deprecated)
-                    </label>
-                    <p>
-                        <small>Use Deployment Variables above for new configuration. This legacy path/value list remains available for older flows and is not used by new configuration.</small>
-                    </p>
-                    <ol id="node-config-input-secret_vars-x"></ol>
-                </div>
             </details>
 
             <details>
@@ -1660,9 +1624,6 @@ rev /dev/stdin
         are always secret; other values can be marked secret to prevent logging and
         redact matching status fields. The variable list is stored in Node-RED's
         encrypted credential store.</dd>
-        <dt>Legacy Credential Overrides</dt>
-        <dd>Deprecated path/value overrides retained for compatibility with older
-        flows. New flows should use function-scoped Deployment Variables in YAML.</dd>
     </dl>
     <h3>Details</h3>
     <p>This config node owns deployment and reconciliation. It creates or updates the
