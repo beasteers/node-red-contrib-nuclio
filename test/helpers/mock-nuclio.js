@@ -219,6 +219,13 @@ const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflic
                 if (mock.hideFunctionAfterWrite) mock.hiddenFunctionReads = 1;
                 return send(200, {});
             }
+            if (req.method === 'DELETE' && fnMatch) {
+                const name = decodeURIComponent(fnMatch[1]);
+                if (!mock.functions[name]) return send(404, { error: 'Function not found' });
+                delete mock.functions[name];
+                res.writeHead(204);
+                return res.end();
+            }
 
             /* --------------------------- Function Invocation ------------------------ */
 

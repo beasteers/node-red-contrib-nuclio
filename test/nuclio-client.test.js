@@ -31,6 +31,28 @@ test('Nuclio resource path segments are URI encoded', async () => {
     }
 });
 
+test('deleteFunction URI-encodes the function name', async () => {
+    let requestUrl;
+    const server = http.createServer((req, res) => {
+        requestUrl = req.url;
+        res.writeHead(204);
+        res.end();
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+    try {
+        const address = `http://127.0.0.1:${server.address().port}`;
+        const client = createClient(
+            { address, namespace: 'nuclio', requestTimeoutMs: 1000, deployTimeoutMs: 1000 },
+            'default',
+        );
+        await client.deleteFunction('function/name');
+        assert.equal(requestUrl, '/api/functions/function%2Fname');
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+    }
+});
+
 test('project requests use the project namespace header', async () => {
     let requestHeaders;
     const server = http.createServer((req, res) => {

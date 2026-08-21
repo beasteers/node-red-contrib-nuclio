@@ -146,11 +146,19 @@ msg.nuclio = { command: 'deploy' }     // converge/create; activates lazy mode
 msg.nuclio = { command: 'redeploy' }   // reuse the existing image
 msg.nuclio = { command: 'rebuild' }    // force a full build
 msg.nuclio = { command: 'status' }     // return cached state without deploying
+msg.nuclio = { command: 'prune', target: 'old-function' } // explicitly delete a reported orphan
 ```
 
 Command acknowledgements use the result output; command failures use the fallback
 output. Ordinary messages sent to a lazy function are gated until a deploy command
 completes successfully.
+
+`prune` is deliberately conservative: it only deletes a function that is missing
+from the loaded flow, belongs to the current Nuclio project, and has the
+`nuclio.io/node-red: true` ownership annotation. It never deletes an unowned or
+currently loaded function. Orphan discovery and pruning are also stopped when the
+project-scoped function list cannot be read or the loaded flow has configuration
+errors.
 
 Transient failures — connection errors and `429`/`502`/`503`/`504` responses (a function
 scaling or redeploying) — only log a warning (they never trigger Catch nodes), and are
