@@ -811,10 +811,10 @@ rev /dev/stdin
                 row.addClass('nuclio-deployment-variable-row');
                 $(`<input class='node-input-key' type="text" placeholder="VARIABLE_NAME" aria-label="Variable name" />`)
                     .appendTo(row).val(data.name || '');
-                $(`<input class='node-input-value' placeholder="value or environment variable name" aria-label="Variable value" />`)
+                $(`<input class='node-input-value' placeholder="value, environment variable name, or secret" aria-label="Variable value" />`)
                     .appendTo(row).val(data.value || '').typedInput({
                         defaultType: data.type || 'str',
-                        types: ['str', 'env'],
+                        types: ['str', 'env', 'cred'],
                     });
                 const secretLabel = $('<label class="nuclio-deployment-variable-secret"><input type="checkbox" aria-label="Treat value as secret" /> secret</label>')
                     .appendTo(row);
@@ -1502,7 +1502,7 @@ rev /dev/stdin
                         Deployment Variables
                     </label>
                     <p>
-                        <small>Use <code>${VAR}</code> or <code>${VAR:-fallback}</code> in the function YAML. Values can be literal or read from the Node-RED process environment. Check <b>secret</b> when a resolved value must be treated as sensitive; sensitive values are not logged and matching status fields are redacted.</small>
+                    <small>Use <code>${VAR}</code> or <code>${VAR:-fallback}</code> in the function YAML. Values can be literal, read from the Node-RED process environment, or entered as encrypted credentials. Credential values are always secret; check <b>secret</b> for sensitive literal or environment-backed values. Sensitive values are not logged and matching status fields are redacted.</small>
                     </p>
                     <ol id="node-config-input-deploymentVariables-x"></ol>
                 </div>
@@ -1654,9 +1654,10 @@ rev /dev/stdin
         stored with the function configuration.</dd>
         <dt>Deployment Variables</dt>
         <dd>Function-scoped values interpolated into YAML with <code>${VAR}</code> or
-        nested <code>${VAR:-fallback}</code>. Values can come from a literal or the
-        Node-RED process environment. Mark a variable as secret to prevent logging
-        and redact matching status fields. The variable list is stored in Node-RED's
+        nested <code>${VAR:-fallback}</code>. Values can come from a literal, the
+        Node-RED process environment, or an encrypted credential. Credential values
+        are always secret; other values can be marked secret to prevent logging and
+        redact matching status fields. The variable list is stored in Node-RED's
         encrypted credential store.</dd>
         <dt>Legacy Credential Overrides</dt>
         <dd>Deprecated path/value overrides retained for compatibility with older

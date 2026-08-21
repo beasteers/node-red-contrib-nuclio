@@ -103,13 +103,14 @@ should read from Node-RED's environment.
 **Function node (per function):**
 
 Deployment Variables belong to the **Nuclio Function** config node so each function owns the
-values needed by its own YAML. They support literal values and Node-RED process environment
-variables. Interpolation is deliberately limited to variable references and nested `:-` defaults;
-it never invokes a shell. Missing variables without a default fail the function configuration.
-Mark a variable as secret to keep it out of logs and redact matching scalar fields from function
-status responses. The variable list is stored in Node-RED's encrypted credential store. Legacy
-function-level Credential Overrides remain readable for backward compatibility but should not be
-used for new flows.
+values needed by its own YAML. They support literal values, Node-RED process environment
+variables, and encrypted credentials. Credential values are always secret; literal and
+environment-backed values can be marked secret as well. Interpolation is deliberately limited
+to variable references and nested `:-` defaults; it never invokes a shell. Missing variables
+without a default fail the function configuration. Secret-bearing scalars are excluded from logs
+and redacted from function status responses. The variable list is stored in Node-RED's encrypted
+credential store. Legacy function-level Credential Overrides remain readable for backward
+compatibility but should not be used for new flows.
 
 The Compose demo passes `NUCLIO_ARCH_PREFIX` into Node-RED so the function YAML can retain the
 image family and version while the deployment supplies its architecture-specific repository
