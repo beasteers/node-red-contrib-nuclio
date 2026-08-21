@@ -4,6 +4,8 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin"; // raw password
 const ADMIN_PASSHASH = bcrypt.hashSync(ADMIN_PASSWORD, 10);
 
 module.exports = {
+    flowFile: 'flows.json',
+    flowFilePretty: true,
     // // httpAdminRoot: "/",
     // adminAuth: {
     //     type: "credentials",

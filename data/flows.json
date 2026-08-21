@@ -1,1252 +1,1254 @@
 [
-  {
-    "id": "0000000000000005",
-    "type": "tab",
-    "label": "01 Runtime gallery",
-    "disabled": false,
-    "info": "",
-    "env": []
-  },
-  {
-    "id": "0000000000000027",
-    "type": "tab",
-    "label": "02 Deployment patterns",
-    "disabled": false,
-    "info": "",
-    "env": []
-  },
-  {
-    "id": "0000000000000042",
-    "type": "tab",
-    "label": "03 Batching",
-    "disabled": false,
-    "info": "",
-    "env": []
-  },
-  {
-    "id": "0000000000000050",
-    "type": "tab",
-    "label": "04 Resilience & configuration",
-    "disabled": false,
-    "info": "",
-    "env": []
-  },
-  {
-    "id": "0000000000000001",
-    "type": "nuclio-config",
-    "address": "http://nuclio-dashboard:8070",
-    "addressType": "str",
-    "namespace": "nuclio",
-    "namespaceType": "str",
-    "publicAddress": "http://localhost:8070",
-    "publicAddressType": "str",
-    "invocationUrlPreference": "service",
-    "internalInvocationServiceHost": "nuclio-nuclio-{function}",
-    "internalInvocationServiceHostType": "str",
-    "externalInvocationProtocol": "http",
-    "deploymentPolicy": "managed",
-    "deploymentPolicyType": "str",
-    "requestTimeoutMs": "",
-    "deployTimeoutMs": "",
-    "pollMs": "",
-    "readyPollMs": "",
-    "backoffMs": "",
-    "backoffMaxMs": "",
-    "startStaggerMs": ""
-  },
-  {
-    "id": "0000000000000002",
-    "type": "nuclio-project",
-    "name": "demo-runtime",
-    "nameType": "str"
-  },
-  {
-    "id": "0000000000000003",
-    "type": "nuclio-project",
-    "name": "demo-patterns",
-    "nameType": "str"
-  },
-  {
-    "id": "0000000000000004",
-    "type": "nuclio-project",
-    "name": "demo-operations",
-    "nameType": "str"
-  },
-  {
-    "id": "0000000000000007",
-    "type": "nuclio-function",
-    "z": "0000000000000005",
-    "server": "0000000000000001",
-    "project": "0000000000000002",
-    "name": "demo-python-echo",
-    "runtime": "python:3.12",
-    "sourceType": "sourceCode",
-    "codeEntryPath": "",
-    "codeEntryBranch": "",
-    "codeEntryTag": "",
-    "codeEntryReference": "",
-    "codeEntryUsername": "",
-    "codeEntryWorkDir": "",
-    "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {\"runtime\": \"python\", \"received\": body}",
-    "configCode": "",
-    "env_vars": [],
-    "deploymentMode": "eager",
-    "secret_vars": [],
-    "maxSelfHealAttempts": "2",
-    "redeployDeadlineMs": "120000",
-    "autoRedeployOnError": "false",
-    "autoRedeployOnErrorType": "bool"
-  },
-  {
-    "id": "0000000000000008",
-    "type": "nuclio-function",
-    "z": "0000000000000005",
-    "server": "0000000000000001",
-    "project": "0000000000000002",
-    "name": "demo-go-echo",
-    "runtime": "golang",
-    "sourceType": "sourceCode",
-    "codeEntryPath": "",
-    "codeEntryBranch": "",
-    "codeEntryTag": "",
-    "codeEntryReference": "",
-    "codeEntryUsername": "",
-    "codeEntryWorkDir": "",
-    "code": "package main\n\nimport (\n    nuclio \"github.com/nuclio/nuclio-sdk-go\"\n)\n\nfunc Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {\n    context.Logger.Info(\"Go demo invoked\")\n    return nuclio.Response{\n        StatusCode:  200,\n        ContentType: \"application/json\",\n        Body:        event.GetBody(),\n    }, nil\n}",
-    "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    # The Node-RED deployment supplies the architecture-specific prefix.\n    baseImage: gcr.io/iguazio/${NUCLIO_ARCH_PREFIX}alpine:3.23",
-    "env_vars": [],
-    "deploymentVariables": [
-      {
-        "name": "NUCLIO_ARCH_PREFIX",
-        "type": "env",
-        "value": "NUCLIO_ARCH_PREFIX"
-      }
-    ],
-    "deploymentMode": "eager",
-    "secret_vars": [],
-    "maxSelfHealAttempts": "2",
-    "redeployDeadlineMs": "120000",
-    "autoRedeployOnError": "false",
-    "autoRedeployOnErrorType": "bool"
-  },
-  {
-    "id": "0000000000000009",
-    "type": "nuclio-function",
-    "z": "0000000000000005",
-    "server": "0000000000000001",
-    "project": "0000000000000002",
-    "name": "demo-nodejs-transform",
-    "runtime": "nodejs",
-    "sourceType": "sourceCode",
-    "codeEntryPath": "",
-    "codeEntryBranch": "",
-    "codeEntryTag": "",
-    "codeEntryReference": "",
-    "codeEntryUsername": "",
-    "codeEntryWorkDir": "",
-    "code": "exports.handler = function(context, event) {\n    let body = event.body;\n    if (Buffer.isBuffer(body)) body = body.toString();\n    try {\n        body = JSON.parse(body);\n    } catch (_) {\n        // Keep plain-text request bodies as strings.\n    }\n    context.callback(JSON.stringify({ runtime: \"nodejs\", received: body }));\n};",
-    "configCode": "",
-    "env_vars": [],
-    "deploymentMode": "eager",
-    "secret_vars": [],
-    "maxSelfHealAttempts": "2",
-    "redeployDeadlineMs": "120000",
-    "autoRedeployOnError": "false",
-    "autoRedeployOnErrorType": "bool"
-  },
-  {
-    "id": "0000000000000010",
-    "type": "nuclio-function",
-    "z": "0000000000000005",
-    "server": "0000000000000001",
-    "project": "0000000000000002",
-    "name": "demo-shell-transform",
-    "runtime": "shell",
-    "sourceType": "sourceCode",
-    "codeEntryPath": "",
-    "codeEntryBranch": "",
-    "codeEntryTag": "",
-    "codeEntryReference": "",
-    "codeEntryUsername": "",
-    "codeEntryWorkDir": "",
-    "code": "#!/bin/sh\nprintf '{\"runtime\":\"shell\",\"received\":\"'\ncat\nprintf '\"}'",
-    "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    # The Node-RED deployment supplies the architecture-specific prefix.\n    baseImage: gcr.io/iguazio/${NUCLIO_ARCH_PREFIX}alpine:3.23",
-    "env_vars": [],
-    "deploymentVariables": [
-      {
-        "name": "NUCLIO_ARCH_PREFIX",
-        "type": "env",
-        "value": "NUCLIO_ARCH_PREFIX"
-      }
-    ],
-    "deploymentMode": "eager",
-    "secret_vars": [],
-    "maxSelfHealAttempts": "2",
-    "redeployDeadlineMs": "120000",
-    "autoRedeployOnError": "false",
-    "autoRedeployOnErrorType": "bool"
-  },
-  {
-    "id": "0000000000000029",
-    "type": "nuclio-function",
-    "z": "0000000000000027",
-    "server": "0000000000000001",
-    "project": "0000000000000003",
-    "name": "demo-lazy-echo",
-    "runtime": "python:3.12",
-    "sourceType": "sourceCode",
-    "codeEntryPath": "",
-    "codeEntryBranch": "",
-    "codeEntryTag": "",
-    "codeEntryReference": "",
-    "codeEntryUsername": "",
-    "codeEntryWorkDir": "",
-    "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {\"runtime\": \"python\", \"mode\": \"lazy\", \"received\": body}",
-    "configCode": "",
-    "env_vars": [],
-    "deploymentMode": "lazy",
-    "secret_vars": [],
-    "maxSelfHealAttempts": "2",
-    "redeployDeadlineMs": "120000",
-    "autoRedeployOnError": "false",
-    "autoRedeployOnErrorType": "bool"
-  },
-  {
-    "id": "0000000000000044",
-    "type": "nuclio-function",
-    "z": "0000000000000042",
-    "server": "0000000000000001",
-    "project": "0000000000000003",
-    "name": "demo-batch-echo",
-    "runtime": "python:3.12",
-    "sourceType": "sourceCode",
-    "codeEntryPath": "",
-    "codeEntryBranch": "",
-    "codeEntryTag": "",
-    "codeEntryReference": "",
-    "codeEntryUsername": "",
-    "codeEntryWorkDir": "",
-    "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {\"runtime\": \"python\", \"batch_payload\": body}",
-    "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  minReplicas: 1\n  maxReplicas: 1\n  triggers:\n    default-http:\n      kind: http\n      batch:\n        mode: enable\n        batchSize: 4\n        timeout: 1s",
-    "env_vars": [],
-    "deploymentMode": "eager",
-    "secret_vars": [],
-    "maxSelfHealAttempts": "2",
-    "redeployDeadlineMs": "120000",
-    "autoRedeployOnError": "false",
-    "autoRedeployOnErrorType": "bool"
-  },
-  {
-    "id": "0000000000000052",
-    "type": "nuclio-function",
-    "z": "0000000000000050",
-    "server": "0000000000000001",
-    "project": "0000000000000004",
-    "name": "demo-resilient-echo",
-    "runtime": "python:3.12",
-    "sourceType": "sourceCode",
-    "codeEntryPath": "",
-    "codeEntryBranch": "",
-    "codeEntryTag": "",
-    "codeEntryReference": "",
-    "codeEntryUsername": "",
-    "codeEntryWorkDir": "",
-    "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n\n    if isinstance(body, dict) and body.get(\"fail\"):\n        return context.Response(\n            body=json.dumps({\"ok\": False, \"reason\": \"intentional transient demo failure\"}),\n            headers={},\n            content_type=\"application/json\",\n            status_code=503)\n\n    return {\"ok\": True, \"received\": body}",
-    "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  minReplicas: 1\n  maxReplicas: 1\n  triggers:\n    default-http:\n      kind: http\n      maxWorkers: 1",
-    "env_vars": [],
-    "deploymentMode": "eager",
-    "secret_vars": [],
-    "maxSelfHealAttempts": "2",
-    "redeployDeadlineMs": "120000",
-    "autoRedeployOnError": "false",
-    "autoRedeployOnErrorType": "bool"
-  },
-  {
-    "id": "0000000000000058",
-    "type": "nuclio-function",
-    "z": "0000000000000050",
-    "server": "0000000000000001",
-    "project": "0000000000000004",
-    "name": "demo-configured-echo",
-    "runtime": "python:3.12",
-    "sourceType": "sourceCode",
-    "codeEntryPath": "",
-    "codeEntryBranch": "",
-    "codeEntryTag": "",
-    "codeEntryReference": "",
-    "codeEntryUsername": "",
-    "codeEntryWorkDir": "",
-    "code": "import os\nimport json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {\n        \"runtime\": \"python\",\n        \"greeting\": os.environ.get(\"DEMO_GREETING\"),\n        \"received\": body\n    }",
-    "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  minReplicas: 1\n  maxReplicas: 2\n  triggers:\n    default-http:\n      kind: http\n      maxWorkers: 2",
-    "env_vars": [
-      {
-        "name": "DEMO_GREETING",
-        "value": "Hello from Node-RED",
-        "type": "str"
-      }
-    ],
-    "deploymentMode": "eager",
-    "secret_vars": [],
-    "maxSelfHealAttempts": "2",
-    "redeployDeadlineMs": "120000",
-    "autoRedeployOnError": "false",
-    "autoRedeployOnErrorType": "bool"
-  },
-  {
-    "id": "0000000000000006",
-    "type": "comment",
-    "z": "0000000000000005",
-    "name": "Same request, four runtimes",
-    "info": "Compare the same simple invocation across Python, Go, Node.js, and Shell. Each function is manually triggered and intentionally has no external dependencies.",
-    "x": 150,
-    "y": 80,
-    "wires": []
-  },
-  {
-    "id": "0000000000000011",
-    "type": "nuclio",
-    "z": "0000000000000005",
-    "function": "0000000000000007",
-    "timeoutMs": "10000",
-    "maxInFlight": "4",
-    "retries": "0",
-    "retryDelayMs": "500",
-    "headers": [],
-    "x": 760,
-    "y": 160,
-    "wires": [
-      [
-        "0000000000000015"
-      ],
-      [
-        "0000000000000016"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000012",
-    "type": "nuclio",
-    "z": "0000000000000005",
-    "function": "0000000000000008",
-    "timeoutMs": "10000",
-    "maxInFlight": "4",
-    "retries": "0",
-    "retryDelayMs": "500",
-    "headers": [],
-    "x": 760,
-    "y": 420,
-    "wires": [
-      [
-        "0000000000000017"
-      ],
-      [
-        "0000000000000018"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000013",
-    "type": "nuclio",
-    "z": "0000000000000005",
-    "function": "0000000000000009",
-    "timeoutMs": "10000",
-    "maxInFlight": "4",
-    "retries": "0",
-    "retryDelayMs": "500",
-    "headers": [],
-    "x": 760,
-    "y": 680,
-    "wires": [
-      [
-        "0000000000000019"
-      ],
-      [
-        "0000000000000020"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000014",
-    "type": "nuclio",
-    "z": "0000000000000005",
-    "function": "0000000000000010",
-    "timeoutMs": "10000",
-    "maxInFlight": "4",
-    "retries": "0",
-    "retryDelayMs": "500",
-    "headers": [],
-    "x": 760,
-    "y": 940,
-    "wires": [
-      [
-        "0000000000000021"
-      ],
-      [
-        "0000000000000022"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000015",
-    "type": "debug",
-    "z": "0000000000000005",
-    "name": "Python response",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1040,
-    "y": 140,
-    "wires": []
-  },
-  {
-    "id": "0000000000000016",
-    "type": "debug",
-    "z": "0000000000000005",
-    "name": "Python error",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1040,
-    "y": 200,
-    "wires": []
-  },
-  {
-    "id": "0000000000000017",
-    "type": "debug",
-    "z": "0000000000000005",
-    "name": "Go response",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1040,
-    "y": 400,
-    "wires": []
-  },
-  {
-    "id": "0000000000000018",
-    "type": "debug",
-    "z": "0000000000000005",
-    "name": "Go error",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1040,
-    "y": 460,
-    "wires": []
-  },
-  {
-    "id": "0000000000000019",
-    "type": "debug",
-    "z": "0000000000000005",
-    "name": "Node.js response",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1040,
-    "y": 660,
-    "wires": []
-  },
-  {
-    "id": "0000000000000020",
-    "type": "debug",
-    "z": "0000000000000005",
-    "name": "Node.js error",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1040,
-    "y": 720,
-    "wires": []
-  },
-  {
-    "id": "0000000000000021",
-    "type": "debug",
-    "z": "0000000000000005",
-    "name": "Shell response",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1040,
-    "y": 920,
-    "wires": []
-  },
-  {
-    "id": "0000000000000022",
-    "type": "debug",
-    "z": "0000000000000005",
-    "name": "Shell error",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1040,
-    "y": 980,
-    "wires": []
-  },
-  {
-    "id": "0000000000000023",
-    "type": "inject",
-    "z": "0000000000000005",
-    "name": "Run Python example",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"message\":\"hello from Python\"}",
-    "payloadType": "json",
-    "x": 150,
-    "y": 160,
-    "wires": [
-      [
-        "0000000000000011"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000024",
-    "type": "inject",
-    "z": "0000000000000005",
-    "name": "Run Go example",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"message\":\"hello from Go\"}",
-    "payloadType": "json",
-    "x": 150,
-    "y": 420,
-    "wires": [
-      [
-        "0000000000000012"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000025",
-    "type": "inject",
-    "z": "0000000000000005",
-    "name": "Run Node.js example",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "hello from Node.js",
-    "payloadType": "str",
-    "x": 150,
-    "y": 680,
-    "wires": [
-      [
-        "0000000000000013"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000026",
-    "type": "inject",
-    "z": "0000000000000005",
-    "name": "Run Shell example",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "hello from Shell",
-    "payloadType": "str",
-    "x": 150,
-    "y": 940,
-    "wires": [
-      [
-        "0000000000000014"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000028",
-    "type": "comment",
-    "z": "0000000000000027",
-    "name": "Lazy deployment and input commands",
-    "info": "This function does not deploy at startup. Send deploy before the first normal invocation; status, redeploy, and rebuild are explicit input commands.",
-    "x": 150,
-    "y": 80,
-    "wires": []
-  },
-  {
-    "id": "0000000000000030",
-    "type": "nuclio",
-    "z": "0000000000000027",
-    "function": "0000000000000029",
-    "timeoutMs": "10000",
-    "maxInFlight": "4",
-    "retries": "0",
-    "retryDelayMs": "500",
-    "headers": [],
-    "x": 760,
-    "y": 320,
-    "wires": [
-      [
-        "0000000000000031"
-      ],
-      [
-        "0000000000000032"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000031",
-    "type": "debug",
-    "z": "0000000000000027",
-    "name": "Response",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1060,
-    "y": 300,
-    "wires": []
-  },
-  {
-    "id": "0000000000000032",
-    "type": "debug",
-    "z": "0000000000000027",
-    "name": "Command or invocation error",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1060,
-    "y": 380,
-    "wires": []
-  },
-  {
-    "id": "0000000000000033",
-    "type": "inject",
-    "z": "0000000000000027",
-    "name": "Normal invocation",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"message\":\"lazy invocation\"}",
-    "payloadType": "json",
-    "x": 150,
-    "y": 320,
-    "wires": [
-      [
-        "0000000000000030"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000034",
-    "type": "function",
-    "z": "0000000000000027",
-    "name": "Deploy command",
-    "func": "msg.nuclio = { command: \"deploy\" };\nreturn msg;",
-    "outputs": 1,
-    "timeout": 0,
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 440,
-    "y": 520,
-    "wires": [
-      [
-        "0000000000000030"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000035",
-    "type": "inject",
-    "z": "0000000000000027",
-    "name": "Deploy",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "true",
-    "payloadType": "bool",
-    "x": 150,
-    "y": 520,
-    "wires": [
-      [
-        "0000000000000034"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000036",
-    "type": "function",
-    "z": "0000000000000027",
-    "name": "Check status command",
-    "func": "msg.nuclio = { command: \"status\" };\nreturn msg;",
-    "outputs": 1,
-    "timeout": 0,
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 440,
-    "y": 620,
-    "wires": [
-      [
-        "0000000000000030"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000037",
-    "type": "inject",
-    "z": "0000000000000027",
-    "name": "Check status",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "true",
-    "payloadType": "bool",
-    "x": 150,
-    "y": 620,
-    "wires": [
-      [
-        "0000000000000036"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000038",
-    "type": "function",
-    "z": "0000000000000027",
-    "name": "Redeploy command",
-    "func": "msg.nuclio = { command: \"redeploy\" };\nreturn msg;",
-    "outputs": 1,
-    "timeout": 0,
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 440,
-    "y": 720,
-    "wires": [
-      [
-        "0000000000000030"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000039",
-    "type": "inject",
-    "z": "0000000000000027",
-    "name": "Redeploy",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "true",
-    "payloadType": "bool",
-    "x": 150,
-    "y": 720,
-    "wires": [
-      [
-        "0000000000000038"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000040",
-    "type": "function",
-    "z": "0000000000000027",
-    "name": "Rebuild image command",
-    "func": "msg.nuclio = { command: \"rebuild\" };\nreturn msg;",
-    "outputs": 1,
-    "timeout": 0,
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 440,
-    "y": 820,
-    "wires": [
-      [
-        "0000000000000030"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000041",
-    "type": "inject",
-    "z": "0000000000000027",
-    "name": "Rebuild image",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "true",
-    "payloadType": "bool",
-    "x": 150,
-    "y": 820,
-    "wires": [
-      [
-        "0000000000000040"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000043",
-    "type": "comment",
-    "z": "0000000000000042",
-    "name": "Batch four messages",
-    "info": "The function trigger batches four incoming messages. The burst generator makes the batching behavior easy to reproduce without a repeating inject.",
-    "x": 150,
-    "y": 80,
-    "wires": []
-  },
-  {
-    "id": "0000000000000045",
-    "type": "nuclio",
-    "z": "0000000000000042",
-    "function": "0000000000000044",
-    "timeoutMs": "10000",
-    "maxInFlight": "8",
-    "retries": "0",
-    "retryDelayMs": "500",
-    "headers": [],
-    "x": 860,
-    "y": 280,
-    "wires": [
-      [
-        "0000000000000046"
-      ],
-      [
-        "0000000000000047"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000046",
-    "type": "debug",
-    "z": "0000000000000042",
-    "name": "Batch response",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1120,
-    "y": 260,
-    "wires": []
-  },
-  {
-    "id": "0000000000000047",
-    "type": "debug",
-    "z": "0000000000000042",
-    "name": "Batch error",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1120,
-    "y": 340,
-    "wires": []
-  },
-  {
-    "id": "0000000000000048",
-    "type": "function",
-    "z": "0000000000000042",
-    "name": "Create four-message burst",
-    "func": "const values = [1, 2, 3, 4];\nreturn [values.map(value => ({ payload: { value }, topic: \"batch-demo\" }))];",
-    "outputs": 1,
-    "timeout": 0,
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 520,
-    "y": 280,
-    "wires": [
-      [
-        "0000000000000045"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000049",
-    "type": "inject",
-    "z": "0000000000000042",
-    "name": "Send four messages",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "true",
-    "payloadType": "bool",
-    "x": 180,
-    "y": 280,
-    "wires": [
-      [
-        "0000000000000048"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000051",
-    "type": "comment",
-    "z": "0000000000000050",
-    "name": "Retries, fallback, environment, and scaling",
-    "info": "The first function returns a deliberate HTTP 503 when fail=true, so the invoke node retries twice before its fallback output. The second demonstrates a runtime environment variable and a two-replica configuration.",
-    "x": 150,
-    "y": 80,
-    "wires": []
-  },
-  {
-    "id": "0000000000000053",
-    "type": "nuclio",
-    "z": "0000000000000050",
-    "function": "0000000000000052",
-    "timeoutMs": "10000",
-    "maxInFlight": "1",
-    "retries": "2",
-    "retryDelayMs": "250",
-    "headers": [],
-    "x": 860,
-    "y": 220,
-    "wires": [
-      [
-        "0000000000000054"
-      ],
-      [
-        "0000000000000055"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000054",
-    "type": "debug",
-    "z": "0000000000000050",
-    "name": "Successful response",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1120,
-    "y": 180,
-    "wires": []
-  },
-  {
-    "id": "0000000000000055",
-    "type": "debug",
-    "z": "0000000000000050",
-    "name": "Fallback after retries",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1120,
-    "y": 260,
-    "wires": []
-  },
-  {
-    "id": "0000000000000056",
-    "type": "inject",
-    "z": "0000000000000050",
-    "name": "Successful request",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"message\":\"this succeeds\"}",
-    "payloadType": "json",
-    "x": 180,
-    "y": 180,
-    "wires": [
-      [
-        "0000000000000053"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000057",
-    "type": "inject",
-    "z": "0000000000000050",
-    "name": "Intentional 503",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"fail\":true}",
-    "payloadType": "json",
-    "x": 180,
-    "y": 280,
-    "wires": [
-      [
-        "0000000000000053"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000059",
-    "type": "nuclio",
-    "z": "0000000000000050",
-    "function": "0000000000000058",
-    "timeoutMs": "10000",
-    "maxInFlight": "4",
-    "retries": "0",
-    "retryDelayMs": "500",
-    "headers": [],
-    "x": 860,
-    "y": 520,
-    "wires": [
-      [
-        "0000000000000060"
-      ],
-      [
-        "0000000000000061"
-      ]
-    ]
-  },
-  {
-    "id": "0000000000000060",
-    "type": "debug",
-    "z": "0000000000000050",
-    "name": "Configured response",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1120,
-    "y": 520,
-    "wires": []
-  },
-  {
-    "id": "0000000000000061",
-    "type": "debug",
-    "z": "0000000000000050",
-    "name": "Configured error",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 1120,
-    "y": 580,
-    "wires": []
-  },
-  {
-    "id": "0000000000000062",
-    "type": "inject",
-    "z": "0000000000000050",
-    "name": "Read environment",
-    "props": [
-      {
-        "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"message\":\"read the environment\"}",
-    "payloadType": "json",
-    "x": 180,
-    "y": 520,
-    "wires": [
-      [
-        "0000000000000059"
-      ]
-    ]
-  }
+    {
+        "id": "0000000000000005",
+        "type": "tab",
+        "label": "01 Runtime gallery",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "0000000000000027",
+        "type": "tab",
+        "label": "02 Deployment patterns",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "0000000000000042",
+        "type": "tab",
+        "label": "03 Batching",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "0000000000000050",
+        "type": "tab",
+        "label": "04 Resilience & configuration",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "0000000000000001",
+        "type": "nuclio-config",
+        "address": "http://nuclio-dashboard:8070",
+        "addressType": "str",
+        "namespace": "nuclio",
+        "namespaceType": "str",
+        "publicAddress": "http://localhost:8070",
+        "publicAddressType": "str",
+        "invocationUrlPreference": "service",
+        "internalInvocationServiceHost": "nuclio-nuclio-{function}",
+        "internalInvocationServiceHostType": "str",
+        "externalInvocationProtocol": "http",
+        "deploymentPolicy": "managed",
+        "deploymentPolicyType": "str",
+        "requestTimeoutMs": "",
+        "deployTimeoutMs": "",
+        "pollMs": "",
+        "readyPollMs": "",
+        "backoffMs": "",
+        "backoffMaxMs": "",
+        "startStaggerMs": ""
+    },
+    {
+        "id": "0000000000000002",
+        "type": "nuclio-project",
+        "name": "demo-runtime",
+        "nameType": "str"
+    },
+    {
+        "id": "0000000000000003",
+        "type": "nuclio-project",
+        "name": "demo-patterns",
+        "nameType": "str"
+    },
+    {
+        "id": "0000000000000004",
+        "type": "nuclio-project",
+        "name": "demo-operations",
+        "nameType": "str"
+    },
+    {
+        "id": "0000000000000007",
+        "type": "nuclio-function",
+        "z": "0000000000000005",
+        "server": "0000000000000001",
+        "project": "0000000000000002",
+        "name": "demo-python-echo",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {\"runtime\": \"python\", \"received\": body}",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nmetadata:\n  labels: {}\n  annotations: {}\nspec:\n  build:\n    commands: []\n    # - pip install requests numpy pandas\n    \n  # # add multiple workers:\n  # triggers:\n  #   mh:\n  #     kind: http\n  #     numWorkers: 4\n      \n  #############\n  # Kubernetes:\n  \n  # env: []\n  # envFrom: []\n  # volumes: []\n\n  # # Pod replica auto-scaling:\n  # minReplicas: 1\n  # maxReplicas: 1\n  # resources: {}\n  #   # Kubernetes Limits & Requests for the function's CPU and memory usage.\n  #   requests:\n  #     cpu: 1\n  #     memory: 128M\n  #   limits:\n  #     cpu: 2\n  #     memory: 256M\n  #     nvidia.com/gpu: 1",
+        "env_vars": [],
+        "deploymentVariables": [],
+        "deploymentMode": "eager",
+        "secret_vars": [],
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000008",
+        "type": "nuclio-function",
+        "z": "0000000000000005",
+        "server": "0000000000000001",
+        "project": "0000000000000002",
+        "name": "demo-go-echo",
+        "runtime": "golang",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "package main\n\nimport (\n    nuclio \"github.com/nuclio/nuclio-sdk-go\"\n)\n\nfunc Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {\n    context.Logger.Info(\"Go demo invoked\")\n    return nuclio.Response{\n        StatusCode:  200,\n        ContentType: \"application/json\",\n        Body:        event.GetBody(),\n    }, nil\n}",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    # The Node-RED deployment supplies the architecture-specific prefix.\n    baseImage: gcr.io/iguazio/${NUCLIO_ARCH_PREFIX}alpine:3.23",
+        "env_vars": [],
+        "deploymentVariables": [
+            {
+                "name": "NUCLIO_ARCH_PREFIX",
+                "type": "env",
+                "value": "NUCLIO_ARCH_PREFIX"
+            }
+        ],
+        "deploymentMode": "eager",
+        "secret_vars": [],
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000009",
+        "type": "nuclio-function",
+        "z": "0000000000000005",
+        "server": "0000000000000001",
+        "project": "0000000000000002",
+        "name": "demo-nodejs-transform",
+        "runtime": "nodejs",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "exports.handler = function(context, event) {\n    let body = event.body;\n    if (Buffer.isBuffer(body)) body = body.toString();\n    try {\n        body = JSON.parse(body);\n    } catch (_) {\n        // Keep plain-text request bodies as strings.\n    }\n    context.callback(JSON.stringify({ runtime: \"nodejs\", received: body }));\n};",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nmetadata:\n  labels: {}\n  annotations: {}\nspec:\n  build:\n    commands: []\n    # - pip install requests numpy pandas\n\n  # # add multiple workers:\n  # triggers:\n  #   mh:\n  #     kind: http\n  #     numWorkers: 4\n      \n  #############\n  # Kubernetes:\n  \n  # env: []\n  # envFrom: []\n  # volumes: []\n\n  # # Pod replica auto-scaling:\n  # minReplicas: 1\n  # maxReplicas: 1\n  # resources: {}\n  #   # Kubernetes Limits & Requests for the function's CPU and memory usage.\n  #   requests:\n  #     cpu: 1\n  #     memory: 128M\n  #   limits:\n  #     cpu: 2\n  #     memory: 256M\n  #     nvidia.com/gpu: 1",
+        "env_vars": [],
+        "deploymentVariables": [],
+        "deploymentMode": "eager",
+        "secret_vars": [],
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000010",
+        "type": "nuclio-function",
+        "z": "0000000000000005",
+        "server": "0000000000000001",
+        "project": "0000000000000002",
+        "name": "demo-shell-transform",
+        "runtime": "shell",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "#!/bin/sh\nprintf '{\"runtime\":\"shell\",\"received\":\"'\ncat\nprintf '\"}'",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    # The Node-RED deployment supplies the architecture-specific prefix.\n    baseImage: gcr.io/iguazio/${NUCLIO_ARCH_PREFIX}alpine:3.23",
+        "env_vars": [],
+        "deploymentVariables": [
+            {
+                "name": "NUCLIO_ARCH_PREFIX",
+                "type": "env",
+                "value": "NUCLIO_ARCH_PREFIX"
+            }
+        ],
+        "deploymentMode": "eager",
+        "secret_vars": [],
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000029",
+        "type": "nuclio-function",
+        "z": "0000000000000027",
+        "server": "0000000000000001",
+        "project": "0000000000000003",
+        "name": "demo-lazy-echo",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {\"runtime\": \"python\", \"mode\": \"lazy\", \"received\": body}",
+        "configCode": "",
+        "env_vars": [],
+        "deploymentMode": "lazy",
+        "secret_vars": [],
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000044",
+        "type": "nuclio-function",
+        "z": "0000000000000042",
+        "server": "0000000000000001",
+        "project": "0000000000000003",
+        "name": "demo-batch-echo",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {\"runtime\": \"python\", \"batch_payload\": body}",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  minReplicas: 1\n  maxReplicas: 1\n  triggers:\n    default-http:\n      kind: http\n      batch:\n        mode: enable\n        batchSize: 4\n        timeout: 1s",
+        "env_vars": [],
+        "deploymentMode": "eager",
+        "secret_vars": [],
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000052",
+        "type": "nuclio-function",
+        "z": "0000000000000050",
+        "server": "0000000000000001",
+        "project": "0000000000000004",
+        "name": "demo-resilient-echo",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n\n    if isinstance(body, dict) and body.get(\"fail\"):\n        return context.Response(\n            body=json.dumps({\"ok\": False, \"reason\": \"intentional transient demo failure\"}),\n            headers={},\n            content_type=\"application/json\",\n            status_code=503)\n\n    return {\"ok\": True, \"received\": body}",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  minReplicas: 1\n  maxReplicas: 1\n  triggers:\n    default-http:\n      kind: http\n      maxWorkers: 1",
+        "env_vars": [],
+        "deploymentMode": "eager",
+        "secret_vars": [],
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000058",
+        "type": "nuclio-function",
+        "z": "0000000000000050",
+        "server": "0000000000000001",
+        "project": "0000000000000004",
+        "name": "demo-configured-echo",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "import os\nimport json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {\n        \"runtime\": \"python\",\n        \"greeting\": os.environ.get(\"DEMO_GREETING\"),\n        \"received\": body\n    }",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  minReplicas: 1\n  maxReplicas: 2\n  triggers:\n    default-http:\n      kind: http\n      maxWorkers: 2",
+        "env_vars": [
+            {
+                "name": "DEMO_GREETING",
+                "value": "Hello from Node-RED",
+                "type": "str"
+            }
+        ],
+        "deploymentMode": "eager",
+        "secret_vars": [],
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000006",
+        "type": "comment",
+        "z": "0000000000000005",
+        "name": "Same request, four runtimes",
+        "info": "Compare the same simple invocation across Python, Go, Node.js, and Shell. Each function is manually triggered and intentionally has no external dependencies.",
+        "x": 150,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "0000000000000011",
+        "type": "nuclio",
+        "z": "0000000000000005",
+        "function": "0000000000000007",
+        "timeoutMs": "10000",
+        "maxInFlight": "4",
+        "retries": "0",
+        "retryDelayMs": "500",
+        "headers": [],
+        "x": 760,
+        "y": 160,
+        "wires": [
+            [
+                "0000000000000015"
+            ],
+            [
+                "0000000000000016"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000012",
+        "type": "nuclio",
+        "z": "0000000000000005",
+        "function": "0000000000000008",
+        "timeoutMs": "10000",
+        "maxInFlight": "4",
+        "retries": "0",
+        "retryDelayMs": "500",
+        "headers": [],
+        "x": 760,
+        "y": 420,
+        "wires": [
+            [
+                "0000000000000017"
+            ],
+            [
+                "0000000000000018"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000013",
+        "type": "nuclio",
+        "z": "0000000000000005",
+        "function": "0000000000000009",
+        "timeoutMs": "10000",
+        "maxInFlight": "4",
+        "retries": "0",
+        "retryDelayMs": "500",
+        "headers": [],
+        "x": 760,
+        "y": 680,
+        "wires": [
+            [
+                "0000000000000019"
+            ],
+            [
+                "0000000000000020"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000014",
+        "type": "nuclio",
+        "z": "0000000000000005",
+        "function": "0000000000000010",
+        "timeoutMs": "10000",
+        "maxInFlight": "4",
+        "retries": "0",
+        "retryDelayMs": "500",
+        "headers": [],
+        "x": 760,
+        "y": 940,
+        "wires": [
+            [
+                "0000000000000021"
+            ],
+            [
+                "0000000000000022"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000015",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": "Python response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "0000000000000016",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": "Python error",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "0000000000000017",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": "Go response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "0000000000000018",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": "Go error",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "0000000000000019",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": "Node.js response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "0000000000000020",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": "Node.js error",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "0000000000000021",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": "Shell response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 920,
+        "wires": []
+    },
+    {
+        "id": "0000000000000022",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": "Shell error",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 980,
+        "wires": []
+    },
+    {
+        "id": "0000000000000023",
+        "type": "inject",
+        "z": "0000000000000005",
+        "name": "Run Python example",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"message\":\"hello from Python\"}",
+        "payloadType": "json",
+        "x": 150,
+        "y": 160,
+        "wires": [
+            [
+                "0000000000000011"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000024",
+        "type": "inject",
+        "z": "0000000000000005",
+        "name": "Run Go example",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"message\":\"hello from Go\"}",
+        "payloadType": "json",
+        "x": 150,
+        "y": 420,
+        "wires": [
+            [
+                "0000000000000012"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000025",
+        "type": "inject",
+        "z": "0000000000000005",
+        "name": "Run Node.js example",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "hello from Node.js",
+        "payloadType": "str",
+        "x": 150,
+        "y": 680,
+        "wires": [
+            [
+                "0000000000000013"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000026",
+        "type": "inject",
+        "z": "0000000000000005",
+        "name": "Run Shell example",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "hello from Shell",
+        "payloadType": "str",
+        "x": 150,
+        "y": 940,
+        "wires": [
+            [
+                "0000000000000014"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000028",
+        "type": "comment",
+        "z": "0000000000000027",
+        "name": "Lazy deployment and input commands",
+        "info": "This function does not deploy at startup. Send deploy before the first normal invocation; status, redeploy, and rebuild are explicit input commands.",
+        "x": 150,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "0000000000000030",
+        "type": "nuclio",
+        "z": "0000000000000027",
+        "function": "0000000000000029",
+        "timeoutMs": "10000",
+        "maxInFlight": "4",
+        "retries": "0",
+        "retryDelayMs": "500",
+        "headers": [],
+        "x": 760,
+        "y": 320,
+        "wires": [
+            [
+                "0000000000000031"
+            ],
+            [
+                "0000000000000032"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000031",
+        "type": "debug",
+        "z": "0000000000000027",
+        "name": "Response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1060,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "0000000000000032",
+        "type": "debug",
+        "z": "0000000000000027",
+        "name": "Command or invocation error",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1060,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "0000000000000033",
+        "type": "inject",
+        "z": "0000000000000027",
+        "name": "Normal invocation",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"message\":\"lazy invocation\"}",
+        "payloadType": "json",
+        "x": 150,
+        "y": 320,
+        "wires": [
+            [
+                "0000000000000030"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000034",
+        "type": "function",
+        "z": "0000000000000027",
+        "name": "Deploy command",
+        "func": "msg.nuclio = { command: \"deploy\" };\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 520,
+        "wires": [
+            [
+                "0000000000000030"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000035",
+        "type": "inject",
+        "z": "0000000000000027",
+        "name": "Deploy",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 150,
+        "y": 520,
+        "wires": [
+            [
+                "0000000000000034"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000036",
+        "type": "function",
+        "z": "0000000000000027",
+        "name": "Check status command",
+        "func": "msg.nuclio = { command: \"status\" };\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 620,
+        "wires": [
+            [
+                "0000000000000030"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000037",
+        "type": "inject",
+        "z": "0000000000000027",
+        "name": "Check status",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 150,
+        "y": 620,
+        "wires": [
+            [
+                "0000000000000036"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000038",
+        "type": "function",
+        "z": "0000000000000027",
+        "name": "Redeploy command",
+        "func": "msg.nuclio = { command: \"redeploy\" };\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 720,
+        "wires": [
+            [
+                "0000000000000030"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000039",
+        "type": "inject",
+        "z": "0000000000000027",
+        "name": "Redeploy",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 150,
+        "y": 720,
+        "wires": [
+            [
+                "0000000000000038"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000040",
+        "type": "function",
+        "z": "0000000000000027",
+        "name": "Rebuild image command",
+        "func": "msg.nuclio = { command: \"rebuild\" };\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 820,
+        "wires": [
+            [
+                "0000000000000030"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000041",
+        "type": "inject",
+        "z": "0000000000000027",
+        "name": "Rebuild image",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 150,
+        "y": 820,
+        "wires": [
+            [
+                "0000000000000040"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000043",
+        "type": "comment",
+        "z": "0000000000000042",
+        "name": "Batch four messages",
+        "info": "The function trigger batches four incoming messages. The burst generator makes the batching behavior easy to reproduce without a repeating inject.",
+        "x": 150,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "0000000000000045",
+        "type": "nuclio",
+        "z": "0000000000000042",
+        "function": "0000000000000044",
+        "timeoutMs": "10000",
+        "maxInFlight": "8",
+        "retries": "0",
+        "retryDelayMs": "500",
+        "headers": [],
+        "x": 860,
+        "y": 280,
+        "wires": [
+            [
+                "0000000000000046"
+            ],
+            [
+                "0000000000000047"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000046",
+        "type": "debug",
+        "z": "0000000000000042",
+        "name": "Batch response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1120,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "0000000000000047",
+        "type": "debug",
+        "z": "0000000000000042",
+        "name": "Batch error",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1120,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "0000000000000048",
+        "type": "function",
+        "z": "0000000000000042",
+        "name": "Create four-message burst",
+        "func": "const values = [1, 2, 3, 4];\nreturn [values.map(value => ({ payload: { value }, topic: \"batch-demo\" }))];",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 520,
+        "y": 280,
+        "wires": [
+            [
+                "0000000000000045"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000049",
+        "type": "inject",
+        "z": "0000000000000042",
+        "name": "Send four messages",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 180,
+        "y": 280,
+        "wires": [
+            [
+                "0000000000000048"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000051",
+        "type": "comment",
+        "z": "0000000000000050",
+        "name": "Retries, fallback, environment, and scaling",
+        "info": "The first function returns a deliberate HTTP 503 when fail=true, so the invoke node retries twice before its fallback output. The second demonstrates a runtime environment variable and a two-replica configuration.",
+        "x": 150,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "0000000000000053",
+        "type": "nuclio",
+        "z": "0000000000000050",
+        "function": "0000000000000052",
+        "timeoutMs": "10000",
+        "maxInFlight": "1",
+        "retries": "2",
+        "retryDelayMs": "250",
+        "headers": [],
+        "x": 860,
+        "y": 220,
+        "wires": [
+            [
+                "0000000000000054"
+            ],
+            [
+                "0000000000000055"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000054",
+        "type": "debug",
+        "z": "0000000000000050",
+        "name": "Successful response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1120,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "0000000000000055",
+        "type": "debug",
+        "z": "0000000000000050",
+        "name": "Fallback after retries",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1120,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "0000000000000056",
+        "type": "inject",
+        "z": "0000000000000050",
+        "name": "Successful request",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"message\":\"this succeeds\"}",
+        "payloadType": "json",
+        "x": 180,
+        "y": 180,
+        "wires": [
+            [
+                "0000000000000053"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000057",
+        "type": "inject",
+        "z": "0000000000000050",
+        "name": "Intentional 503",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"fail\":true}",
+        "payloadType": "json",
+        "x": 180,
+        "y": 280,
+        "wires": [
+            [
+                "0000000000000053"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000059",
+        "type": "nuclio",
+        "z": "0000000000000050",
+        "function": "0000000000000058",
+        "timeoutMs": "10000",
+        "maxInFlight": "4",
+        "retries": "0",
+        "retryDelayMs": "500",
+        "headers": [],
+        "x": 860,
+        "y": 520,
+        "wires": [
+            [
+                "0000000000000060"
+            ],
+            [
+                "0000000000000061"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000060",
+        "type": "debug",
+        "z": "0000000000000050",
+        "name": "Configured response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1120,
+        "y": 520,
+        "wires": []
+    },
+    {
+        "id": "0000000000000061",
+        "type": "debug",
+        "z": "0000000000000050",
+        "name": "Configured error",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1120,
+        "y": 580,
+        "wires": []
+    },
+    {
+        "id": "0000000000000062",
+        "type": "inject",
+        "z": "0000000000000050",
+        "name": "Read environment",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"message\":\"read the environment\"}",
+        "payloadType": "json",
+        "x": 180,
+        "y": 520,
+        "wires": [
+            [
+                "0000000000000059"
+            ]
+        ]
+    }
 ]
