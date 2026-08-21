@@ -473,7 +473,7 @@ spec:
   build:
     commands: []
     # - pip install requests numpy pandas
-    
+
   # # add multiple workers:
   # triggers:
   #   mh:
@@ -1476,22 +1476,6 @@ rev /dev/stdin
                 </label>
                 <input type="text" id="node-config-input-project" placeholder="default" />
             </div>
-            <div class="form-row">
-                <h2>Function Config [<a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/function-configuration-reference.html" title="">docs</a>]:</h2>
-                <p>
-                </p>
-            </div>
-            <div style="min-height:150px;" class="node-text-editor" id="node-config-input-nuclio-config-editor" ></div>
-
-            <div class="form-row node-input-list-row">
-                <label for="node-config-input-deploymentVariables-x">
-                    Deployment Variables
-                </label>
-                <p>
-                    <small>Use <code>${VAR}</code> or <code>${VAR:-fallback}</code> in the function YAML. Values can be literal or read from the Node-RED process environment. Check <b>secret</b> when a resolved value must be treated as sensitive; sensitive values are not logged and matching status fields are redacted.</small>
-                </p>
-                <ol id="node-config-input-deploymentVariables-x"></ol>
-            </div>
 
             <div class="form-row node-input-list-row">
                 <label for="node-config-input-env_vars-x">
@@ -1503,47 +1487,68 @@ rev /dev/stdin
                 <ol id="node-config-input-env_vars-x"></ol>
             </div>
 
-            <div class="form-row node-input-list-row">
-                <label for="node-config-input-secret_vars-x">
-                    Legacy Credential Overrides (deprecated)
-                </label>
-                <p>
-                    <small>Use Deployment Variables above for new configuration. This legacy path/value list remains available for older flows and is not used by new configuration.</small>
-                </p>
-                <ol id="node-config-input-secret_vars-x"></ol>
-            </div>
-            <div class="form-row">
-                <label for="node-config-input-deploymentMode">Deployment mode</label>
-                <select id="node-config-input-deploymentMode" class="form-control">
-                    <option value="eager">Eager</option>
-                    <option value="lazy">Lazy</option>
-                </select>
-                <div>
-                    <small><b>Eager</b> deploys when Node-RED starts. <b>Lazy</b> waits for an input command such as <code>deploy</code>; ordinary messages are gated until the function is ready.</small>
+            <details>
+                <summary>
+                    Function Config [<a target="_blank" href="https://docs.nuclio.io/en/stable/reference/function-configuration/function-configuration-reference.html" title="">docs</a>]:
+                </summary>
+                <div class="form-row">
+                    <p>
+                    </p>
                 </div>
-            </div>
+                <div style="min-height:150px;" class="node-text-editor" id="node-config-input-nuclio-config-editor" ></div>
 
-            <div class="form-row">
-                <h2>Recovery</h2>
-                <p>
-                    <small>How this function self-heals. Leave blank to use the built-in default. Takes effect on the next Deploy.</small>
-                </p>
-            </div>
-            <div class="form-row">
-                <label for="node-config-input-maxSelfHealAttempts">Self-heal attempts</label>
-                <input type="text" id="node-config-input-maxSelfHealAttempts" placeholder="5 (built-in default)" />
-            </div>
-            <div class="form-row">
-                <label for="node-config-input-redeployDeadlineMs">Redeploy deadline (ms)</label>
-                <input type="text" id="node-config-input-redeployDeadlineMs" placeholder="120000 ms (built-in default)" />
-            </div>
-            <div class="form-row">
-                <label for="node-config-input-autoRedeployOnError">Auto-redeploy on error</label>
-                <input type="text" id="node-config-input-autoRedeployOnError" />
-                <div>
-                    <small>Also auto-redeploy functions in Nuclio's <code>error</code> state (treated as terminal by default).</small>
+                <div class="form-row node-input-list-row">
+                    <label for="node-config-input-deploymentVariables-x">
+                        Deployment Variables
+                    </label>
+                    <p>
+                        <small>Use <code>${VAR}</code> or <code>${VAR:-fallback}</code> in the function YAML. Values can be literal or read from the Node-RED process environment. Check <b>secret</b> when a resolved value must be treated as sensitive; sensitive values are not logged and matching status fields are redacted.</small>
+                    </p>
+                    <ol id="node-config-input-deploymentVariables-x"></ol>
                 </div>
-            </div>
+
+                <div class="form-row node-input-list-row">
+                    <label for="node-config-input-secret_vars-x">
+                        Legacy Credential Overrides (deprecated)
+                    </label>
+                    <p>
+                        <small>Use Deployment Variables above for new configuration. This legacy path/value list remains available for older flows and is not used by new configuration.</small>
+                    </p>
+                    <ol id="node-config-input-secret_vars-x"></ol>
+                </div>
+            </details>
+
+            <details>
+                <summary>
+                    Deployment
+                </summary>
+                <div class="form-row">
+                    <label for="node-config-input-deploymentMode">Deployment mode</label>
+                    <select id="node-config-input-deploymentMode" class="form-control">
+                        <option value="eager">Eager</option>
+                        <option value="lazy">Lazy</option>
+                    </select>
+                    <div>
+                        <small><b>Eager</b> deploys when Node-RED starts. <b>Lazy</b> waits for an input command such as <code>deploy</code>; ordinary messages are gated until the function is ready.</small>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-maxSelfHealAttempts">Self-heal attempts</label>
+                    <input type="text" id="node-config-input-maxSelfHealAttempts" placeholder="5 (built-in default)" />
+                </div>
+
+                <div class="form-row">
+                    <label for="node-config-input-redeployDeadlineMs">Redeploy deadline (ms)</label>
+                    <input type="text" id="node-config-input-redeployDeadlineMs" placeholder="120000 ms (built-in default)" />
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-autoRedeployOnError">Auto-redeploy on error</label>
+                    <input type="text" id="node-config-input-autoRedeployOnError" />
+                    <div>
+                        <small>Also auto-redeploy functions in Nuclio's <code>error</code> state (treated as terminal by default).</small>
+                    </div>
+                </div>
+            </details>
         </div>
         <div id="nuclio-tab-status" style="display:none">
             <div class="nuclio-status-shell">
