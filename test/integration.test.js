@@ -141,6 +141,20 @@ test('scaling and resource controls merge into the function spec', async () => {
     });
 });
 
+test('Kubernetes secret references are emitted without secret values', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        envSecretRefs: [{ name: 'DATABASE_PASSWORD', secretName: 'app-secrets', secretKey: 'database-password' }],
+    }));
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.deepEqual(req.body.spec.env, [{
+        name: 'DATABASE_PASSWORD',
+        valueFrom: { secretKeyRef: { name: 'app-secrets', key: 'database-password' } },
+    }]);
+    assert.doesNotMatch(JSON.stringify(req.body), /secret-value|password-value/i);
+});
+
 test('external Git source suppresses online code and emits Nuclio source fields', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {

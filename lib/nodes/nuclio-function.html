@@ -166,6 +166,17 @@
     #nuclio-tabs-content .nuclio-deployment-variable-row .nuclio-deployment-variable-secret input {
         width: auto;
     }
+    #nuclio-tabs-content .nuclio-secret-reference-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        width: 100%;
+    }
+    #nuclio-tabs-content .nuclio-secret-reference-row input {
+        flex: 1 1 0;
+        min-width: 100px;
+    }
 
     #nuclio-tabs-content a {
         text-decoration: underline;
@@ -842,6 +853,35 @@ rev /dev/stdin
         });
         return rows;
     };
+
+    const initSecretReferenceList = (selector, items) => {
+        const list = $(selector).editableList({
+            addItem: function(row, index, data) {
+                row.addClass('nuclio-secret-reference-row');
+                $(`<input type='text' placeholder='ENV_NAME' aria-label='Environment variable name' />`)
+                    .appendTo(row).val(data.name || '');
+                $(`<input type='text' placeholder='Secret name' aria-label='Kubernetes secret name' />`)
+                    .appendTo(row).val(data.secretName || '');
+                $(`<input type='text' placeholder='Secret key' aria-label='Kubernetes secret key' />`)
+                    .appendTo(row).val(data.secretKey || '');
+            },
+            removable: true,
+        });
+        for (const data of items || []) list.editableList('addItem', data);
+        return list;
+    };
+
+    const collectSecretReferenceList = (selector) => {
+        const rows = [];
+        $(selector).editableList('items').each(function() {
+            const inputs = $(this).find('input');
+            const name = inputs.eq(0).val();
+            const secretName = inputs.eq(1).val();
+            const secretKey = inputs.eq(2).val();
+            if (name && secretName && secretKey) rows.push({ name, secretName, secretKey });
+        });
+        return rows;
+    };
 </script>
 
 <script type="text/javascript">/* ---------------------------- Nuclio Function ----------------------------- */
@@ -883,6 +923,7 @@ rev /dev/stdin
             code: { value: SAMPLES.python.code },
             configCode: { value: SAMPLES.python.config },
             env_vars: { value: [] },
+            envSecretRefs: { value: [] },
             deploymentVariables: { value: [] },
             deploymentMode: { value: 'eager' },
             executionTriggerName: { value: '' },
@@ -1116,6 +1157,7 @@ rev /dev/stdin
                 defaultType: 'str',
                 types: ['str','num','json','env','cred'],
             });
+            this.envSecretRefList = initSecretReferenceList('#node-config-input-env_secret_refs-x', this.envSecretRefs);
 
             $('#node-config-input-executionTriggerName').val(this.executionTriggerName || 'http');
             $('#node-config-input-executionMode').val(this.executionMode || 'inherit');
@@ -1379,6 +1421,8 @@ rev /dev/stdin
 
             node.env_vars = collectKeyValueList("#node-config-input-env_vars-x");
             delete this.envList;
+            node.envSecretRefs = collectSecretReferenceList('#node-config-input-env_secret_refs-x');
+            delete this.envSecretRefList;
 
             node.credentials.deploymentVariables = JSON.stringify(
                 collectDeploymentVariableList('#node-config-input-deploymentVariables-x'),
@@ -1423,6 +1467,7 @@ rev /dev/stdin
             delete this.nuclioEditorDirty;
             this.name = this.originalName;
             delete this.envList;
+            delete this.envSecretRefList;
             delete this.deploymentVariableList;
             delete this.secretList;
             delete this.resolvedSecretVars;
@@ -1541,6 +1586,12 @@ rev /dev/stdin
                     <small>You can specify environment variables that will be available to your application at runtime.</small>
                 </p>
                 <ol id="node-config-input-env_vars-x"></ol>
+            </div>
+
+            <div class="form-row node-input-list-row">
+                <label for="node-config-input-env_secret_refs-x">Kubernetes Secret References</label>
+                <p><small>Inject an environment variable from a Kubernetes Secret without storing its value in Node-RED. These entries become <code>valueFrom.secretKeyRef</code> fields in the function spec.</small></p>
+                <ol id="node-config-input-env_secret_refs-x"></ol>
             </div>
 
             <details>
@@ -1772,6 +1823,9 @@ rev /dev/stdin
         <dt>Environment Variables</dt>
         <dd>Key/value pairs injected into the function environment. Values are
         stored with the function configuration.</dd>
+        <dt>Kubernetes Secret References</dt>
+        <dd>Environment variables populated from Kubernetes Secret keys. Only the
+        Secret name and key are stored; the Secret value is resolved by Kubernetes.</dd>
         <dt>Deployment Variables</dt>
         <dd>Function-scoped values interpolated into YAML with <code>${VAR}</code> or
         nested <code>${VAR:-fallback}</code>. Values can come from a literal, the
