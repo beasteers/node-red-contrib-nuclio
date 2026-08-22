@@ -159,6 +159,22 @@ Nuclio reports container health; Node-RED performs reconciliation and self-heali
 still polled after successful invocations, and self-healing waits for two consecutive unhealthy
 observations before acting.
 
+Dashboard requests use a shared per-server circuit breaker. Repeated transient dashboard failures
+pause API traffic and recover through a single probe, while already-known function invocation
+endpoints remain available. In-flight dashboard and invocation requests are cancelled when their
+Node-RED nodes close.
+
+For monitoring, a Prometheus-compatible endpoint is available through a loaded function node. It
+uses Node-RED's `flows.read` admin permission when Node-RED admin authentication is
+enabled:
+
+```text
+GET /nuclio/api/metrics?id=<function-node-id>
+```
+
+Metrics include dashboard requests, circuit trips, deployments, reconciliation cycles, and
+invocation outcomes. Payloads, credentials, URLs, and error bodies are not included.
+
 ## Orphaned functions
 
 Orphan cleanup is explicit. Node-RED never automatically deletes functions merely because they

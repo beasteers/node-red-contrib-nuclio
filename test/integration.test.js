@@ -355,6 +355,20 @@ test('status summary and details are selectively returned', async () => {
     assert.deepEqual(logs.body, { logs: [] });
 });
 
+test('metrics endpoint returns authenticated Prometheus-compatible metrics', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await waitUntil(() => mock.requests.some(r => r.method === 'GET' && r.url === `/api/functions/${FN}`));
+
+    const response = await helper.request()
+        .get('/nuclio/api/metrics?id=fn')
+        .expect(200);
+    assert.match(response.headers['content-type'], /text\/plain/);
+    assert.match(response.text, /nuclio_dashboard_requests_total/);
+    assert.match(response.text, /nuclio_reconcile_steps_total/);
+    assert.doesNotMatch(response.text, /127\.0\.0\.1|password|token/i);
+});
+
 test('admin errors do not expose dashboard response bodies', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));
