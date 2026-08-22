@@ -111,3 +111,25 @@ test('dashboard circuit state is shared by clients using the same server', async
         await new Promise(resolve => server.close(resolve));
     }
 });
+
+test('dashboard requests are aborted by the caller signal', async () => {
+    const server = http.createServer(() => {
+        // Deliberately leave the request pending until the client aborts it.
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+    try {
+        const controller = new AbortController();
+        const address = `http://127.0.0.1:${server.address().port}`;
+        const client = createClient(
+            { address, namespace: 'nuclio', requestTimeoutMs: 10000, deployTimeoutMs: 10000 },
+            'default',
+            { signal: controller.signal },
+        );
+        const request = client.getFunction('fn');
+        setTimeout(() => controller.abort(), 20);
+        await assert.rejects(request, err => err.code === 'ERR_CANCELED');
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+    }
+});

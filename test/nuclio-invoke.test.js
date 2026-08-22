@@ -27,7 +27,8 @@ const makeNodes = (overrides = {}) => {
 };
 
 test('invokes successfully and records the response', async () => {
-    const { node, fnNode, statuses } = makeNodes();
+    const abortController = new AbortController();
+    const { node, fnNode, statuses } = makeNodes({ node: { abortController } });
     const msg = { payload: { input: 1 } };
 
     const result = await invokeWithRetry({
@@ -39,6 +40,7 @@ test('invokes successfully and records the response', async () => {
             assert.equal(url, 'http://first.test');
             assert.deepEqual(payload, { input: 1 });
             assert.equal(options.timeout, 1000);
+            assert.equal(options.signal, abortController.signal);
             return { data: { output: 2 }, status: 200 };
         },
     });
