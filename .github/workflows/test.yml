@@ -24,3 +24,30 @@ jobs:
       - run: npm pack --dry-run
       - run: npm run lint
       - run: npm test
+
+  fixture:
+    name: ${{ matrix.fixture }} fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - fixture: compose
+            command: npm run smoke
+          - fixture: kind
+            command: npm run test:kind
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - uses: helm/kind-action@v1.12.0
+        if: matrix.fixture == 'kind'
+        with:
+          cluster_name: nuclio-node-red-canary
+      - uses: azure/setup-helm@v4
+        if: matrix.fixture == 'kind'
+      - run: npm ci
+      - run: ${{ matrix.command }}
