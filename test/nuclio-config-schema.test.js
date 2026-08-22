@@ -17,6 +17,12 @@ test('Nuclio schema suggests trigger execution settings', () => {
     assert.ok(labels.includes('numWorkers'));
 });
 
+test('Nuclio schema suggests enum values', () => {
+    const text = 'spec:\n  triggers:\n    http:\n      mode: ';
+    const labels = editor.completions(text, 3, text.split('\n')[3].length).map(item => item.label);
+    assert.deepEqual(labels, ['sync', 'async']);
+});
+
 test('Nuclio schema warns on invalid scalar values without rejecting unknown fields', () => {
     const warnings = editor.validate([
         'spec:',

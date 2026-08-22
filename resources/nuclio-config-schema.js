@@ -151,6 +151,18 @@
 
     const completions = (text, lineNumber, column) => {
         const context = contextAt(text, lineNumber, column);
+        if (!context.keyPrefix && context.path.length) {
+            const valueDefinition = getDefinition(context.path.slice(0, -1))[context.path[context.path.length - 1]];
+            if (valueDefinition?.enum) {
+                return valueDefinition.enum.map(value => ({
+                    label: value,
+                    insertText: value,
+                    kind: 'value',
+                    detail: 'allowed value',
+                    documentation: valueDefinition.description || '',
+                }));
+            }
+        }
         const definition = getDefinition(context.path);
         const prefix = context.keyPrefix || '';
         return Object.entries(definition)
@@ -201,7 +213,8 @@
             },
         };
         let aceAttached = false;
-        if (editor.session && editor.session.setAnnotations && editor.completers) {
+        if (editor.session && editor.session.setAnnotations) {
+            editor.completers = editor.completers || [];
             editor.completers.unshift(completer);
             editor.setOptions?.({ enableBasicAutocompletion: true });
             aceAttached = true;
