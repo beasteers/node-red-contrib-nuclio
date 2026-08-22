@@ -8,6 +8,8 @@ All notable changes to this project are documented here.
 - Add abortable in-flight dashboard and invocation requests during Node-RED shutdown.
 - Add Compose and KinD canary jobs to continuous integration.
 - Add operational metrics for dashboard requests, deployments, reconciliation, and invocations.
+- Add schema-assisted YAML completion and conservative configuration warnings.
+- Add curated execution, scaling, resource, and Kubernetes Secret-reference helpers.
 
 ## [3.0.1] - 2026-08-21
 

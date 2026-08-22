@@ -114,6 +114,23 @@ Interpolation is limited to variable references; it never invokes a shell. An un
 variable without a default makes the function configuration invalid. Secret-bearing values are
 not logged, and matching fields are redacted from status responses.
 
+### Function configuration helpers
+
+The Config tab includes optional helpers for common Nuclio settings while preserving the full
+YAML editor for advanced and future fields:
+
+- **Execution** configures trigger mode, batching, trigger workers, and event timeout. Async mode
+  and batching are intended for Python HTTP functions and require the handler contract described
+  in the Nuclio documentation.
+- **Scaling & resources** configures replicas, autoscaling bounds, target CPU, and CPU/memory
+  requests and limits.
+- **Kubernetes Secret References** injects runtime environment variables using
+  `valueFrom.secretKeyRef`; Node-RED stores only the Secret name and key, never its value.
+
+The YAML editor provides completion and conservative type warnings for documented Nuclio fields.
+Unknown fields remain valid so platform-specific and newer Nuclio configuration can be used
+without waiting for a plugin update.
+
 ## Projects and status
 
 Functions are grouped by the selected Nuclio Project. The project name is sent with every
