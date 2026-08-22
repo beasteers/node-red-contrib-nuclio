@@ -179,6 +179,54 @@
         "autoRedeployOnErrorType": "bool"
     },
     {
+        "id": "0000000000000063",
+        "type": "nuclio-function",
+        "z": "0000000000000005",
+        "server": "0000000000000001",
+        "project": "0000000000000002",
+        "name": "demo-java-echo",
+        "runtime": "java",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "import io.nuclio.Context;\nimport io.nuclio.Event;\nimport io.nuclio.EventHandler;\nimport io.nuclio.Response;\n\npublic class EmptyHandler implements EventHandler {\n    @Override\n    public Response handleEvent(Context context, Event event) {\n        return new Response().setBody(\"Hello, from Java :]\");\n    }\n}",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    commands: []",
+        "env_vars": [],
+        "deploymentMode": "lazy",
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000064",
+        "type": "nuclio-function",
+        "z": "0000000000000005",
+        "server": "0000000000000001",
+        "project": "0000000000000002",
+        "name": "demo-dotnetcore-echo",
+        "runtime": "dotnetcore",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "using Nuclio.Sdk;\n\npublic class nuclio\n{\n    public object empty(Context context, Event eventBase)\n    {\n        return new Response()\n        {\n            StatusCode = 200,\n            ContentType = \"application/text\",\n            Body = \"Hello, from .NET Core :)\"\n        };\n    }\n}",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    commands: []",
+        "env_vars": [],
+        "deploymentMode": "lazy",
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
         "id": "0000000000000029",
         "type": "nuclio-function",
         "z": "0000000000000027",
@@ -284,8 +332,8 @@
         "id": "0000000000000006",
         "type": "comment",
         "z": "0000000000000005",
-        "name": "Same request, four runtimes",
-        "info": "Compare the same simple invocation across Python, Go, Node.js, and Shell. Each function is manually triggered and intentionally has no external dependencies.",
+        "name": "Same request, six runtimes",
+        "info": "Compare the same simple invocation across Python, Go, Node.js, Shell, Java, and .NET Core. Java and .NET Core are lazy so their tech-preview runtimes do not block the core gallery; send the explicit deploy command before invoking them.",
         "x": 150,
         "y": 80,
         "wires": []
@@ -509,6 +557,282 @@
         "x": 1040,
         "y": 980,
         "wires": []
+    },
+    {
+        "id": "0000000000000077",
+        "type": "comment",
+        "z": "0000000000000005",
+        "name": "Optional Java and .NET Core",
+        "info": "These two functions use the new editor samples. They are lazy because Java is tech-preview and availability varies by Nuclio platform image; click Deploy before sending a normal request.",
+        "x": 170,
+        "y": 1160,
+        "wires": []
+    },
+    {
+        "id": "0000000000000065",
+        "type": "nuclio",
+        "z": "0000000000000005",
+        "function": "0000000000000063",
+        "timeoutMs": "10000",
+        "maxInFlight": "4",
+        "retries": "0",
+        "retryDelayMs": "500",
+        "headers": [],
+        "x": 760,
+        "y": 1160,
+        "wires": [
+            [
+                "0000000000000067"
+            ],
+            [
+                "0000000000000068"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000066",
+        "type": "nuclio",
+        "z": "0000000000000005",
+        "function": "0000000000000064",
+        "timeoutMs": "10000",
+        "maxInFlight": "4",
+        "retries": "0",
+        "retryDelayMs": "500",
+        "headers": [],
+        "x": 760,
+        "y": 1420,
+        "wires": [
+            [
+                "0000000000000069"
+            ],
+            [
+                "0000000000000070"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000067",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": "Java response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 1140,
+        "wires": []
+    },
+    {
+        "id": "0000000000000068",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": "Java error",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 1200,
+        "wires": []
+    },
+    {
+        "id": "0000000000000069",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": ".NET Core response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 1400,
+        "wires": []
+    },
+    {
+        "id": "0000000000000070",
+        "type": "debug",
+        "z": "0000000000000005",
+        "name": ".NET Core error",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1040,
+        "y": 1460,
+        "wires": []
+    },
+    {
+        "id": "0000000000000071",
+        "type": "inject",
+        "z": "0000000000000005",
+        "name": "Run Java example",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "hello from Java",
+        "payloadType": "str",
+        "x": 150,
+        "y": 1160,
+        "wires": [
+            [
+                "0000000000000065"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000072",
+        "type": "inject",
+        "z": "0000000000000005",
+        "name": "Run .NET Core example",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "hello from .NET Core",
+        "payloadType": "str",
+        "x": 150,
+        "y": 1420,
+        "wires": [
+            [
+                "0000000000000066"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000073",
+        "type": "function",
+        "z": "0000000000000005",
+        "name": "Deploy Java",
+        "func": "msg.nuclio = { command: \"deploy\" };\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 1240,
+        "wires": [
+            [
+                "0000000000000065"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000074",
+        "type": "function",
+        "z": "0000000000000005",
+        "name": "Deploy .NET Core",
+        "func": "msg.nuclio = { command: \"deploy\" };\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 430,
+        "y": 1500,
+        "wires": [
+            [
+                "0000000000000066"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000075",
+        "type": "inject",
+        "z": "0000000000000005",
+        "name": "Deploy Java",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 150,
+        "y": 1240,
+        "wires": [
+            [
+                "0000000000000073"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000076",
+        "type": "inject",
+        "z": "0000000000000005",
+        "name": "Deploy .NET Core",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 150,
+        "y": 1500,
+        "wires": [
+            [
+                "0000000000000074"
+            ]
+        ]
     },
     {
         "id": "0000000000000023",
