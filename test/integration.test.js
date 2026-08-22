@@ -95,6 +95,28 @@ test('deploys a new function: project + full spec', async () => {
     await waitReady(helper.getNode('fn'));
 });
 
+test('execution controls merge into the configured HTTP trigger', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        executionTriggerName: 'http',
+        executionMode: 'async',
+        executionBatchMode: 'enable',
+        executionBatchSize: '10',
+        executionBatchTimeout: '1s',
+        executionWorkers: '4',
+        executionEventTimeout: '30s',
+    }));
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(req.body.spec.eventTimeout, '30s');
+    assert.deepEqual(req.body.spec.triggers.http, {
+        kind: 'http',
+        mode: 'async',
+        batch: { mode: 'enable', batchSize: 10, timeout: '1s' },
+        numWorkers: 4,
+    });
+});
+
 test('external Git source suppresses online code and emits Nuclio source fields', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {

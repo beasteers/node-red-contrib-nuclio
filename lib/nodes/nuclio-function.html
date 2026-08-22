@@ -885,6 +885,13 @@ rev /dev/stdin
             env_vars: { value: [] },
             deploymentVariables: { value: [] },
             deploymentMode: { value: 'eager' },
+            executionTriggerName: { value: '' },
+            executionMode: { value: 'inherit' },
+            executionBatchMode: { value: 'inherit' },
+            executionBatchSize: { value: '' }, executionBatchSizeType: { value: 'num' },
+            executionBatchTimeout: { value: '' }, executionBatchTimeoutType: { value: 'str' },
+            executionWorkers: { value: '' }, executionWorkersType: { value: 'num' },
+            executionEventTimeout: { value: '' }, executionEventTimeoutType: { value: 'str' },
             // Recovery policy (blank = built-in default).
             maxSelfHealAttempts: { value: '' }, maxSelfHealAttemptsType: { value: 'num' },
             redeployDeadlineMs:  { value: '' }, redeployDeadlineMsType:  { value: 'num' },
@@ -1083,6 +1090,7 @@ rev /dev/stdin
                 }
                 node.editor.setMode(`ace/mode/${lang}`);
                 $('#nuclio-handler-preview').val(defaultHandlerFor(runtime));
+                updateExecutionOptions();
             });
 
             /* ---------------------------------- Settings --------------------------------- */
@@ -1100,6 +1108,29 @@ rev /dev/stdin
                 defaultType: 'str',
                 types: ['str','num','json','env','cred'],
             });
+
+            $('#node-config-input-executionTriggerName').val(this.executionTriggerName || 'http');
+            $('#node-config-input-executionMode').val(this.executionMode || 'inherit');
+            $('#node-config-input-executionBatchMode').val(this.executionBatchMode || 'inherit');
+            $('#node-config-input-executionBatchSize').val(this.executionBatchSize || '');
+            $('#node-config-input-executionBatchTimeout').val(this.executionBatchTimeout || '');
+            $('#node-config-input-executionWorkers').val(this.executionWorkers || '');
+            $('#node-config-input-executionEventTimeout').val(this.executionEventTimeout || '');
+            $('#node-config-input-executionBatchSize, #node-config-input-executionWorkers').typedInput({
+                default: 'num',
+                types: ['num', 'env'],
+            });
+            $('#node-config-input-executionBatchTimeout, #node-config-input-executionEventTimeout').typedInput({
+                default: 'str',
+                types: ['str', 'env'],
+            });
+
+            const updateExecutionOptions = () => {
+                const isPython = ($('#node-config-input-runtime').val() || '').startsWith('python');
+                $('#node-config-input-executionMode option[value="async"]').prop('disabled', !isPython);
+                $('#nuclio-execution-async-note').toggleClass('nuclio-hidden', isPython);
+            };
+            updateExecutionOptions();
 
             // Recovery policy: numeric literal or env-var reference, resolved on deploy.
             ['maxSelfHealAttempts','redeployDeadlineMs'].forEach(function(f){
@@ -1335,6 +1366,18 @@ rev /dev/stdin
             node.deploymentVariables = [];
             delete this.deploymentVariableList;
 
+            this.executionTriggerName = $('#node-config-input-executionTriggerName').val() || '';
+            this.executionMode = $('#node-config-input-executionMode').val() || 'inherit';
+            this.executionBatchMode = $('#node-config-input-executionBatchMode').val() || 'inherit';
+            this.executionBatchSize = $('#node-config-input-executionBatchSize').typedInput('value') || '';
+            this.executionBatchSizeType = $('#node-config-input-executionBatchSize').typedInput('type');
+            this.executionBatchTimeout = $('#node-config-input-executionBatchTimeout').typedInput('value') || '';
+            this.executionBatchTimeoutType = $('#node-config-input-executionBatchTimeout').typedInput('type');
+            this.executionWorkers = $('#node-config-input-executionWorkers').typedInput('value') || '';
+            this.executionWorkersType = $('#node-config-input-executionWorkers').typedInput('type');
+            this.executionEventTimeout = $('#node-config-input-executionEventTimeout').typedInput('value') || '';
+            this.executionEventTimeoutType = $('#node-config-input-executionEventTimeout').typedInput('type');
+
         },
         oneditcancel: function() {
             this.editor.destroy();
@@ -1489,6 +1532,48 @@ rev /dev/stdin
                     <ol id="node-config-input-deploymentVariables-x"></ol>
                 </div>
 
+            </details>
+
+            <details>
+                <summary>Execution</summary>
+                <p><small>These optional settings override the matching HTTP trigger and <code>spec.eventTimeout</code> fields in the YAML editor. Leave them inherited to keep full control in YAML.</small></p>
+                <div class="form-row">
+                    <label for="node-config-input-executionTriggerName">Trigger name</label>
+                    <input type="text" id="node-config-input-executionTriggerName" class="form-control" placeholder="http" />
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-executionMode">Processing mode</label>
+                    <select id="node-config-input-executionMode" class="form-control">
+                        <option value="inherit">Inherit from YAML</option>
+                        <option value="sync">Synchronous</option>
+                        <option value="async">Asynchronous (Python HTTP only)</option>
+                    </select>
+                    <small id="nuclio-execution-async-note" class="nuclio-hidden">Asynchronous mode is available only for Python HTTP triggers.</small>
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-executionBatchMode">Batching</label>
+                    <select id="node-config-input-executionBatchMode" class="form-control">
+                        <option value="inherit">Inherit from YAML</option>
+                        <option value="enable">Enable</option>
+                        <option value="disable">Disable</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-executionBatchSize">Batch size</label>
+                    <input type="text" id="node-config-input-executionBatchSize" placeholder="10" />
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-executionBatchTimeout">Batch timeout</label>
+                    <input type="text" id="node-config-input-executionBatchTimeout" placeholder="1s" />
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-executionWorkers">Trigger workers</label>
+                    <input type="text" id="node-config-input-executionWorkers" placeholder="1" />
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-executionEventTimeout">Event timeout</label>
+                    <input type="text" id="node-config-input-executionEventTimeout" placeholder="30s" />
+                </div>
             </details>
 
             <details>
