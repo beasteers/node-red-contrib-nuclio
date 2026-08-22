@@ -75,3 +75,39 @@ test('project requests use the project namespace header', async () => {
         await new Promise(resolve => server.close(resolve));
     }
 });
+
+test('dashboard circuit state is shared by clients using the same server', async () => {
+    let requestCount = 0;
+    const server = http.createServer((req, res) => {
+        requestCount++;
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'unavailable' }));
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+    try {
+        const address = `http://127.0.0.1:${server.address().port}`;
+        const config = { address, namespace: 'nuclio', requestTimeoutMs: 1000, deployTimeoutMs: 1000 };
+        const firstClient = createClient(config, 'project-a');
+        const secondClient = createClient(config, 'project-b');
+
+        for (const request of [
+            () => firstClient.listFunctions(),
+            () => secondClient.listProjects(),
+            () => firstClient.getFunction('fn'),
+        ]) {
+            await assert.rejects(request, err => err.response?.status === 503);
+        }
+
+        let circuitError;
+        try {
+            await secondClient.getFunction('fn');
+        } catch (err) {
+            circuitError = err;
+        }
+        assert.equal(circuitError?.code, 'NUCLIO_CIRCUIT_OPEN');
+        assert.equal(requestCount, 3);
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+    }
+});

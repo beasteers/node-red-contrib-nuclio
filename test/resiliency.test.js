@@ -104,8 +104,8 @@ test('connectivity failures back off exponentially and cap', async () => {
     const node = makeNode(UNREACHABLE);
     const seq = [];
     for (let i = 0; i < 4; i++) seq.push(await reconcileStep(node));
-    assert.deepEqual(seq, [100, 200, 400, 400]);  // 100 -> 200 -> 400(cap) -> 400
-    assert.match(node.lastStatus.text, /not responding/i);
+    assert.deepEqual(seq, [100, 200, 400, 5000]);  // per-function backoff, then the server circuit cooldown
+    assert.match(node.lastStatus.text, /not responding|unavailable/i);
 });
 
 test('backoff resets the moment the dashboard answers again', async () => {
