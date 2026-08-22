@@ -33,6 +33,8 @@
             targetCPU: integer('Autoscaling target CPU percentage.'),
             dataBindings: map('Named data sources available to the function.'),
             triggers: map('Named Nuclio triggers.'),
+            platform: map('Platform-specific deployment settings.'),
+            devices: list('Devices to expose to the function container.'),
             build: {
                 path: string('Git, archive, or source URL.'),
                 functionSourceCode: string('Base64-encoded inline source code.'),
@@ -74,7 +76,18 @@
     };
 
     const TRIGGER_SCHEMA = {
-        kind: enumValue(['http', 'cron', 'eventhub', 'kafka-cluster', 'kinesis', 'nats', 'rabbit-mq'], 'Trigger kind.'),
+        kind: enumValue([
+            'http',
+            'cron',
+            'eventhub',
+            'kafka-cluster',
+            'kinesis',
+            'mqtt',
+            'nats',
+            'natsjetstream',
+            'rabbit-mq',
+            'v3ioStream',
+        ], 'Trigger kind.'),
         url: string('Trigger-specific URL.'),
         numWorkers: integer('Concurrent workers for this trigger.'),
         workerTerminationTimeout: string('Worker termination timeout.'),
@@ -95,6 +108,47 @@
         },
     };
 
+    const TRIGGER_ATTRIBUTE_SCHEMAS = {
+        mqtt: {
+            subscriptions: list('MQTT topic subscriptions, each with topic and qos.'),
+            clientID: string('MQTT client identifier.'),
+            protocolVersion: integer('MQTT protocol version.'),
+        },
+        natsjetstream: {
+            stream: string('NATS JetStream stream name.'),
+            consumer: string('NATS JetStream consumer name.'),
+            allowReconnect: boolean('Reconnect after a NATS disconnect.'),
+            maxReconnect: integer('Maximum NATS reconnect attempts; negative means unlimited.'),
+            reconnectWait: string('NATS reconnect backoff duration.'),
+            reconnectJitter: string('Random NATS reconnect jitter duration.'),
+            timeout: string('NATS connection timeout.'),
+            drainTimeout: string('NATS drain timeout.'),
+            flusherTimeout: string('NATS flush timeout.'),
+            pingInterval: string('NATS ping interval.'),
+            maxPingsOut: integer('Maximum outstanding NATS pings.'),
+        },
+        v3ioStream: {
+            containerName: string('v3io data container name.'),
+            streamPath: string('v3io stream path.'),
+            consumerGroup: string('v3io stream consumer group.'),
+            numTransportWorkers: integer('Number of transport workers.'),
+            seekTo: enumValue(['earliest', 'latest'], 'Initial stream position when no offset is committed.'),
+            readBatchSize: integer('Number of stream records read in each request.'),
+            pollingIntervalMs: integer('Polling interval in milliseconds.'),
+            sessionTimeout: string('Consumer-group session timeout.'),
+            heartbeatInterval: string('Consumer-group heartbeat interval.'),
+            sequenceNumberCommitInterval: string('Stream offset commit interval.'),
+            sequenceNumberShardWaitInterval: string('Interval to wait for stream shards.'),
+            recordBatchSizeChan: integer('Record batch channel size.'),
+            ackWindowSize: integer('Stream acknowledgement window size.'),
+        },
+    };
+
+    const MQTT_SUBSCRIPTION_SCHEMA = {
+        topic: string('MQTT topic filter.'),
+        qos: integer('MQTT quality-of-service level.'),
+    };
+
     const NESTED_SCHEMA = {
         'spec.resources': {
             requests: map('Resource requests.'),
@@ -105,14 +159,33 @@
             runAsGroup: integer('Container group ID.'),
             fsGroup: integer('Supplemental filesystem group.'),
         },
+        'spec.platform': {
+            attributes: map('Platform-specific attributes.'),
+        },
+        'spec.platform.attributes': {
+            restartPolicy: {
+                name: enumValue(['no', 'always', 'unless-stopped', 'on-failure'], 'Container restart policy name.'),
+                maximumRetryCount: integer('Maximum container restart retries.'),
+            },
+            mountMode: enumValue(['bind', 'volume'], 'Function source mount mode.'),
+            healthCheckInterval: string('Platform health-check interval.'),
+        },
     };
 
-    const getDefinition = (path) => {
+    const getDefinition = (path, triggerKind) => {
         if (!Array.isArray(path) || !path.length) return SCHEMA;
         const joined = path.join('.');
         if (NESTED_SCHEMA[joined]) return NESTED_SCHEMA[joined];
         if (path[0] === 'spec' && path[1] === 'triggers') {
             if (path.length === 2) return { http: { type: 'object', description: 'Default HTTP trigger.' } };
+            if (triggerKind === 'mqtt' && path[path.length - 2] === 'attributes' && path[path.length - 1] === 'subscriptions') {
+                return MQTT_SUBSCRIPTION_SCHEMA;
+            }
+            if (path[path.length - 1] === 'attributes') {
+                return triggerKind && TRIGGER_ATTRIBUTE_SCHEMAS[triggerKind]
+                    ? TRIGGER_ATTRIBUTE_SCHEMAS[triggerKind]
+                    : {};
+            }
             return TRIGGER_SCHEMA;
         }
         let current = SCHEMA;
@@ -121,6 +194,27 @@
             current = current[segment];
         }
         return current && typeof current === 'object' && !current.type ? current : {};
+    };
+
+    const triggerKindAt = (text, path) => {
+        if (path.length < 4 || path[0] !== 'spec' || path[1] !== 'triggers') return '';
+        const triggerName = path[2];
+        const lines = text.split(/\r?\n/);
+        let inTrigger = false;
+        let triggerIndent = -1;
+        for (const line of lines) {
+            const match = line.match(/^(\s*)([A-Za-z_][\w.-]*)\s*:\s*(.*?)\s*$/);
+            if (!match) continue;
+            const indent = match[1].length;
+            if (match[2] === triggerName && indent > 2) {
+                inTrigger = true;
+                triggerIndent = indent;
+                continue;
+            }
+            if (!inTrigger || indent <= triggerIndent) continue;
+            if (match[2] === 'kind') return match[3].replace(/^['"]|['"]$/g, '');
+        }
+        return '';
     };
 
     const contextAt = (text, lineNumber, column) => {
@@ -151,8 +245,10 @@
 
     const completions = (text, lineNumber, column) => {
         const context = contextAt(text, lineNumber, column);
+        const triggerKind = triggerKindAt(text, context.path);
         if (!context.keyPrefix && context.path.length) {
-            const valueDefinition = getDefinition(context.path.slice(0, -1))[context.path[context.path.length - 1]];
+            const parentDefinition = getDefinition(context.path.slice(0, -1), triggerKind);
+            const valueDefinition = parentDefinition[context.path[context.path.length - 1]];
             if (valueDefinition?.enum) {
                 return valueDefinition.enum.map(value => ({
                     label: value,
@@ -163,7 +259,7 @@
                 }));
             }
         }
-        const definition = getDefinition(context.path);
+        const definition = getDefinition(context.path, triggerKind);
         const prefix = context.keyPrefix || '';
         return Object.entries(definition)
             .filter(([key]) => !prefix || key.startsWith(prefix))
@@ -183,7 +279,8 @@
             const match = line.match(/^(\s*)(?:-\s*)?([A-Za-z_][\w.-]*)\s*:\s*(.*?)\s*(?:#.*)?$/);
             if (!match || !match[3]) return;
             const context = contextAt(text, lineNumber, line.length);
-            const definition = getDefinition(context.path.slice(0, -1))[match[2]] || {};
+            const triggerKind = triggerKindAt(text, context.path);
+            const definition = getDefinition(context.path.slice(0, -1), triggerKind)[match[2]] || {};
             const raw = match[3].replace(/^['"]|['"]$/g, '');
             if (raw.includes('${') || raw === 'null' || raw === '~') return;
             if (definition.enum && !definition.enum.includes(raw)) {

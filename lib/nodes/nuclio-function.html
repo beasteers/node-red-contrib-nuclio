@@ -550,6 +550,43 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 }
     `.trim()
         },
+        java: {
+            config: configCode,
+            entrypoint: 'EmptyHandler',
+            code: `
+import io.nuclio.Context;
+import io.nuclio.Event;
+import io.nuclio.EventHandler;
+import io.nuclio.Response;
+
+public class EmptyHandler implements EventHandler {
+    @Override
+    public Response handleEvent(Context context, Event event) {
+        return new Response().setBody("Hello, from Nuclio :]");
+    }
+}
+    `.trim()
+        },
+        dotnetcore: {
+            config: configCode,
+            entrypoint: 'nuclio:empty',
+            code: `
+using Nuclio.Sdk;
+
+public class nuclio
+{
+    public object empty(Context context, Event eventBase)
+    {
+        return new Response()
+        {
+            StatusCode = 200,
+            ContentType = "application/text",
+            Body = "Hello, from Nuclio :)"
+        };
+    }
+}
+    `.trim()
+        },
         nodejs: {
             config: configCode,
             entrypoint: 'handler',

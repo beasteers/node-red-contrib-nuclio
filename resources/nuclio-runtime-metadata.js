@@ -9,6 +9,8 @@
         { value: 'python:3.10', base: 'python', label: 'Python 3.10', language: 'python', handler: 'main:handler' },
         { value: 'python:3.9', base: 'python', label: 'Python 3.9', language: 'python', handler: 'main:handler' },
         { value: 'golang', base: 'golang', label: 'Go', language: 'go', handler: 'main:Handler' },
+        { value: 'java', base: 'java', label: 'Java', language: 'java', handler: 'EmptyHandler' },
+        { value: 'dotnetcore', base: 'dotnetcore', label: '.NET Core', language: 'csharp', handler: 'nuclio:empty' },
         { value: 'nodejs', base: 'nodejs', label: 'Node.js', language: 'javascript', handler: 'handler:handler' },
         { value: 'shell', base: 'shell', label: 'Shell', language: 'shell', handler: 'main.sh:handler' },
     ]);
