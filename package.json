@@ -2,11 +2,13 @@
   "name": "@bea.steers/node-red-contrib-nuclio",
   "version": "3.0.1",
   "description": "Deploy Nuclio functions from Node-RED",
+  "license": "MIT",
   "main": "lib/nodes/nuclio.js",
   "files": [
     "lib",
     "resources",
-    "scripts"
+    "scripts",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node --test",
@@ -47,7 +49,6 @@
     "cluster"
   ],
   "author": "beasteers",
-  "license": "MIT",
   "engines": {
     "node": ">=22"
   },
