@@ -117,6 +117,30 @@ test('execution controls merge into the configured HTTP trigger', async () => {
     });
 });
 
+test('scaling and resource controls merge into the function spec', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        scalingReplicas: '0',
+        scalingMinReplicas: '1',
+        scalingMaxReplicas: '3',
+        scalingTargetCPU: '70',
+        resourceRequestsCpu: '250m',
+        resourceRequestsMemory: '256Mi',
+        resourceLimitsCpu: '1',
+        resourceLimitsMemory: '512Mi',
+    }));
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(req.body.spec.replicas, 0);
+    assert.equal(req.body.spec.minReplicas, 1);
+    assert.equal(req.body.spec.maxReplicas, 3);
+    assert.equal(req.body.spec.targetCPU, 70);
+    assert.deepEqual(req.body.spec.resources, {
+        requests: { cpu: '250m', memory: '256Mi' },
+        limits: { cpu: '1', memory: '512Mi' },
+    });
+});
+
 test('external Git source suppresses online code and emits Nuclio source fields', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {

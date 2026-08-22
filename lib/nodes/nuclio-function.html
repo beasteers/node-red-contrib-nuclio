@@ -892,6 +892,14 @@ rev /dev/stdin
             executionBatchTimeout: { value: '' }, executionBatchTimeoutType: { value: 'str' },
             executionWorkers: { value: '' }, executionWorkersType: { value: 'num' },
             executionEventTimeout: { value: '' }, executionEventTimeoutType: { value: 'str' },
+            scalingReplicas: { value: '' }, scalingReplicasType: { value: 'num' },
+            scalingMinReplicas: { value: '' }, scalingMinReplicasType: { value: 'num' },
+            scalingMaxReplicas: { value: '' }, scalingMaxReplicasType: { value: 'num' },
+            scalingTargetCPU: { value: '' }, scalingTargetCPUType: { value: 'num' },
+            resourceRequestsCpu: { value: '' }, resourceRequestsCpuType: { value: 'str' },
+            resourceRequestsMemory: { value: '' }, resourceRequestsMemoryType: { value: 'str' },
+            resourceLimitsCpu: { value: '' }, resourceLimitsCpuType: { value: 'str' },
+            resourceLimitsMemory: { value: '' }, resourceLimitsMemoryType: { value: 'str' },
             // Recovery policy (blank = built-in default).
             maxSelfHealAttempts: { value: '' }, maxSelfHealAttemptsType: { value: 'num' },
             redeployDeadlineMs:  { value: '' }, redeployDeadlineMsType:  { value: 'num' },
@@ -1131,6 +1139,18 @@ rev /dev/stdin
                 $('#nuclio-execution-async-note').toggleClass('nuclio-hidden', isPython);
             };
             updateExecutionOptions();
+
+            const scalingNumberFields = ['scalingReplicas', 'scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU'];
+            const resourceFields = ['resourceRequestsCpu', 'resourceRequestsMemory', 'resourceLimitsCpu', 'resourceLimitsMemory'];
+            [...scalingNumberFields, ...resourceFields].forEach(field => {
+                $('#node-config-input-' + field).val(this[field] || '');
+            });
+            scalingNumberFields.forEach(field => {
+                $('#node-config-input-' + field).typedInput({ default: 'num', types: ['num', 'env'] });
+            });
+            resourceFields.forEach(field => {
+                $('#node-config-input-' + field).typedInput({ default: 'str', types: ['str', 'env'] });
+            });
 
             // Recovery policy: numeric literal or env-var reference, resolved on deploy.
             ['maxSelfHealAttempts','redeployDeadlineMs'].forEach(function(f){
@@ -1378,6 +1398,17 @@ rev /dev/stdin
             this.executionEventTimeout = $('#node-config-input-executionEventTimeout').typedInput('value') || '';
             this.executionEventTimeoutType = $('#node-config-input-executionEventTimeout').typedInput('type');
 
+            const scalingNumberFields = ['scalingReplicas', 'scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU'];
+            const resourceFields = ['resourceRequestsCpu', 'resourceRequestsMemory', 'resourceLimitsCpu', 'resourceLimitsMemory'];
+            scalingNumberFields.forEach(field => {
+                this[field] = $('#node-config-input-' + field).typedInput('value') || '';
+                this[field + 'Type'] = $('#node-config-input-' + field).typedInput('type');
+            });
+            resourceFields.forEach(field => {
+                this[field] = $('#node-config-input-' + field).typedInput('value') || '';
+                this[field + 'Type'] = $('#node-config-input-' + field).typedInput('type');
+            });
+
         },
         oneditcancel: function() {
             this.editor.destroy();
@@ -1573,6 +1604,37 @@ rev /dev/stdin
                 <div class="form-row">
                     <label for="node-config-input-executionEventTimeout">Event timeout</label>
                     <input type="text" id="node-config-input-executionEventTimeout" placeholder="30s" />
+                </div>
+            </details>
+
+            <details>
+                <summary>Scaling &amp; resources</summary>
+                <p><small>Optional common scaling and CPU/memory settings. Kubernetes placement, GPUs, probes, and other platform-specific options remain available in the YAML editor.</small></p>
+                <div class="form-row">
+                    <label for="node-config-input-scalingReplicas">Replicas</label>
+                    <input type="text" id="node-config-input-scalingReplicas" placeholder="0 for autoscaling" />
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-scalingMinReplicas">Minimum replicas</label>
+                    <input type="text" id="node-config-input-scalingMinReplicas" placeholder="1" />
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-scalingMaxReplicas">Maximum replicas</label>
+                    <input type="text" id="node-config-input-scalingMaxReplicas" placeholder="1" />
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-scalingTargetCPU">Target CPU (%)</label>
+                    <input type="text" id="node-config-input-scalingTargetCPU" placeholder="75" />
+                </div>
+                <div class="form-row">
+                    <label>Resource requests</label>
+                    <input type="text" id="node-config-input-resourceRequestsCpu" placeholder="CPU, e.g. 250m" />
+                    <input type="text" id="node-config-input-resourceRequestsMemory" placeholder="Memory, e.g. 256Mi" />
+                </div>
+                <div class="form-row">
+                    <label>Resource limits</label>
+                    <input type="text" id="node-config-input-resourceLimitsCpu" placeholder="CPU, e.g. 1" />
+                    <input type="text" id="node-config-input-resourceLimitsMemory" placeholder="Memory, e.g. 512Mi" />
                 </div>
             </details>
 
