@@ -457,6 +457,7 @@
 
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-runtime-metadata.js"></script>
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-validation.js"></script>
+<script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-config-schema.js"></script>
 
 <script type="text/javascript">
     const RUNTIME_METADATA = window.NUCLIO_RUNTIME_METADATA || [];
@@ -1013,6 +1014,9 @@ rev /dev/stdin
                 value: this.configCode || "",
                 focus: true,
             });
+            this.configEditorAssist = window.NUCLIO_CONFIG_EDITOR?.attach(this.configeditor, {
+                getRuntime: () => $('#node-config-input-runtime').val(),
+            });
 
             const legacySource = sourceFromConfigCode(this.configCode);
             const sourceType = this.sourceType
@@ -1302,6 +1306,8 @@ rev /dev/stdin
             this.configCode = this.configeditor.getValue();
             this.configeditor.destroy();
             delete this.configeditor;
+            this.configEditorAssist?.destroy();
+            delete this.configEditorAssist;
             this.statusPoller.stop();
             delete this.statusPoller;
             $('#dialog-form').off('.nuclioFunctionDirty');
@@ -1335,6 +1341,8 @@ rev /dev/stdin
             delete this.editor;
             this.configeditor.destroy();
             delete this.configeditor;
+            this.configEditorAssist?.destroy();
+            delete this.configEditorAssist;
             this.statusPoller.stop();
             delete this.statusPoller;
             $('#dialog-form').off('.nuclioFunctionDirty');
