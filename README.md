@@ -58,6 +58,11 @@ flow, and click **Publish MQTT event**. The transformed event appears in the Nod
 sidebar. This is an architecture demo for direct event consumption; Nuclio currently documents
 the MQTT trigger as a tech-preview feature, so the fixture is not a production MQTT recipe.
 
+The **06 Cron trigger** tab demonstrates a schedule owned by Nuclio. Its function runs every 30
+seconds and writes a timestamped event to the function logs; open the Status tab and refresh Run
+logs to observe it. This demonstrates trigger ownership, not durable batch scheduling, backfills,
+or workflow orchestration.
+
 ## Function sources
 
 The Function tab supports these source types:

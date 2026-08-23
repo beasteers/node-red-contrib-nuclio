@@ -5,6 +5,7 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 - Add a direct MQTT-trigger demo flow with a local Mosquitto fixture.
+- Add a Nuclio-owned Cron-trigger demo flow.
 
 ## [3.1.0] - 2026-08-23
 

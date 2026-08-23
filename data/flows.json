@@ -241,6 +241,54 @@
         "wires": []
     },
     {
+        "id": "0000000000000086",
+        "type": "tab",
+        "label": "06 Cron trigger",
+        "disabled": false,
+        "info": "Nuclio owns the schedule and invokes the function at the configured interval. Refresh the function Run logs to observe each tick.",
+        "env": []
+    },
+    {
+        "id": "0000000000000087",
+        "type": "nuclio-project",
+        "name": "demo-scheduled",
+        "nameType": "str"
+    },
+    {
+        "id": "0000000000000088",
+        "type": "nuclio-function",
+        "z": "0000000000000086",
+        "server": "0000000000000001",
+        "project": "0000000000000087",
+        "name": "demo-cron-timestamp",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "import json\nfrom datetime import datetime, timezone\n\ndef handler(context, event):\n    body = getattr(event, 'body', None)\n    if isinstance(body, bytes):\n        body = body.decode('utf-8')\n    result = {\n        'trigger': 'cron',\n        'ran_at': datetime.now(timezone.utc).isoformat(),\n        'body': body,\n    }\n    context.logger.info(json.dumps(result))\n    return result",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  triggers:\n    cron:\n      kind: cron\n      attributes:\n        interval: 30s\n        body: '{\"source\":\"node-red-demo\"}'",
+        "env_vars": [],
+        "deploymentMode": "eager",
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000089",
+        "type": "comment",
+        "z": "0000000000000086",
+        "name": "Nuclio-owned schedule",
+        "info": "Nuclio owns this 30-second interval; Node-RED only declares and observes the function. Open the function Status tab and refresh Run logs to see each invocation. This demonstrates a schedule, not durable batch orchestration or backfill support.",
+        "x": 190,
+        "y": 100,
+        "wires": []
+    },
+    {
         "id": "0000000000000007",
         "type": "nuclio-function",
         "z": "0000000000000005",

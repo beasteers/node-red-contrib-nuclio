@@ -43,3 +43,15 @@ test('demo flow includes a direct MQTT trigger path', () => {
     assert.ok(input, 'expected the MQTT input publisher');
     assert.ok(output, 'expected the MQTT output subscriber');
 });
+
+test('demo flow includes a Nuclio-owned Cron trigger', () => {
+    const flows = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'flows.json'), 'utf8'));
+    const tab = flows.find(node => node.type === 'tab' && node.label === '06 Cron trigger');
+    const fn = flows.find(node => node.type === 'nuclio-function' && node.name === 'demo-cron-timestamp');
+
+    assert.ok(tab, 'expected the Cron demo tab');
+    assert.ok(fn, 'expected the Cron-triggered Nuclio function');
+    assert.match(fn.configCode, /kind:\s*cron/);
+    assert.match(fn.configCode, /interval:\s*30s/);
+    assert.match(fn.configCode, /body:/);
+});
