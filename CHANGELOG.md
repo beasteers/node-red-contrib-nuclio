@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+No changes yet.
+
+## [3.1.0] - 2026-08-23
+
 - Add a shared dashboard circuit breaker for transient Nuclio outages.
 - Add abortable in-flight dashboard and invocation requests during Node-RED shutdown.
 - Add Compose and KinD canary jobs to continuous integration.
@@ -11,6 +15,9 @@ All notable changes to this project are documented here.
 - Add optional Basic/Bearer dashboard authentication with typed values and credential-backed custom request headers.
 - Add schema-assisted YAML completion and conservative configuration warnings.
 - Add curated execution, scaling, resource, and Kubernetes Secret-reference helpers.
+- Add endpoint-aware invocation status, including service, internal, and external routes.
+- Require Node.js 22 or newer and Node-RED 4 or newer.
+- Add package, lint, audit, Compose, and KinD checks to the release validation matrix.
 
 ## [3.0.1] - 2026-08-21
 
