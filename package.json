@@ -17,6 +17,7 @@
     "test:kind": "bash scripts/kind-canary.sh",
     "stress": "node scripts/stress-test.js",
     "stress:matrix": "node scripts/stress-matrix.js",
+    "stress:scenario": "node scripts/stress-scenario.js",
     "diagnose:redeploy": "node scripts/diagnose-redeploy.js"
   },
   "node-red": {

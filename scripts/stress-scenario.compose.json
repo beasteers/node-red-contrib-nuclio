@@ -1,0 +1,28 @@
+{
+  "name": "compose-fixed-scale-saturation",
+  "defaults": {
+    "trigger": "http",
+    "url": "http://nuclio-nuclio-demo-python-echo:8080",
+    "concurrency": 64,
+    "timeout": 10000,
+    "warmup": 5,
+    "sampleInterval": 1000
+  },
+  "phases": [
+    {
+      "name": "baseline",
+      "rate": 100,
+      "duration": 30
+    },
+    {
+      "name": "sustained-peak",
+      "rate": 500,
+      "duration": 120
+    },
+    {
+      "name": "recovery",
+      "rate": 100,
+      "duration": 30
+    }
+  ]
+}

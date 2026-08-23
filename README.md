@@ -414,3 +414,32 @@ npm run stress:matrix -- \
 Cases run sequentially so one result does not contaminate another. The output includes each
 case's full stress result, including sampled function state and replica information when a
 dashboard/function is configured.
+
+For sustained saturation or autoscaling, use the phased scenario runner. Phases run in order and
+retain their own latency/error results; when a dashboard and function are configured, status
+samples are attached to the phase that was active when they were collected. The Compose example
+uses fixed replicas:
+
+```bash
+docker exec nodered-nuclio node \
+  /usr/src/node-red/node-red-contrib-nuclio/scripts/stress-scenario.js \
+  --config /usr/src/node-red/node-red-contrib-nuclio/scripts/stress-scenario.compose.json \
+  --output /tmp/stress-scenario-compose.json
+```
+
+For KinD or Kubernetes, start with the autoscaling example, replace the function and project with
+the deployed autoscaled function, and run it from a pod or other process that can reach the
+dashboard's internal service address:
+
+```bash
+node scripts/stress-scenario.js \
+  --config scripts/stress-scenario.kind-autoscale.example.json \
+  --output stress-scenario-kind.json
+```
+
+The scenario runner does not create or change functions, replicas, or autoscaling policies. The
+autoscaling scenario therefore requires a function already configured with its desired
+`minReplicas`, `maxReplicas`, and scaling trigger. Its result can show scale-up lag, observed
+replica bounds, recovery after a load drop, and the latency/error impact of scaling. Resource
+metrics such as Kubernetes CPU and memory should be collected separately with `kubectl top` or
+the cluster's monitoring system.
