@@ -72,6 +72,8 @@ Connection and reconciliation settings live on the **Nuclio Server** node.
 | Invocation source | `service` | Use a stable service hostname or a Nuclio-reported internal/external URL. |
 | Service hostname template | `nuclio-{function}` | Stable function hostname. Docker Compose commonly uses `nuclio-nuclio-{function}`. |
 | External URL protocol | `https` | Protocol for scheme-less external URLs. |
+| Dashboard authentication | `none` | Optional Basic or Bearer authentication for dashboard requests. |
+| Request headers | blank | Additional credential-backed headers sent with every dashboard request. |
 | Deployment policy | `managed` | Set to `disabled` to prevent creates, updates, and self-healing. Existing functions are left untouched. |
 | Poll interval | `1000` | Poll interval while a function is building or transitioning. |
 | Ready poll | `5000` | Poll interval while a function is healthy. |
@@ -81,6 +83,11 @@ Connection and reconciliation settings live on the **Nuclio Server** node.
 
 Blank settings use the built-in defaults. Settings that support typed input can read a value from
 the Node-RED process environment.
+
+Dashboard authentication credentials and custom request-header values are stored as Node-RED
+credentials. Required Nuclio namespace and project headers cannot be overridden. The dashboard
+authentication mode is intentionally separate from custom headers so an integration-specific
+header can be used alongside Basic or Bearer authentication.
 
 ### Function settings
 

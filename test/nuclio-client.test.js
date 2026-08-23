@@ -76,6 +76,37 @@ test('project requests use the project namespace header', async () => {
     }
 });
 
+test('dashboard requests include authentication and custom headers', async () => {
+    let requestHeaders;
+    const server = http.createServer((req, res) => {
+        requestHeaders = req.headers;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({}));
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+    try {
+        const address = `http://127.0.0.1:${server.address().port}`;
+        const client = createClient({
+            address,
+            namespace: 'custom-namespace',
+            requestTimeoutMs: 1000,
+            deployTimeoutMs: 1000,
+            requestHeaders: {
+                Authorization: 'Bearer test-token',
+                'X-Organization': 'team-a',
+            },
+        }, 'project-a');
+        await client.listFunctions();
+        assert.equal(requestHeaders.authorization, 'Bearer test-token');
+        assert.equal(requestHeaders['x-organization'], 'team-a');
+        assert.equal(requestHeaders['x-nuclio-project-name'], 'project-a');
+        assert.equal(requestHeaders['x-nuclio-function-namespace'], 'custom-namespace');
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+    }
+});
+
 test('dashboard circuit state is shared by clients using the same server', async () => {
     let requestCount = 0;
     const server = http.createServer((req, res) => {

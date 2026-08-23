@@ -95,6 +95,26 @@ test('deploys a new function: project + full spec', async () => {
     await waitReady(helper.getNode('fn'));
 });
 
+test('server authentication and custom headers are sent to the dashboard', async () => {
+    mock = await startMockNuclio();
+    const flow = baseFlow(mock);
+    flow[0].authType = 'basic';
+    flow[0].authUsername = 'dashboard-user';
+    flow[0].authUsernameType = 'str';
+    await load(flow, {
+        srv: {
+            authPassword: 'dashboard-password',
+            requestHeaders: JSON.stringify([{ name: 'X-Organization', type: 'str', value: 'team-a' }]),
+        },
+    });
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(req.headers.authorization, `Basic ${Buffer.from('dashboard-user:dashboard-password').toString('base64')}`);
+    assert.equal(req.headers['x-organization'], 'team-a');
+    assert.equal(req.headers['x-nuclio-project-name'], 'default');
+    assert.equal(req.headers['x-nuclio-function-namespace'], 'nuclio');
+});
+
 test('execution controls merge into the configured HTTP trigger', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {

@@ -9,9 +9,55 @@
         max-width: 600px;
     }
 
+    #node-config-input-request-headers .red-ui-editableList-item-content {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    #node-config-input-request-headers .node-input-header-name {
+        flex: 0 0 38%;
+    }
+
+    #node-config-input-request-headers .red-ui-typedInput-container {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
     </style>
 
 <script type="text/javascript">/* ------------------------------ Nuclio Server ----------------------------- */
+
+    const nuclioServerInitHeaderList = (selector, items) => {
+        const list = $(selector).editableList({
+            addItem: function(row, index, data) {
+                $(`<input class='node-input-header-name' type='text' placeholder='X-Header-Name' aria-label='Header name' />`)
+                    .appendTo(row).val(data.name || '');
+                $(`<input class='node-input-header-value' type='text' placeholder='value' aria-label='Header value' />`)
+                    .appendTo(row).val(data.value || '').typedInput({
+                        default: data.type || 'str',
+                        types: ['str', 'env', 'cred'],
+                    });
+            },
+            removable: true,
+        });
+        for (const item of items || []) list.editableList('addItem', item);
+        return list;
+    };
+
+    const nuclioServerCollectHeaderList = (selector) => {
+        const headers = [];
+        $(selector).editableList('items').each(function() {
+            const name = $(this).find('.node-input-header-name').val();
+            const value = $(this).find('.node-input-header-value');
+            if (name) headers.push({
+                name,
+                type: value.typedInput('type'),
+                value: value.typedInput('value'),
+            });
+        });
+        return headers;
+    };
 
     RED.nodes.registerType('nuclio-config', {
         category: 'config',
@@ -27,6 +73,9 @@
             internalInvocationServiceHost: { value: '' },
             internalInvocationServiceHostType: { value: 'str' },
             externalInvocationProtocol: { value: 'https' },
+            authType: { value: 'none' },
+            authUsername: { value: '' },
+            authUsernameType: { value: 'str' },
             deploymentPolicy: { value: 'managed' },
             deploymentPolicyType: { value: 'str' },
             // Shared connection, timeout, and reconciliation settings
@@ -38,6 +87,11 @@
             backoffMs:        { value: '' }, backoffMsType:        { value: 'num' },
             backoffMaxMs:     { value: '' }, backoffMaxMsType:     { value: 'num' },
             startStaggerMs:   { value: '' }, startStaggerMsType:   { value: 'num' },
+        },
+        credentials: {
+            authPassword: { type: 'password' },
+            authToken: { type: 'password' },
+            requestHeaders: { type: 'text' },
         },
         label: function () {
             return this.publicAddress || this.address || 'Nuclio Server';
@@ -63,6 +117,29 @@
                 default: this.deploymentPolicyType || 'str',
                 types: ['str', 'env'],
             });
+            $('#node-config-input-authUsername').typedInput({
+                default: this.authUsernameType || 'str',
+                types: ['str', 'env'],
+            });
+            $('#node-config-input-authType').val(this.authType || 'none');
+            $('#node-config-input-authUsername').val(this.authUsername || '');
+            $('#node-config-input-authPassword').val(this.credentials?.authPassword || '');
+            $('#node-config-input-authToken').val(this.credentials?.authToken || '');
+
+            let requestHeaders = [];
+            try {
+                if (this.credentials?.requestHeaders && this.credentials.requestHeaders !== '__PWRD__') {
+                    requestHeaders = JSON.parse(this.credentials.requestHeaders) || [];
+                }
+            } catch (err) { /* runtime validation reports malformed credentials */ }
+            this.requestHeadersList = nuclioServerInitHeaderList('#node-config-input-request-headers', requestHeaders);
+            const updateAuthVisibility = () => {
+                const authType = $('#node-config-input-authType').val() || 'none';
+                $('#nuclio-basic-auth-fields').toggle(authType === 'basic');
+                $('#nuclio-bearer-auth-fields').toggle(authType === 'bearer');
+            };
+            $('#node-config-input-authType').on('change', updateAuthVisibility);
+            updateAuthVisibility();
             // Shared settings: numeric literal or an env-var reference, resolved on deploy.
             ['requestTimeoutMs','deployTimeoutMs','pollMs','readyPollMs','backoffMs','backoffMaxMs','startStaggerMs']
                 .forEach(function(f){ $('#node-config-input-'+f).typedInput({ default: this[f+'Type'] || 'num', types: ['num','env'] }); }.bind(this));
@@ -74,6 +151,37 @@
             };
             $('#node-config-input-invocationUrlPreference').on('change', updateInvocationOptionVisibility);
             updateInvocationOptionVisibility();
+        },
+        oneditsave: function() {
+            this.authType = $('#node-config-input-authType').val() || 'none';
+            this.authUsername = $('#node-config-input-authUsername').typedInput('value') || '';
+            this.authUsernameType = $('#node-config-input-authUsername').typedInput('type');
+            this.credentials = this.credentials || {};
+
+            const password = $('#node-config-input-authPassword').val() || '';
+            const token = $('#node-config-input-authToken').val() || '';
+            if (this.authType === 'basic') {
+                if (password) this.credentials.authPassword = password;
+                else if (this.credentials.authPassword !== '__PWRD__') delete this.credentials.authPassword;
+                delete this.credentials.authToken;
+            } else if (this.authType === 'bearer') {
+                if (token) this.credentials.authToken = token;
+                else if (this.credentials.authToken !== '__PWRD__') delete this.credentials.authToken;
+                delete this.credentials.authPassword;
+            } else {
+                delete this.credentials.authPassword;
+                delete this.credentials.authToken;
+            }
+
+            const headers = nuclioServerCollectHeaderList('#node-config-input-request-headers');
+            if (headers.length || this.credentials.requestHeaders !== '__PWRD__') {
+                if (headers.length) this.credentials.requestHeaders = JSON.stringify(headers);
+                else delete this.credentials.requestHeaders;
+            }
+            delete this.requestHeadersList;
+        },
+        oneditcancel: function() {
+            delete this.requestHeadersList;
         },
     });
 
@@ -135,6 +243,41 @@
         <div>
             <small>Used only when Nuclio reports an external host without a scheme. Explicit http:// or https:// URLs are preserved.</small>
         </div>
+    </div>
+
+    <div class="form-row">
+        <label for="node-config-input-authType">Dashboard authentication</label>
+        <select id="node-config-input-authType" class="form-control">
+            <option value="none">None</option>
+            <option value="basic">Basic authentication</option>
+            <option value="bearer">Bearer token</option>
+        </select>
+        <div>
+            <small>Authentication is sent to the Nuclio dashboard from Node-RED. Credentials are not included in flow JSON, status, logs, or metrics.</small>
+        </div>
+    </div>
+    <div id="nuclio-basic-auth-fields">
+        <div class="form-row">
+            <label for="node-config-input-authUsername">Username</label>
+            <input type="text" id="node-config-input-authUsername" placeholder="username" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-authPassword">Password</label>
+            <input type="password" id="node-config-input-authPassword" placeholder="password" />
+        </div>
+    </div>
+    <div id="nuclio-bearer-auth-fields">
+        <div class="form-row">
+            <label for="node-config-input-authToken">Bearer token</label>
+            <input type="password" id="node-config-input-authToken" placeholder="token" />
+        </div>
+    </div>
+    <div class="form-row node-input-list-row">
+        <label for="node-config-input-request-headers">Request headers</label>
+        <div>
+            <small>Optional headers sent with every dashboard request. Values support literals, environment variables, and credentials. Nuclio scope and transport headers are reserved.</small>
+        </div>
+        <ol id="node-config-input-request-headers"></ol>
     </div>
 
     <div class="form-row">
@@ -206,5 +349,7 @@
         <dd>Scheme used for scheme-less external URLs reported by Nuclio. Explicit schemes are preserved.</dd>
         <dt>Deployment policy</dt>
         <dd><code>managed</code> (the default) allows deployment and self-healing. <code>disabled</code> prevents writes and leaves existing remote functions untouched. The value can use the <code>env</code> type.</dd>
+        <dt>Dashboard authentication</dt>
+        <dd>Optional Basic or Bearer authentication sent to the dashboard. Additional request headers are configured separately and stored as credentials.</dd>
     </dl>
 </script>
