@@ -32,6 +32,30 @@
         "env": []
     },
     {
+        "id": "0000000000000077",
+        "type": "tab",
+        "label": "05 Direct MQTT trigger",
+        "disabled": false,
+        "info": "Nuclio consumes MQTT messages directly; Node-RED publishes test messages and observes the output topic.",
+        "env": []
+    },
+    {
+        "id": "0000000000000086",
+        "type": "tab",
+        "label": "06 Cron trigger",
+        "disabled": false,
+        "info": "Nuclio owns the schedule and invokes the function at the configured interval. Refresh the function Run logs to observe each tick.",
+        "env": []
+    },
+    {
+        "id": "0000000000000090",
+        "type": "tab",
+        "label": "07 Direct NATS trigger",
+        "disabled": false,
+        "info": "Nuclio subscribes directly to NATS and replies to requesters. Use the documented nats-box command to send a request.",
+        "env": []
+    },
+    {
         "id": "0000000000000001",
         "type": "nuclio-config",
         "address": "http://nuclio-dashboard:8070",
@@ -71,14 +95,6 @@
         "type": "nuclio-project",
         "name": "demo-operations",
         "nameType": "str"
-    },
-    {
-        "id": "0000000000000077",
-        "type": "tab",
-        "label": "05 Direct MQTT trigger",
-        "disabled": false,
-        "info": "Nuclio consumes MQTT messages directly; Node-RED publishes test messages and observes the output topic.",
-        "env": []
     },
     {
         "id": "0000000000000078",
@@ -150,105 +166,6 @@
         "autoRedeployOnErrorType": "bool"
     },
     {
-        "id": "0000000000000081",
-        "type": "comment",
-        "z": "0000000000000077",
-        "name": "Direct MQTT trigger",
-        "info": "Node-RED publishes a test message to Mosquitto. Nuclio subscribes directly, transforms it, and publishes the result to a second topic. The message does not pass through the Nuclio HTTP invoke node. MQTT triggers are currently a Nuclio tech-preview feature.",
-        "x": 190,
-        "y": 80,
-        "wires": []
-    },
-    {
-        "id": "0000000000000082",
-        "type": "inject",
-        "z": "0000000000000077",
-        "name": "Publish MQTT event",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "{\"temperature\":21.5,\"unit\":\"C\"}",
-        "payloadType": "json",
-        "x": 180,
-        "y": 180,
-        "wires": [
-            [
-                "0000000000000083"
-            ]
-        ]
-    },
-    {
-        "id": "0000000000000083",
-        "type": "mqtt out",
-        "z": "0000000000000077",
-        "name": "Mosquitto input",
-        "topic": "demo/mqtt/input",
-        "qos": "0",
-        "retain": "",
-        "respTopic": "",
-        "contentType": "",
-        "userProps": "",
-        "correl": "",
-        "expiry": "",
-        "broker": "0000000000000079",
-        "x": 460,
-        "y": 180,
-        "wires": []
-    },
-    {
-        "id": "0000000000000084",
-        "type": "mqtt in",
-        "z": "0000000000000077",
-        "name": "Mosquitto output",
-        "topic": "demo/mqtt/output",
-        "qos": "0",
-        "datatype": "auto-detect",
-        "broker": "0000000000000079",
-        "nl": false,
-        "rap": true,
-        "rh": 0,
-        "inputs": 0,
-        "x": 190,
-        "y": 280,
-        "wires": [
-            [
-                "0000000000000085"
-            ]
-        ]
-    },
-    {
-        "id": "0000000000000085",
-        "type": "debug",
-        "z": "0000000000000077",
-        "name": "Transformed MQTT event",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 490,
-        "y": 280,
-        "wires": []
-    },
-    {
-        "id": "0000000000000086",
-        "type": "tab",
-        "label": "06 Cron trigger",
-        "disabled": false,
-        "info": "Nuclio owns the schedule and invokes the function at the configured interval. Refresh the function Run logs to observe each tick.",
-        "env": []
-    },
-    {
         "id": "0000000000000087",
         "type": "nuclio-project",
         "name": "demo-scheduled",
@@ -279,24 +196,6 @@
         "autoRedeployOnErrorType": "bool"
     },
     {
-        "id": "0000000000000089",
-        "type": "comment",
-        "z": "0000000000000086",
-        "name": "Nuclio-owned schedule",
-        "info": "Nuclio owns this 30-second interval; Node-RED only declares and observes the function. Open the function Status tab and refresh Run logs to see each invocation. This demonstrates a schedule, not durable batch orchestration or backfill support.",
-        "x": 190,
-        "y": 100,
-        "wires": []
-    },
-    {
-        "id": "0000000000000090",
-        "type": "tab",
-        "label": "07 Direct NATS trigger",
-        "disabled": false,
-        "info": "Nuclio subscribes directly to NATS and replies to requesters. Use the documented nats-box command to send a request.",
-        "env": []
-    },
-    {
         "id": "0000000000000091",
         "type": "nuclio-project",
         "name": "demo-messaging",
@@ -325,16 +224,6 @@
         "redeployDeadlineMs": "120000",
         "autoRedeployOnError": "false",
         "autoRedeployOnErrorType": "bool"
-    },
-    {
-        "id": "0000000000000093",
-        "type": "comment",
-        "z": "0000000000000090",
-        "name": "NATS request/reply",
-        "info": "Nuclio consumes demo.nats.input directly and returns the handler result on the NATS request reply subject. Run: docker run --rm --network node-red-contrib-nuclio_default natsio/nats-box:latest nats request -s nats://nats:4222 demo.nats.input '{\"message\":\"hello\"}'. NATS triggers are currently a Nuclio tech-preview feature.",
-        "x": 230,
-        "y": 100,
-        "wires": []
     },
     {
         "id": "0000000000000007",
@@ -1805,6 +1694,180 @@
             [
                 "0000000000000059"
             ]
+        ]
+    },
+    {
+        "id": "0000000000000081",
+        "type": "comment",
+        "z": "0000000000000077",
+        "name": "Direct MQTT trigger",
+        "info": "Node-RED publishes a test message to Mosquitto. Nuclio subscribes directly, transforms it, and publishes the result to a second topic. The message does not pass through the Nuclio HTTP invoke node. MQTT triggers are currently a Nuclio tech-preview feature.",
+        "x": 190,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "0000000000000082",
+        "type": "inject",
+        "z": "0000000000000077",
+        "name": "Publish MQTT event",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"temperature\":21.5,\"unit\":\"C\"}",
+        "payloadType": "json",
+        "x": 180,
+        "y": 180,
+        "wires": [
+            [
+                "0000000000000083"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000083",
+        "type": "mqtt out",
+        "z": "0000000000000077",
+        "name": "Mosquitto input",
+        "topic": "demo/mqtt/input",
+        "qos": "0",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "0000000000000079",
+        "x": 460,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "0000000000000084",
+        "type": "mqtt in",
+        "z": "0000000000000077",
+        "name": "Mosquitto output",
+        "topic": "demo/mqtt/output",
+        "qos": "0",
+        "datatype": "auto-detect",
+        "broker": "0000000000000079",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 190,
+        "y": 280,
+        "wires": [
+            [
+                "0000000000000085"
+            ]
+        ]
+    },
+    {
+        "id": "0000000000000085",
+        "type": "debug",
+        "z": "0000000000000077",
+        "name": "Transformed MQTT event",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 490,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "601ec8e5c7fa70d0",
+        "type": "nuclio",
+        "z": "0000000000000077",
+        "function": "0000000000000080",
+        "timeoutMs": "",
+        "timeoutMsType": "num",
+        "maxInFlight": "",
+        "maxInFlightType": "num",
+        "retries": "",
+        "retriesType": "num",
+        "retryDelayMs": "",
+        "retryDelayMsType": "num",
+        "headers": [],
+        "x": 460,
+        "y": 440,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "0000000000000089",
+        "type": "comment",
+        "z": "0000000000000086",
+        "name": "Nuclio-owned schedule",
+        "info": "Nuclio owns this 30-second interval; Node-RED only declares and observes the function. Open the function Status tab and refresh Run logs to see each invocation. This demonstrates a schedule, not durable batch orchestration or backfill support.",
+        "x": 190,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "2dddb1939711d199",
+        "type": "nuclio",
+        "z": "0000000000000086",
+        "function": "0000000000000088",
+        "timeoutMs": "",
+        "timeoutMsType": "num",
+        "maxInFlight": "",
+        "maxInFlightType": "num",
+        "retries": "",
+        "retriesType": "num",
+        "retryDelayMs": "",
+        "retryDelayMsType": "num",
+        "headers": [],
+        "x": 420,
+        "y": 320,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "0000000000000093",
+        "type": "comment",
+        "z": "0000000000000090",
+        "name": "NATS request/reply",
+        "info": "Nuclio consumes demo.nats.input directly and returns the handler result on the NATS request reply subject. Run: docker run --rm --network node-red-contrib-nuclio_default natsio/nats-box:latest nats request -s nats://nats:4222 demo.nats.input '{\"message\":\"hello\"}'. NATS triggers are currently a Nuclio tech-preview feature.",
+        "x": 230,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "ede7dff31c309a89",
+        "type": "nuclio",
+        "z": "0000000000000090",
+        "function": "0000000000000092",
+        "timeoutMs": "",
+        "timeoutMsType": "num",
+        "maxInFlight": "",
+        "maxInFlightType": "num",
+        "retries": "",
+        "retriesType": "num",
+        "retryDelayMs": "",
+        "retryDelayMsType": "num",
+        "headers": [],
+        "x": 370,
+        "y": 240,
+        "wires": [
+            [],
+            []
         ]
     }
 ]
