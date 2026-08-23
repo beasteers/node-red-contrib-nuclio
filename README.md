@@ -333,7 +333,9 @@ The repository also contains optional integration fixtures:
   It requires Docker, KinD, `kubectl`, Helm, Python 3, and a completed `npm ci`. The cluster is
   removed when the test finishes; set `KIND_CANARY_KEEP_CLUSTER=1` to keep it for inspection.
 - `KIND_CANARY_AUTOSCALE=1 npm run test:kind` additionally installs metrics-server, deploys a
-  CPU-loaded 1-to-3 replica canary, and runs the phased autoscaling scenario. Set
+  CPU-loaded 1-to-3 replica canary, and runs the phased autoscaling scenario from an in-cluster
+  load-generator pod through the function Service. This preserves normal Kubernetes load
+  balancing; the host port-forward is used only for the one-message canary check. Set
   `KIND_CANARY_KEEP_CLUSTER=1` to retain the cluster and logs for inspection.
 - `node scripts/diagnose-redeploy.js ...` captures a local Docker/Node-RED/Nuclio timeline when
   investigating a specific redeploy problem. It is a troubleshooting aid, not part of normal

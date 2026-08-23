@@ -54,6 +54,7 @@ DASHBOARD_FORWARD_PID=""
 FUNCTION_FORWARD_PID=""
 NODE_RED_PID=""
 HPA_SAMPLE_PID=""
+LOADGEN_POD=""
 
 cleanup() {
     local exit_code=$?
@@ -62,6 +63,10 @@ cleanup() {
     for pid in "$DASHBOARD_FORWARD_PID" "$FUNCTION_FORWARD_PID" "$NODE_RED_PID" "$HPA_SAMPLE_PID"; do
         if [ -n "$pid" ]; then kill "$pid" 2>/dev/null || true; fi
     done
+
+    if [ -n "$LOADGEN_POD" ]; then
+        kubectl delete pod "$LOADGEN_POD" -n "$NUCLIO_NAMESPACE" --ignore-not-found >/dev/null 2>&1 || true
+    fi
 
     if [ "$KIND_CANARY_KEEP_CLUSTER" != "1" ] && [ "$CLUSTER_CREATED" = "1" ]; then
         kind delete cluster --name "$KIND_CLUSTER_NAME" >/dev/null 2>&1 || true
@@ -290,6 +295,22 @@ echo "Canary function is ready and invocation succeeded."
 
 if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
     echo "Running phased autoscaling scenario"
+    LOADGEN_POD="${CANARY_FUNCTION_NAME}-stress-loadgen"
+    scenario_config_name="$(basename "$AUTOSCALE_SCENARIO_CONFIG")"
+    echo "Starting in-cluster stress load generator: $LOADGEN_POD"
+    kubectl run "$LOADGEN_POD" \
+        -n "$NUCLIO_NAMESPACE" \
+        --image=node:22-alpine \
+        --restart=Never \
+        --command -- sleep 1200 \
+        >"$LOG_DIR/loadgen.log" 2>&1
+    kubectl wait --for=condition=Ready "pod/$LOADGEN_POD" \
+        -n "$NUCLIO_NAMESPACE" --timeout=120s \
+        >>"$LOG_DIR/loadgen.log" 2>&1
+    kubectl cp "$PROJECT_DIR/scripts" \
+        "$NUCLIO_NAMESPACE/$LOADGEN_POD:/tmp/" \
+        >>"$LOG_DIR/loadgen.log" 2>&1
+
     HPA_SAMPLE_FILE="$LOG_DIR/hpa-samples.tsv"
     hpa_name="nuclio-$CANARY_FUNCTION_NAME"
     (
@@ -306,20 +327,24 @@ if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
     HPA_SAMPLE_PID=$!
     scenario_exit=0
     scenario_args=(
-        node "$PROJECT_DIR/scripts/stress-scenario.js"
-        --config "$AUTOSCALE_SCENARIO_CONFIG"
-        --url "http://127.0.0.1:$FUNCTION_PORT"
-        --dashboard "$dashboard_url"
+        kubectl exec "$LOADGEN_POD" -n "$NUCLIO_NAMESPACE" --
+        node /tmp/scripts/stress-scenario.js
+        --config "/tmp/scripts/$scenario_config_name"
+        --url "http://nuclio-$CANARY_FUNCTION_NAME.$NUCLIO_NAMESPACE.svc.cluster.local:8080"
+        --dashboard "http://nuclio-dashboard.$NUCLIO_NAMESPACE.svc.cluster.local:8070"
         --function "$CANARY_FUNCTION_NAME"
         --namespace "$NUCLIO_NAMESPACE"
         --project "$NUCLIO_PROJECT"
         --concurrency "$AUTOSCALE_CONCURRENCY"
-        --output "$LOG_DIR/autoscale-scenario.json"
+        --output /tmp/autoscale-scenario.json
     )
     if [ -n "$AUTOSCALE_PHASE_DURATION" ]; then
         scenario_args+=(--duration "$AUTOSCALE_PHASE_DURATION")
     fi
     "${scenario_args[@]}" || scenario_exit=$?
+    kubectl cp "$NUCLIO_NAMESPACE/$LOADGEN_POD:/tmp/autoscale-scenario.json" \
+        "$LOG_DIR/autoscale-scenario.json" \
+        >>"$LOG_DIR/loadgen.log" 2>&1 || true
     kill "$HPA_SAMPLE_PID" 2>/dev/null || true
     wait "$HPA_SAMPLE_PID" 2>/dev/null || true
     HPA_SAMPLE_PID=""
