@@ -122,8 +122,8 @@ YAML editor for advanced and future fields:
 - **Execution** configures trigger mode, batching, trigger workers, and event timeout. Async mode
   and batching are intended for Python HTTP functions and require the handler contract described
   in the Nuclio documentation.
-- **Scaling & resources** configures replicas, autoscaling bounds, target CPU, and CPU/memory
-  requests and limits.
+- **Scaling & resources** lets you choose YAML-controlled, fixed-replica, or CPU-autoscaled
+  deployment, then configure the relevant replica bounds and CPU/memory requests and limits.
 - **Kubernetes Secret References** injects runtime environment variables using
   `valueFrom.secretKeyRef`; Node-RED stores only the Secret name and key, never its value.
 

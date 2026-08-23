@@ -117,6 +117,26 @@ test('execution controls merge into the configured HTTP trigger', async () => {
     });
 });
 
+test('inherit execution defaults do not emit a second HTTP trigger', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        executionTriggerName: 'http',
+        executionMode: 'inherit',
+        executionBatchMode: 'inherit',
+    }));
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(req.body.spec.triggers, undefined);
+});
+
+test('execution controls default to Nuclio default-http trigger', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, { executionMode: 'async' }));
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(req.body.spec.triggers['default-http'].mode, 'async');
+});
+
 test('scaling and resource controls merge into the function spec', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {
@@ -139,6 +159,52 @@ test('scaling and resource controls merge into the function spec', async () => {
         requests: { cpu: '250m', memory: '256Mi' },
         limits: { cpu: '1', memory: '512Mi' },
     });
+});
+
+test('fixed scaling mode emits only a fixed replica count', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        scalingMode: 'fixed',
+        scalingReplicas: '2',
+        configCode: 'spec:\n  minReplicas: 1\n  maxReplicas: 5\n  targetCPU: 80\n',
+    }));
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(req.body.spec.replicas, 2);
+    assert.equal(req.body.spec.minReplicas, undefined);
+    assert.equal(req.body.spec.maxReplicas, undefined);
+    assert.equal(req.body.spec.targetCPU, undefined);
+});
+
+test('autoscaled scaling mode emits replicas zero and autoscaling bounds', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        scalingMode: 'autoscaled',
+        scalingMinReplicas: '1',
+        scalingMaxReplicas: '3',
+        scalingTargetCPU: '70',
+    }));
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.equal(req.body.spec.replicas, 0);
+    assert.equal(req.body.spec.minReplicas, 1);
+    assert.equal(req.body.spec.maxReplicas, 3);
+    assert.equal(req.body.spec.targetCPU, 70);
+});
+
+test('scaling rejects an invalid autoscaling range', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        scalingMode: 'autoscaled',
+        scalingMinReplicas: '4',
+        scalingMaxReplicas: '2',
+    }));
+
+    const fn = helper.getNode('fn');
+    assert.equal(fn.configError, true);
+    assert.equal(fn.configErrorReason, 'Invalid config YAML');
+    assert.match(fn.lastStatus?.text || '', /Invalid config YAML/);
+    assert.equal(mock.requests.some(r => r.method === 'POST' && r.url === '/api/functions'), false);
 });
 
 test('Kubernetes secret references are emitted without secret values', async () => {

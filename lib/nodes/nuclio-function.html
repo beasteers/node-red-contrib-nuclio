@@ -970,6 +970,7 @@ rev /dev/stdin
             executionBatchTimeout: { value: '' }, executionBatchTimeoutType: { value: 'str' },
             executionWorkers: { value: '' }, executionWorkersType: { value: 'num' },
             executionEventTimeout: { value: '' }, executionEventTimeoutType: { value: 'str' },
+            scalingMode: { value: 'yaml' },
             scalingReplicas: { value: '' }, scalingReplicasType: { value: 'num' },
             scalingMinReplicas: { value: '' }, scalingMinReplicasType: { value: 'num' },
             scalingMaxReplicas: { value: '' }, scalingMaxReplicasType: { value: 'num' },
@@ -1196,7 +1197,7 @@ rev /dev/stdin
             });
             this.envSecretRefList = initSecretReferenceList('#node-config-input-env_secret_refs-x', this.envSecretRefs);
 
-            $('#node-config-input-executionTriggerName').val(this.executionTriggerName || 'http');
+            $('#node-config-input-executionTriggerName').val(this.executionTriggerName || 'default-http');
             $('#node-config-input-executionMode').val(this.executionMode || 'inherit');
             $('#node-config-input-executionBatchMode').val(this.executionBatchMode || 'inherit');
             $('#node-config-input-executionBatchSize').val(this.executionBatchSize || '');
@@ -1222,7 +1223,7 @@ rev /dev/stdin
             const scalingNumberFields = ['scalingReplicas', 'scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU'];
             const resourceFields = ['resourceRequestsCpu', 'resourceRequestsMemory', 'resourceLimitsCpu', 'resourceLimitsMemory'];
             [...scalingNumberFields, ...resourceFields].forEach(field => {
-                $('#node-config-input-' + field).val(this[field] || '');
+                $('#node-config-input-' + field).val(this[field] ?? '');
             });
             scalingNumberFields.forEach(field => {
                 $('#node-config-input-' + field).typedInput({ default: 'num', types: ['num', 'env'] });
@@ -1230,6 +1231,31 @@ rev /dev/stdin
             resourceFields.forEach(field => {
                 $('#node-config-input-' + field).typedInput({ default: 'str', types: ['str', 'env'] });
             });
+
+            const scalingFieldsHaveValues = ['scalingReplicas', 'scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU']
+                .some(field => this[field] !== undefined && this[field] !== '');
+            const inferredScalingMode = this.scalingMode && ['yaml', 'fixed', 'autoscaled'].includes(this.scalingMode)
+                ? this.scalingMode
+                : !scalingFieldsHaveValues
+                    ? 'yaml'
+                    : this.scalingReplicas === '0' || ['scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU']
+                        .some(field => this[field] !== undefined && this[field] !== '')
+                        ? 'autoscaled'
+                        : 'fixed';
+            $('#node-config-input-scalingMode').val(inferredScalingMode);
+
+            const updateScalingOptions = () => {
+                const mode = $('#node-config-input-scalingMode').val() || 'yaml';
+                $('#nuclio-scaling-fixed-fields').toggleClass('nuclio-hidden', mode !== 'fixed');
+                $('#nuclio-scaling-autoscaled-fields').toggleClass('nuclio-hidden', mode !== 'autoscaled');
+                $('#nuclio-scaling-yaml-note').toggleClass('nuclio-hidden', mode !== 'yaml');
+                $('#node-config-input-scalingReplicas').prop('disabled', mode !== 'fixed');
+                ['scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU'].forEach(field => {
+                    $('#node-config-input-' + field).prop('disabled', mode !== 'autoscaled');
+                });
+            };
+            $('#node-config-input-scalingMode').off('change.nuclioScaling').on('change.nuclioScaling', updateScalingOptions);
+            updateScalingOptions();
 
             // Recovery policy: numeric literal or env-var reference, resolved on deploy.
             ['maxSelfHealAttempts','redeployDeadlineMs'].forEach(function(f){
@@ -1288,8 +1314,26 @@ rev /dev/stdin
                         : preference === 'external'
                             ? 'External URL'
                             : 'Service name';
-                const scaleMin = spec.minReplicas ?? '—';
-                const scaleMax = spec.maxReplicas ?? '—';
+                const numberValue = value => {
+                    if (typeof value === 'number' && Number.isFinite(value)) return value;
+                    if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
+                    return undefined;
+                };
+                const readyReplicas = numberValue(status.readyReplicas ?? status.availableReplicas);
+                const desiredReplicas = numberValue(status.desiredReplicas ?? status.replicas);
+                const observedReplicas = readyReplicas === undefined
+                    ? desiredReplicas === undefined ? '' : `${desiredReplicas}`
+                    : desiredReplicas === undefined ? `${readyReplicas}` : `${readyReplicas}/${desiredReplicas}`;
+                const fixedReplicas = numberValue(spec.replicas);
+                const autoscaled = fixedReplicas === 0 || spec.targetCPU !== undefined;
+                const scaleMin = numberValue(spec.minReplicas);
+                const scaleMax = numberValue(spec.maxReplicas);
+                const scaleValue = observedReplicas || (autoscaled
+                    ? `${scaleMin ?? '—'}–${scaleMax ?? '—'}`
+                    : fixedReplicas === undefined ? '—' : `${fixedReplicas}`);
+                const scaleMeta = autoscaled
+                    ? `Autoscaling ${scaleMin ?? '—'}–${scaleMax ?? '—'} · target ${spec.targetCPU ?? 75}% CPU`
+                    : `Fixed · ${fixedReplicas ?? 'YAML-configured'} replica(s)`;
 
                 $('#nuclio-status-function-name').text(metadata.name || node.name || '—');
                 $('#nuclio-status-state').text(state);
@@ -1299,8 +1343,8 @@ rev /dev/stdin
                 $('#nuclio-deployment-meta').text(status.error || status.message || metadata.namespace || 'Nuclio deployment state');
                 $('#nuclio-runtime-value').text(spec.runtime || '—');
                 $('#nuclio-runtime-meta').text(spec.handler ? `Handler: ${spec.handler}` : 'Handler not reported');
-                $('#nuclio-scale-value').text(`${scaleMin}–${scaleMax}`);
-                $('#nuclio-scale-meta').text(status.readyReplicas !== undefined ? `${status.readyReplicas} ready replica(s)` : 'Configured replicas');
+                $('#nuclio-scale-value').text(scaleValue);
+                $('#nuclio-scale-meta').text(scaleMeta);
                 $('#nuclio-invocation-mode').text(mode);
                 if (canUpdateElement(statusElement('nuclio-status'))) {
                     const signals = { ...status };
@@ -1430,6 +1474,52 @@ rev /dev/stdin
         },
         oneditsave: function() {
             let node = this;
+
+            const scalingMode = $('#node-config-input-scalingMode').val() || 'yaml';
+            const typedValue = field => ({
+                value: $('#node-config-input-' + field).typedInput('value') || '',
+                type: $('#node-config-input-' + field).typedInput('type'),
+            });
+            const literalNumber = field => {
+                const input = typedValue(field);
+                if (!input.value || input.type === 'env') return undefined;
+                const value = Number(input.value);
+                return Number.isFinite(value) ? value : NaN;
+            };
+            const scalingError = message => {
+                RED.notify(`Scaling: ${message}`, { type: 'error', timeout: 5000 });
+                return false;
+            };
+            if (scalingMode === 'fixed') {
+                const replicas = typedValue('scalingReplicas');
+                const literalReplicas = literalNumber('scalingReplicas');
+                if (!replicas.value) return scalingError('fixed scaling requires a replica count');
+                if (replicas.type !== 'env' && (!Number.isInteger(literalReplicas) || literalReplicas < 1)) {
+                    return scalingError('fixed replicas must be a positive integer');
+                }
+            } else if (scalingMode === 'autoscaled') {
+                const replicas = typedValue('scalingReplicas');
+                const literalReplicas = literalNumber('scalingReplicas');
+                if (replicas.value && replicas.type !== 'env' && literalReplicas !== 0) {
+                    return scalingError('autoscaled functions use replicas 0');
+                }
+                const min = literalNumber('scalingMinReplicas');
+                const max = literalNumber('scalingMaxReplicas');
+                const targetCPU = literalNumber('scalingTargetCPU');
+                if (Number.isNaN(min) || (min !== undefined && (!Number.isInteger(min) || min < 0))) {
+                    return scalingError('minimum replicas must be a non-negative integer');
+                }
+                if (Number.isNaN(max) || (max !== undefined && (!Number.isInteger(max) || max < 0))) {
+                    return scalingError('maximum replicas must be a non-negative integer');
+                }
+                if (min !== undefined && max !== undefined && min > max) {
+                    return scalingError('minimum replicas cannot exceed maximum replicas');
+                }
+                if (Number.isNaN(targetCPU) || (targetCPU !== undefined && (!Number.isInteger(targetCPU) || targetCPU < 1 || targetCPU > 100))) {
+                    return scalingError('target CPU must be an integer from 1 to 100');
+                }
+            }
+
             this.code = this.editor.getValue();
             this.editor.destroy();
             delete this.editor;
@@ -1481,10 +1571,25 @@ rev /dev/stdin
 
             const scalingNumberFields = ['scalingReplicas', 'scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU'];
             const resourceFields = ['resourceRequestsCpu', 'resourceRequestsMemory', 'resourceLimitsCpu', 'resourceLimitsMemory'];
+            this.scalingMode = scalingMode;
             scalingNumberFields.forEach(field => {
                 this[field] = $('#node-config-input-' + field).typedInput('value') || '';
                 this[field + 'Type'] = $('#node-config-input-' + field).typedInput('type');
             });
+            if (scalingMode === 'fixed') {
+                ['scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU'].forEach(field => {
+                    this[field] = '';
+                    this[field + 'Type'] = 'num';
+                });
+            } else if (scalingMode === 'autoscaled') {
+                this.scalingReplicas = '0';
+                this.scalingReplicasType = 'num';
+            } else {
+                scalingNumberFields.forEach(field => {
+                    this[field] = '';
+                    this[field + 'Type'] = 'num';
+                });
+            }
             resourceFields.forEach(field => {
                 this[field] = $('#node-config-input-' + field).typedInput('value') || '';
                 this[field + 'Type'] = $('#node-config-input-' + field).typedInput('type');
@@ -1658,7 +1763,7 @@ rev /dev/stdin
                 <p><small>These optional settings override the matching HTTP trigger and <code>spec.eventTimeout</code> fields in the YAML editor. Leave them inherited to keep full control in YAML.</small></p>
                 <div class="form-row">
                     <label for="node-config-input-executionTriggerName">Trigger name</label>
-                    <input type="text" id="node-config-input-executionTriggerName" class="form-control" placeholder="http" />
+                    <input type="text" id="node-config-input-executionTriggerName" class="form-control" placeholder="default-http" />
                 </div>
                 <div class="form-row">
                     <label for="node-config-input-executionMode">Processing mode</label>
@@ -1697,22 +1802,35 @@ rev /dev/stdin
 
             <details>
                 <summary>Scaling &amp; resources</summary>
-                <p><small>Optional common scaling and CPU/memory settings. Kubernetes placement, GPUs, probes, and other platform-specific options remain available in the YAML editor.</small></p>
+                <p><small>Choose one scaling strategy. Kubernetes placement, custom metrics, GPUs, probes, and other platform-specific options remain available in the YAML editor.</small></p>
                 <div class="form-row">
-                    <label for="node-config-input-scalingReplicas">Replicas</label>
-                    <input type="text" id="node-config-input-scalingReplicas" placeholder="0 for autoscaling" />
+                    <label for="node-config-input-scalingMode">Scaling mode</label>
+                    <select id="node-config-input-scalingMode" class="form-control">
+                        <option value="yaml">Configure in YAML</option>
+                        <option value="fixed">Fixed replicas</option>
+                        <option value="autoscaled">Autoscaled replicas</option>
+                    </select>
                 </div>
-                <div class="form-row">
-                    <label for="node-config-input-scalingMinReplicas">Minimum replicas</label>
-                    <input type="text" id="node-config-input-scalingMinReplicas" placeholder="1" />
+                <p id="nuclio-scaling-yaml-note"><small>Scaling fields in this editor are ignored; the YAML editor controls the function's scaling.</small></p>
+                <div id="nuclio-scaling-fixed-fields" class="nuclio-hidden">
+                    <div class="form-row">
+                        <label for="node-config-input-scalingReplicas">Replicas</label>
+                        <input type="text" id="node-config-input-scalingReplicas" placeholder="2" />
+                    </div>
                 </div>
-                <div class="form-row">
-                    <label for="node-config-input-scalingMaxReplicas">Maximum replicas</label>
-                    <input type="text" id="node-config-input-scalingMaxReplicas" placeholder="1" />
-                </div>
-                <div class="form-row">
-                    <label for="node-config-input-scalingTargetCPU">Target CPU (%)</label>
-                    <input type="text" id="node-config-input-scalingTargetCPU" placeholder="75" />
+                <div id="nuclio-scaling-autoscaled-fields" class="nuclio-hidden">
+                    <div class="form-row">
+                        <label for="node-config-input-scalingMinReplicas">Minimum replicas</label>
+                        <input type="text" id="node-config-input-scalingMinReplicas" placeholder="1" />
+                    </div>
+                    <div class="form-row">
+                        <label for="node-config-input-scalingMaxReplicas">Maximum replicas</label>
+                        <input type="text" id="node-config-input-scalingMaxReplicas" placeholder="3" />
+                    </div>
+                    <div class="form-row">
+                        <label for="node-config-input-scalingTargetCPU">Autoscaling target CPU (%)</label>
+                        <input type="text" id="node-config-input-scalingTargetCPU" placeholder="75" />
+                    </div>
                 </div>
                 <div class="form-row">
                     <label>Resource requests</label>

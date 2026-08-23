@@ -13,8 +13,9 @@ test('runtime metadata includes editor samples for Java and .NET Core', () => {
     assert.deepEqual(metadata.find(item => item.value === 'dotnetcore'), {
         value: 'dotnetcore',
         base: 'dotnetcore',
-        label: '.NET Core',
+        label: '.NET Core (amd64 only)',
         language: 'csharp',
         handler: 'nuclio:empty',
+        architectures: ['amd64'],
     });
 });

@@ -38,7 +38,7 @@
         "addressType": "str",
         "namespace": "nuclio",
         "namespaceType": "str",
-        "publicAddress": "http://localhost:8070",
+        "publicAddress": "http://localhost:8072",
         "publicAddressType": "str",
         "invocationUrlPreference": "service",
         "internalInvocationServiceHost": "nuclio-nuclio-{function}",
@@ -90,8 +90,36 @@
         "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {\"runtime\": \"python\", \"received\": body}",
         "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nmetadata:\n  labels: {}\n  annotations: {}\nspec:\n  build:\n    commands: []\n    # - pip install requests numpy pandas\n    \n  # # add multiple workers:\n  # triggers:\n  #   mh:\n  #     kind: http\n  #     numWorkers: 4\n      \n  #############\n  # Kubernetes:\n  \n  # env: []\n  # envFrom: []\n  # volumes: []\n\n  # # Pod replica auto-scaling:\n  # minReplicas: 1\n  # maxReplicas: 1\n  # resources: {}\n  #   # Kubernetes Limits & Requests for the function's CPU and memory usage.\n  #   requests:\n  #     cpu: 1\n  #     memory: 128M\n  #   limits:\n  #     cpu: 2\n  #     memory: 256M\n  #     nvidia.com/gpu: 1",
         "env_vars": [],
+        "envSecretRefs": [],
         "deploymentVariables": [],
         "deploymentMode": "eager",
+        "executionTriggerName": "http",
+        "executionMode": "inherit",
+        "executionBatchMode": "inherit",
+        "executionBatchSize": "",
+        "executionBatchSizeType": "num",
+        "executionBatchTimeout": "",
+        "executionBatchTimeoutType": "str",
+        "executionWorkers": "",
+        "executionWorkersType": "num",
+        "executionEventTimeout": "",
+        "executionEventTimeoutType": "str",
+        "scalingReplicas": "",
+        "scalingReplicasType": "num",
+        "scalingMinReplicas": "",
+        "scalingMinReplicasType": "num",
+        "scalingMaxReplicas": "",
+        "scalingMaxReplicasType": "num",
+        "scalingTargetCPU": "",
+        "scalingTargetCPUType": "num",
+        "resourceRequestsCpu": "",
+        "resourceRequestsCpuType": "str",
+        "resourceRequestsMemory": "",
+        "resourceRequestsMemoryType": "str",
+        "resourceLimitsCpu": "",
+        "resourceLimitsCpuType": "str",
+        "resourceLimitsMemory": "",
+        "resourceLimitsMemoryType": "str",
         "maxSelfHealAttempts": "2",
         "redeployDeadlineMs": "120000",
         "autoRedeployOnError": "false",
@@ -140,8 +168,36 @@
         "code": "exports.handler = function(context, event) {\n    let body = event.body;\n    if (Buffer.isBuffer(body)) body = body.toString();\n    try {\n        body = JSON.parse(body);\n    } catch (_) {\n        // Keep plain-text request bodies as strings.\n    }\n    context.callback(JSON.stringify({ runtime: \"nodejs\", received: body }));\n};",
         "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nmetadata:\n  labels: {}\n  annotations: {}\nspec:\n  build:\n    commands: []\n    # - pip install requests numpy pandas\n\n  # # add multiple workers:\n  # triggers:\n  #   mh:\n  #     kind: http\n  #     numWorkers: 4\n      \n  #############\n  # Kubernetes:\n  \n  # env: []\n  # envFrom: []\n  # volumes: []\n\n  # # Pod replica auto-scaling:\n  # minReplicas: 1\n  # maxReplicas: 1\n  # resources: {}\n  #   # Kubernetes Limits & Requests for the function's CPU and memory usage.\n  #   requests:\n  #     cpu: 1\n  #     memory: 128M\n  #   limits:\n  #     cpu: 2\n  #     memory: 256M\n  #     nvidia.com/gpu: 1",
         "env_vars": [],
+        "envSecretRefs": [],
         "deploymentVariables": [],
         "deploymentMode": "eager",
+        "executionTriggerName": "http",
+        "executionMode": "inherit",
+        "executionBatchMode": "inherit",
+        "executionBatchSize": "",
+        "executionBatchSizeType": "num",
+        "executionBatchTimeout": "",
+        "executionBatchTimeoutType": "str",
+        "executionWorkers": "",
+        "executionWorkersType": "num",
+        "executionEventTimeout": "",
+        "executionEventTimeoutType": "str",
+        "scalingReplicas": "",
+        "scalingReplicasType": "num",
+        "scalingMinReplicas": "",
+        "scalingMinReplicasType": "num",
+        "scalingMaxReplicas": "",
+        "scalingMaxReplicasType": "num",
+        "scalingTargetCPU": "",
+        "scalingTargetCPUType": "num",
+        "resourceRequestsCpu": "",
+        "resourceRequestsCpuType": "str",
+        "resourceRequestsMemory": "",
+        "resourceRequestsMemoryType": "str",
+        "resourceLimitsCpu": "",
+        "resourceLimitsCpuType": "str",
+        "resourceLimitsMemory": "",
+        "resourceLimitsMemoryType": "str",
         "maxSelfHealAttempts": "2",
         "redeployDeadlineMs": "120000",
         "autoRedeployOnError": "false",
@@ -162,17 +218,39 @@
         "codeEntryReference": "",
         "codeEntryUsername": "",
         "codeEntryWorkDir": "",
-        "code": "#!/bin/sh\nprintf '{\"runtime\":\"shell\",\"received\":\"'\ncat\nprintf '\"}'",
-        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    # The Node-RED deployment supplies the architecture-specific prefix.\n    baseImage: gcr.io/iguazio/${NUCLIO_ARCH_PREFIX}alpine:3.23",
+        "code": "#!/bin/sh\nprintf '{\"runtime\":\"shell\",\"received\":'\ncat\nprintf '}'\n",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec: {}\n  # build:\n  #   # The Node-RED deployment supplies the architecture-specific prefix.\n  #   baseImage: gcr.io/iguazio/${NUCLIO_ARCH_PREFIX}alpine:3.23",
         "env_vars": [],
-        "deploymentVariables": [
-            {
-                "name": "NUCLIO_ARCH_PREFIX",
-                "type": "env",
-                "value": "NUCLIO_ARCH_PREFIX"
-            }
-        ],
+        "envSecretRefs": [],
+        "deploymentVariables": [],
         "deploymentMode": "eager",
+        "executionTriggerName": "http",
+        "executionMode": "inherit",
+        "executionBatchMode": "inherit",
+        "executionBatchSize": "",
+        "executionBatchSizeType": "num",
+        "executionBatchTimeout": "",
+        "executionBatchTimeoutType": "str",
+        "executionWorkers": "",
+        "executionWorkersType": "num",
+        "executionEventTimeout": "",
+        "executionEventTimeoutType": "str",
+        "scalingReplicas": "",
+        "scalingReplicasType": "num",
+        "scalingMinReplicas": "",
+        "scalingMinReplicasType": "num",
+        "scalingMaxReplicas": "",
+        "scalingMaxReplicasType": "num",
+        "scalingTargetCPU": "",
+        "scalingTargetCPUType": "num",
+        "resourceRequestsCpu": "",
+        "resourceRequestsCpuType": "str",
+        "resourceRequestsMemory": "",
+        "resourceRequestsMemoryType": "str",
+        "resourceLimitsCpu": "",
+        "resourceLimitsCpuType": "str",
+        "resourceLimitsMemory": "",
+        "resourceLimitsMemoryType": "str",
         "maxSelfHealAttempts": "2",
         "redeployDeadlineMs": "120000",
         "autoRedeployOnError": "false",
@@ -196,7 +274,36 @@
         "code": "import io.nuclio.Context;\nimport io.nuclio.Event;\nimport io.nuclio.EventHandler;\nimport io.nuclio.Response;\n\npublic class EmptyHandler implements EventHandler {\n    @Override\n    public Response handleEvent(Context context, Event event) {\n        return new Response().setBody(\"Hello, from Java :]\");\n    }\n}",
         "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    commands: []",
         "env_vars": [],
-        "deploymentMode": "lazy",
+        "envSecretRefs": [],
+        "deploymentVariables": [],
+        "deploymentMode": "eager",
+        "executionTriggerName": "http",
+        "executionMode": "inherit",
+        "executionBatchMode": "inherit",
+        "executionBatchSize": "",
+        "executionBatchSizeType": "num",
+        "executionBatchTimeout": "",
+        "executionBatchTimeoutType": "str",
+        "executionWorkers": "",
+        "executionWorkersType": "num",
+        "executionEventTimeout": "",
+        "executionEventTimeoutType": "str",
+        "scalingReplicas": "",
+        "scalingReplicasType": "num",
+        "scalingMinReplicas": "",
+        "scalingMinReplicasType": "num",
+        "scalingMaxReplicas": "",
+        "scalingMaxReplicasType": "num",
+        "scalingTargetCPU": "",
+        "scalingTargetCPUType": "num",
+        "resourceRequestsCpu": "",
+        "resourceRequestsCpuType": "str",
+        "resourceRequestsMemory": "",
+        "resourceRequestsMemoryType": "str",
+        "resourceLimitsCpu": "",
+        "resourceLimitsCpuType": "str",
+        "resourceLimitsMemory": "",
+        "resourceLimitsMemoryType": "str",
         "maxSelfHealAttempts": "2",
         "redeployDeadlineMs": "120000",
         "autoRedeployOnError": "false",
@@ -220,7 +327,36 @@
         "code": "using Nuclio.Sdk;\n\npublic class nuclio\n{\n    public object empty(Context context, Event eventBase)\n    {\n        return new Response()\n        {\n            StatusCode = 200,\n            ContentType = \"application/text\",\n            Body = \"Hello, from .NET Core :)\"\n        };\n    }\n}",
         "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    commands: []",
         "env_vars": [],
+        "envSecretRefs": [],
+        "deploymentVariables": [],
         "deploymentMode": "lazy",
+        "executionTriggerName": "http",
+        "executionMode": "inherit",
+        "executionBatchMode": "inherit",
+        "executionBatchSize": "",
+        "executionBatchSizeType": "num",
+        "executionBatchTimeout": "",
+        "executionBatchTimeoutType": "str",
+        "executionWorkers": "",
+        "executionWorkersType": "num",
+        "executionEventTimeout": "",
+        "executionEventTimeoutType": "str",
+        "scalingReplicas": "",
+        "scalingReplicasType": "num",
+        "scalingMinReplicas": "",
+        "scalingMinReplicasType": "num",
+        "scalingMaxReplicas": "",
+        "scalingMaxReplicasType": "num",
+        "scalingTargetCPU": "",
+        "scalingTargetCPUType": "num",
+        "resourceRequestsCpu": "",
+        "resourceRequestsCpuType": "str",
+        "resourceRequestsMemory": "",
+        "resourceRequestsMemoryType": "str",
+        "resourceLimitsCpu": "",
+        "resourceLimitsCpuType": "str",
+        "resourceLimitsMemory": "",
+        "resourceLimitsMemoryType": "str",
         "maxSelfHealAttempts": "2",
         "redeployDeadlineMs": "120000",
         "autoRedeployOnError": "false",
@@ -334,7 +470,7 @@
         "z": "0000000000000005",
         "name": "Same request, six runtimes",
         "info": "Compare the same simple invocation across Python, Go, Node.js, Shell, Java, and .NET Core. Java and .NET Core are lazy so their tech-preview runtimes do not block the core gallery; send the explicit deploy command before invoking them.",
-        "x": 150,
+        "x": 230,
         "y": 80,
         "wires": []
     },
@@ -348,7 +484,7 @@
         "retries": "0",
         "retryDelayMs": "500",
         "headers": [],
-        "x": 760,
+        "x": 510,
         "y": 160,
         "wires": [
             [
@@ -369,8 +505,8 @@
         "retries": "0",
         "retryDelayMs": "500",
         "headers": [],
-        "x": 760,
-        "y": 420,
+        "x": 500,
+        "y": 340,
         "wires": [
             [
                 "0000000000000017"
@@ -390,8 +526,8 @@
         "retries": "0",
         "retryDelayMs": "500",
         "headers": [],
-        "x": 760,
-        "y": 680,
+        "x": 510,
+        "y": 500,
         "wires": [
             [
                 "0000000000000019"
@@ -411,8 +547,8 @@
         "retries": "0",
         "retryDelayMs": "500",
         "headers": [],
-        "x": 760,
-        "y": 940,
+        "x": 510,
+        "y": 660,
         "wires": [
             [
                 "0000000000000021"
@@ -435,7 +571,7 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
+        "x": 790,
         "y": 140,
         "wires": []
     },
@@ -452,7 +588,7 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
+        "x": 790,
         "y": 200,
         "wires": []
     },
@@ -469,8 +605,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
-        "y": 400,
+        "x": 780,
+        "y": 320,
         "wires": []
     },
     {
@@ -486,8 +622,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
-        "y": 460,
+        "x": 780,
+        "y": 380,
         "wires": []
     },
     {
@@ -503,8 +639,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
-        "y": 660,
+        "x": 790,
+        "y": 480,
         "wires": []
     },
     {
@@ -520,8 +656,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
-        "y": 720,
+        "x": 790,
+        "y": 540,
         "wires": []
     },
     {
@@ -537,8 +673,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
-        "y": 920,
+        "x": 790,
+        "y": 640,
         "wires": []
     },
     {
@@ -554,18 +690,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
-        "y": 980,
-        "wires": []
-    },
-    {
-        "id": "0000000000000077",
-        "type": "comment",
-        "z": "0000000000000005",
-        "name": "Optional Java and .NET Core",
-        "info": "These two functions use the new editor samples. They are lazy because Java is tech-preview and availability varies by Nuclio platform image; click Deploy before sending a normal request.",
-        "x": 170,
-        "y": 1160,
+        "x": 790,
+        "y": 700,
         "wires": []
     },
     {
@@ -578,8 +704,8 @@
         "retries": "0",
         "retryDelayMs": "500",
         "headers": [],
-        "x": 760,
-        "y": 1160,
+        "x": 500,
+        "y": 840,
         "wires": [
             [
                 "0000000000000067"
@@ -599,8 +725,8 @@
         "retries": "0",
         "retryDelayMs": "500",
         "headers": [],
-        "x": 760,
-        "y": 1420,
+        "x": 491,
+        "y": 1008,
         "wires": [
             [
                 "0000000000000069"
@@ -623,8 +749,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
-        "y": 1140,
+        "x": 780,
+        "y": 820,
         "wires": []
     },
     {
@@ -640,8 +766,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
-        "y": 1200,
+        "x": 780,
+        "y": 880,
         "wires": []
     },
     {
@@ -657,8 +783,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
-        "y": 1400,
+        "x": 771,
+        "y": 988,
         "wires": []
     },
     {
@@ -674,8 +800,8 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1040,
-        "y": 1460,
+        "x": 771,
+        "y": 1048,
         "wires": []
     },
     {
@@ -699,8 +825,8 @@
         "topic": "",
         "payload": "hello from Java",
         "payloadType": "str",
-        "x": 150,
-        "y": 1160,
+        "x": 220,
+        "y": 840,
         "wires": [
             [
                 "0000000000000065"
@@ -728,80 +854,11 @@
         "topic": "",
         "payload": "hello from .NET Core",
         "payloadType": "str",
-        "x": 150,
-        "y": 1420,
+        "x": 211,
+        "y": 1008,
         "wires": [
             [
                 "0000000000000066"
-            ]
-        ]
-    },
-    {
-        "id": "0000000000000073",
-        "type": "function",
-        "z": "0000000000000005",
-        "name": "Deploy Java",
-        "func": "msg.nuclio = { command: \"deploy\" };\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 420,
-        "y": 1240,
-        "wires": [
-            [
-                "0000000000000065"
-            ]
-        ]
-    },
-    {
-        "id": "0000000000000074",
-        "type": "function",
-        "z": "0000000000000005",
-        "name": "Deploy .NET Core",
-        "func": "msg.nuclio = { command: \"deploy\" };\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 430,
-        "y": 1500,
-        "wires": [
-            [
-                "0000000000000066"
-            ]
-        ]
-    },
-    {
-        "id": "0000000000000075",
-        "type": "inject",
-        "z": "0000000000000005",
-        "name": "Deploy Java",
-        "props": [
-            {
-                "p": "payload"
-            },
-            {
-                "p": "topic",
-                "vt": "str"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "true",
-        "payloadType": "bool",
-        "x": 150,
-        "y": 1240,
-        "wires": [
-            [
-                "0000000000000073"
             ]
         ]
     },
@@ -815,7 +872,8 @@
                 "p": "payload"
             },
             {
-                "p": "topic",
+                "p": "nuclio.command",
+                "v": "deploy",
                 "vt": "str"
             }
         ],
@@ -826,11 +884,11 @@
         "topic": "",
         "payload": "true",
         "payloadType": "bool",
-        "x": 150,
-        "y": 1500,
+        "x": 211,
+        "y": 1088,
         "wires": [
             [
-                "0000000000000074"
+                "0000000000000066"
             ]
         ]
     },
@@ -855,7 +913,7 @@
         "topic": "",
         "payload": "{\"message\":\"hello from Python\"}",
         "payloadType": "json",
-        "x": 150,
+        "x": 230,
         "y": 160,
         "wires": [
             [
@@ -884,8 +942,8 @@
         "topic": "",
         "payload": "{\"message\":\"hello from Go\"}",
         "payloadType": "json",
-        "x": 150,
-        "y": 420,
+        "x": 240,
+        "y": 340,
         "wires": [
             [
                 "0000000000000012"
@@ -913,8 +971,8 @@
         "topic": "",
         "payload": "hello from Node.js",
         "payloadType": "str",
-        "x": 150,
-        "y": 680,
+        "x": 220,
+        "y": 500,
         "wires": [
             [
                 "0000000000000013"
@@ -942,8 +1000,8 @@
         "topic": "",
         "payload": "hello from Shell",
         "payloadType": "str",
-        "x": 150,
-        "y": 940,
+        "x": 230,
+        "y": 660,
         "wires": [
             [
                 "0000000000000014"
@@ -970,7 +1028,7 @@
         "retries": "0",
         "retryDelayMs": "500",
         "headers": [],
-        "x": 760,
+        "x": 450,
         "y": 320,
         "wires": [
             [
@@ -994,7 +1052,7 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1060,
+        "x": 750,
         "y": 300,
         "wires": []
     },
@@ -1011,7 +1069,7 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1060,
+        "x": 750,
         "y": 380,
         "wires": []
     },
@@ -1045,26 +1103,6 @@
         ]
     },
     {
-        "id": "0000000000000034",
-        "type": "function",
-        "z": "0000000000000027",
-        "name": "Deploy command",
-        "func": "msg.nuclio = { command: \"deploy\" };\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 440,
-        "y": 520,
-        "wires": [
-            [
-                "0000000000000030"
-            ]
-        ]
-    },
-    {
         "id": "0000000000000035",
         "type": "inject",
         "z": "0000000000000027",
@@ -1074,7 +1112,8 @@
                 "p": "payload"
             },
             {
-                "p": "topic",
+                "p": "nuclio.command",
+                "v": "deploy",
                 "vt": "str"
             }
         ],
@@ -1085,28 +1124,8 @@
         "topic": "",
         "payload": "true",
         "payloadType": "bool",
-        "x": 150,
-        "y": 520,
-        "wires": [
-            [
-                "0000000000000034"
-            ]
-        ]
-    },
-    {
-        "id": "0000000000000036",
-        "type": "function",
-        "z": "0000000000000027",
-        "name": "Check status command",
-        "func": "msg.nuclio = { command: \"status\" };\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 440,
-        "y": 620,
+        "x": 170,
+        "y": 420,
         "wires": [
             [
                 "0000000000000030"
@@ -1123,7 +1142,8 @@
                 "p": "payload"
             },
             {
-                "p": "topic",
+                "p": "nuclio.command",
+                "v": "status",
                 "vt": "str"
             }
         ],
@@ -1135,27 +1155,7 @@
         "payload": "true",
         "payloadType": "bool",
         "x": 150,
-        "y": 620,
-        "wires": [
-            [
-                "0000000000000036"
-            ]
-        ]
-    },
-    {
-        "id": "0000000000000038",
-        "type": "function",
-        "z": "0000000000000027",
-        "name": "Redeploy command",
-        "func": "msg.nuclio = { command: \"redeploy\" };\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 440,
-        "y": 720,
+        "y": 460,
         "wires": [
             [
                 "0000000000000030"
@@ -1172,7 +1172,8 @@
                 "p": "payload"
             },
             {
-                "p": "topic",
+                "p": "nuclio.command",
+                "v": "redeploy",
                 "vt": "str"
             }
         ],
@@ -1183,28 +1184,8 @@
         "topic": "",
         "payload": "true",
         "payloadType": "bool",
-        "x": 150,
-        "y": 720,
-        "wires": [
-            [
-                "0000000000000038"
-            ]
-        ]
-    },
-    {
-        "id": "0000000000000040",
-        "type": "function",
-        "z": "0000000000000027",
-        "name": "Rebuild image command",
-        "func": "msg.nuclio = { command: \"rebuild\" };\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 440,
-        "y": 820,
+        "x": 160,
+        "y": 500,
         "wires": [
             [
                 "0000000000000030"
@@ -1221,7 +1202,8 @@
                 "p": "payload"
             },
             {
-                "p": "topic",
+                "p": "nuclio.command",
+                "v": "rebuild",
                 "vt": "str"
             }
         ],
@@ -1233,10 +1215,10 @@
         "payload": "true",
         "payloadType": "bool",
         "x": 150,
-        "y": 820,
+        "y": 540,
         "wires": [
             [
-                "0000000000000040"
+                "0000000000000030"
             ]
         ]
     },
@@ -1374,7 +1356,7 @@
         "retries": "2",
         "retryDelayMs": "250",
         "headers": [],
-        "x": 860,
+        "x": 460,
         "y": 220,
         "wires": [
             [
@@ -1398,7 +1380,7 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1120,
+        "x": 720,
         "y": 180,
         "wires": []
     },
@@ -1415,7 +1397,7 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1120,
+        "x": 720,
         "y": 260,
         "wires": []
     },
@@ -1487,7 +1469,7 @@
         "retries": "0",
         "retryDelayMs": "500",
         "headers": [],
-        "x": 860,
+        "x": 460,
         "y": 520,
         "wires": [
             [
@@ -1511,7 +1493,7 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1120,
+        "x": 720,
         "y": 520,
         "wires": []
     },
@@ -1528,7 +1510,7 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 1120,
+        "x": 720,
         "y": 580,
         "wires": []
     },
