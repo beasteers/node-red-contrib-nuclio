@@ -46,8 +46,12 @@ services:
     image: nats:2.10-alpine
     container_name: nats
     restart: unless-stopped
+    command: ["-c", "/etc/nats/nats-server.conf"]
     ports:
       - 4222:4222
+      - 1884:1883
+    volumes:
+      - ./config/nats-server.conf:/etc/nats/nats-server.conf:ro
 
   # # --------------------------------- Testing -------------------------------- #
 

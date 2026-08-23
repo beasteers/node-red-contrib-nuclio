@@ -1,0 +1,29 @@
+{
+  "defaults": {
+    "duration": 10,
+    "warmup": 1,
+    "concurrency": 64,
+    "timeout": 10000
+  },
+  "rates": [10, 100],
+  "cases": [
+    {
+      "name": "python-http",
+      "trigger": "http",
+      "url": "http://127.0.0.1:18080"
+    },
+    {
+      "name": "mqtt-python",
+      "trigger": "mqtt",
+      "broker": "mqtt://127.0.0.1:1883",
+      "inputTopic": "demo/mqtt/input",
+      "outputTopic": "demo/mqtt/output"
+    },
+    {
+      "name": "nats-python",
+      "trigger": "nats",
+      "server": "nats://127.0.0.1:4222",
+      "subject": "demo.nats.input"
+    }
+  ]
+}

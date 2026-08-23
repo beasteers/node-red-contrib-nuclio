@@ -11,10 +11,12 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
     "lint": "eslint",
     "smoke": "bash scripts/smoke-test.sh",
     "test:kind": "bash scripts/kind-canary.sh",
+    "stress": "node scripts/stress-test.js",
+    "stress:matrix": "node scripts/stress-matrix.js",
     "diagnose:redeploy": "node scripts/diagnose-redeploy.js"
   },
   "node-red": {
@@ -61,7 +63,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@nats-io/transport-node": "^3.4.0",
     "eslint": "^10.4.1",
+    "mqtt": "^5.15.2",
     "node-red": "^5.0.4",
     "node-red-node-test-helper": "^0.3.6"
   }

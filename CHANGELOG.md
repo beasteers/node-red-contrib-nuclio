@@ -7,6 +7,8 @@ All notable changes to this project are documented here.
 - Add a direct MQTT-trigger demo flow with a local Mosquitto fixture.
 - Add a Nuclio-owned Cron-trigger demo flow.
 - Add a direct NATS request/reply trigger demo with a local NATS fixture.
+- Add a direct HTTP, MQTT, and NATS stress-test harness with latency, throughput, error, and status-sample reporting.
+- Add a configuration-driven sequential stress matrix runner for comparing trigger and load cases.
 
 ## [3.1.0] - 2026-08-23
 

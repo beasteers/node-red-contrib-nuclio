@@ -60,6 +60,10 @@ test('demo flow includes a direct NATS request/reply trigger', () => {
     const flows = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'flows.json'), 'utf8'));
     const tab = flows.find(node => node.type === 'tab' && node.label === '07 Direct NATS trigger');
     const fn = flows.find(node => node.type === 'nuclio-function' && node.name === 'demo-nats-request');
+    const bridgeFn = flows.find(node => node.type === 'nuclio-function' && node.name === 'demo-nats-mqtt-transform');
+    const broker = flows.find(node => node.type === 'mqtt-broker' && node.name === 'NATS MQTT');
+    const input = flows.find(node => node.type === 'mqtt out' && node.topic === 'demo/nats/mqtt/input');
+    const output = flows.find(node => node.type === 'mqtt in' && node.topic === 'demo/nats/mqtt/output');
 
     assert.ok(tab, 'expected the NATS demo tab');
     assert.ok(fn, 'expected the NATS-triggered Nuclio function');
@@ -67,4 +71,15 @@ test('demo flow includes a direct NATS request/reply trigger', () => {
     assert.match(fn.configCode, /url:\s*nats:\/\/nats:4222/);
     assert.match(fn.configCode, /topic:\s*demo\.nats\.input/);
     assert.match(fn.configCode, /reply:\s*true/);
+    assert.ok(bridgeFn, 'expected the NATS MQTT bridge function');
+    assert.match(bridgeFn.configCode, /kind:\s*nats/);
+    assert.match(bridgeFn.configCode, /topic:\s*demo\.nats\.mqtt\.input/);
+    assert.match(bridgeFn.configCode, /reply:\s*false/);
+    assert.match(bridgeFn.code, /nats\.aio\.client/);
+    assert.match(bridgeFn.configCode, /pip install nats-py/);
+    assert.ok(broker, 'expected the NATS MQTT broker configuration');
+    assert.ok(input, 'expected the NATS MQTT input publisher');
+    assert.equal(input.broker, broker.id);
+    assert.ok(output, 'expected the NATS MQTT output subscriber');
+    assert.equal(output.broker, broker.id);
 });

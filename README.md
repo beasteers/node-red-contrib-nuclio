@@ -63,8 +63,8 @@ seconds and writes a timestamped event to the function logs; open the Status tab
 logs to observe it. This demonstrates trigger ownership, not durable batch scheduling, backfills,
 or workflow orchestration.
 
-The **07 Direct NATS trigger** tab demonstrates Nuclio request/reply messaging. Start the local
-NATS service with `docker compose up -d`, deploy the flow, then run:
+The **07 Direct NATS trigger** tab demonstrates two NATS paths. The upper path uses native NATS
+request/reply and can be exercised with `nats-box`:
 
 ```bash
 docker run --rm --network node-red-contrib-nuclio_default natsio/nats-box:latest \
@@ -74,6 +74,12 @@ docker run --rm --network node-red-contrib-nuclio_default natsio/nats-box:latest
 The response is produced by Nuclio and returned on the NATS reply subject. Node-RED owns the
 function declaration and status view, while NATS and Nuclio own the message path. Nuclio currently
 documents the NATS trigger as a tech-preview feature.
+
+The lower path uses NATS's built-in MQTT listener at the Node-RED boundary. Click **Publish NATS
+MQTT event** in Node-RED; the message is published to NATS through MQTT, consumed by the Nuclio
+NATS trigger, and published natively by the function to `demo.nats.mqtt.output`. NATS's MQTT bridge
+delivers that subject back to Node-RED as `demo/nats/mqtt/output`. The Compose fixture enables this
+listener with JetStream on port 1883 inside the Compose network (mapped to host port 1884).
 
 ## Function sources
 
@@ -332,3 +338,79 @@ The repository also contains optional integration fixtures:
 
 The Compose and KinD fixtures use local, unauthenticated dashboards and are integration tests,
 not production deployment recipes.
+
+### Stress testing
+
+The stress harness measures an already deployed function without changing its configuration. It
+supports HTTP, MQTT, and NATS paths (including NATS request/reply), correlation IDs, offered rate, concurrency,
+timeouts, latency percentiles, errors, and optional Nuclio status samples. It is intentionally a
+load generator rather than a deployment tool, so the same harness can test functions managed by
+Node-RED, `nuctl`, or Kubernetes.
+
+HTTP against a directly reachable function endpoint:
+
+```bash
+npm run stress -- --trigger http \
+  --url http://127.0.0.1:18080 \
+  --rate 100 --duration 30 --concurrency 64 \
+  --output stress-http.json
+```
+
+HTTP can resolve a Nuclio-reported endpoint and collect replica samples when the dashboard
+exposes one. The selected endpoint must be routable from the process running the harness:
+
+```bash
+npm run stress -- --trigger http \
+  --function demo-configured-echo \
+  --dashboard http://127.0.0.1:8072 \
+  --project demo-operations \
+  --rate 100 --duration 30
+```
+
+For the Docker Compose fixture, run the HTTP harness inside the Node-RED container so it can
+reach the function's Docker-network hostname directly:
+
+```bash
+docker exec nodered-nuclio node \
+  /usr/src/node-red/node-red-contrib-nuclio/scripts/stress-test.js \
+  --trigger http --url http://nuclio-nuclio-demo-python-echo:8080 \
+  --rate 100 --duration 30 --concurrency 64
+```
+
+On Kubernetes or KinD, use a port-forward and pass its URL with `--url`, or resolve an internal
+endpoint with `--endpoint internal` when the harness runs inside the cluster network.
+
+The direct trigger demos can be exercised with the same load generator:
+
+```bash
+npm run stress -- --trigger mqtt \
+  --broker mqtt://127.0.0.1:1883 \
+  --input-topic demo/mqtt/input \
+  --output-topic demo/mqtt/output \
+  --rate 100 --duration 30
+
+npm run stress -- --trigger nats \
+  --server nats://127.0.0.1:4222 \
+  --subject demo.nats.input \
+  --rate 100 --duration 30
+```
+
+Use `--payload-size` to add deterministic body size, `--requests` for an exact message count,
+and `--timeout` to expose overload behavior. For autoscaling, run the harness against a function
+already configured with `minReplicas`/`maxReplicas` on Kubernetes or KinD; Compose results measure
+fixed-scale behavior and should not be interpreted as autoscaling evidence.
+
+For repeatable comparisons, use the matrix wrapper. Copy
+`scripts/stress-matrix.example.json`, replace the HTTP endpoint with a reachable port-forward or
+in-network URL, and run:
+
+```bash
+npm run stress:matrix -- \
+  --config scripts/stress-matrix.example.json \
+  --rates 10,100,500 \
+  --output stress-matrix.json
+```
+
+Cases run sequentially so one result does not contaminate another. The output includes each
+case's full stress result, including sampled function state and replica information when a
+dashboard/function is configured.
