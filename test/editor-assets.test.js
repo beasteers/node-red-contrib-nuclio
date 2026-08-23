@@ -26,3 +26,20 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
     assert.doesNotMatch(html, /secret_vars|Credential Overrides/,
         'deprecated credential override fields must not remain in the editor');
 });
+
+test('demo flow includes a direct MQTT trigger path', () => {
+    const flows = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'flows.json'), 'utf8'));
+    const tab = flows.find(node => node.type === 'tab' && node.label === '05 Direct MQTT trigger');
+    const broker = flows.find(node => node.type === 'mqtt-broker' && node.broker === 'mosquitto');
+    const fn = flows.find(node => node.type === 'nuclio-function' && node.name === 'demo-mqtt-transform');
+    const input = flows.find(node => node.type === 'mqtt out' && node.topic === 'demo/mqtt/input');
+    const output = flows.find(node => node.type === 'mqtt in' && node.topic === 'demo/mqtt/output');
+
+    assert.ok(tab, 'expected the direct MQTT demo tab');
+    assert.ok(broker, 'expected the Mosquitto broker configuration');
+    assert.ok(fn, 'expected the MQTT-triggered Nuclio function');
+    assert.match(fn.configCode, /kind:\s*mqtt/);
+    assert.match(fn.configCode, /url:\s*mosquitto:1883/);
+    assert.ok(input, 'expected the MQTT input publisher');
+    assert.ok(output, 'expected the MQTT output subscriber');
+});

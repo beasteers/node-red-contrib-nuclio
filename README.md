@@ -46,6 +46,18 @@ Restart Node-RED, then add a **Nuclio Server**, **Nuclio Project**, **Nuclio Fun
 Functions deploy eagerly on Node-RED startup by default. Set **Deployment mode** to **Lazy** if
 a function should not be created until a flow explicitly sends a `deploy` command.
 
+### Direct MQTT trigger demo
+
+The repository's Docker Compose fixture includes an optional Mosquitto broker and a **05 Direct
+MQTT trigger** flow. In that example, Node-RED publishes a test event to Mosquitto, while Nuclio
+subscribes directly, transforms the event, and publishes the result to a second MQTT topic. The
+message does not pass through the HTTP-oriented Nuclio Invoke node.
+
+Start the local fixture with `docker compose up -d`, open Node-RED on port `1882`, deploy the
+flow, and click **Publish MQTT event**. The transformed event appears in the Node-RED debug
+sidebar. This is an architecture demo for direct event consumption; Nuclio currently documents
+the MQTT trigger as a tech-preview feature, so the fixture is not a production MQTT recipe.
+
 ## Function sources
 
 The Function tab supports these source types:

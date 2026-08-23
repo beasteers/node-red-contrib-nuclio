@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-No changes yet.
+- Add a direct MQTT-trigger demo flow with a local Mosquitto fixture.
 
 ## [3.1.0] - 2026-08-23
 
