@@ -448,3 +448,13 @@ metrics such as Kubernetes CPU and memory should be collected separately with `k
 the cluster's monitoring system. The opt-in KinD canary also samples the HPA directly; when
 `KIND_CANARY_KEEP_CLUSTER=1` is set, its retained log directory contains the HPA timeline and
 scenario JSON.
+
+For a longer scale-down observation, use the long scenario fixture with a larger client
+concurrency:
+
+```bash
+KIND_CANARY_AUTOSCALE=1 \
+AUTOSCALE_SCENARIO_CONFIG="$PWD/scripts/stress-scenario.kind-autoscale-long.example.json" \
+AUTOSCALE_CONCURRENCY=512 \
+npm run test:kind
+```

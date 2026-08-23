@@ -24,7 +24,9 @@ CANARY_MAX_REPLICAS="${CANARY_MAX_REPLICAS:-1}"
 CANARY_TARGET_CPU="${CANARY_TARGET_CPU:-50}"
 CANARY_CPU_BURN_MS="${CANARY_CPU_BURN_MS:-0}"
 METRICS_SERVER_VERSION="${METRICS_SERVER_VERSION:-v0.7.2}"
-AUTOSCALE_PHASE_DURATION="${AUTOSCALE_PHASE_DURATION:-60}"
+AUTOSCALE_PHASE_DURATION="${AUTOSCALE_PHASE_DURATION:-}"
+AUTOSCALE_CONCURRENCY="${AUTOSCALE_CONCURRENCY:-512}"
+AUTOSCALE_SCENARIO_CONFIG="${AUTOSCALE_SCENARIO_CONFIG:-$PROJECT_DIR/scripts/stress-scenario.kind-autoscale.example.json}"
 
 if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
     [ "$CANARY_MAX_REPLICAS" = "1" ] && CANARY_MAX_REPLICAS=3
@@ -303,15 +305,21 @@ if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
     ) >"$HPA_SAMPLE_FILE" 2>/dev/null &
     HPA_SAMPLE_PID=$!
     scenario_exit=0
-    node "$PROJECT_DIR/scripts/stress-scenario.js" \
-        --config "$PROJECT_DIR/scripts/stress-scenario.kind-autoscale.example.json" \
-        --url "http://127.0.0.1:$FUNCTION_PORT" \
-        --dashboard "$dashboard_url" \
-        --function "$CANARY_FUNCTION_NAME" \
-        --namespace "$NUCLIO_NAMESPACE" \
-        --project "$NUCLIO_PROJECT" \
-        --duration "$AUTOSCALE_PHASE_DURATION" \
-        --output "$LOG_DIR/autoscale-scenario.json" || scenario_exit=$?
+    scenario_args=(
+        node "$PROJECT_DIR/scripts/stress-scenario.js"
+        --config "$AUTOSCALE_SCENARIO_CONFIG"
+        --url "http://127.0.0.1:$FUNCTION_PORT"
+        --dashboard "$dashboard_url"
+        --function "$CANARY_FUNCTION_NAME"
+        --namespace "$NUCLIO_NAMESPACE"
+        --project "$NUCLIO_PROJECT"
+        --concurrency "$AUTOSCALE_CONCURRENCY"
+        --output "$LOG_DIR/autoscale-scenario.json"
+    )
+    if [ -n "$AUTOSCALE_PHASE_DURATION" ]; then
+        scenario_args+=(--duration "$AUTOSCALE_PHASE_DURATION")
+    fi
+    "${scenario_args[@]}" || scenario_exit=$?
     kill "$HPA_SAMPLE_PID" 2>/dev/null || true
     wait "$HPA_SAMPLE_PID" 2>/dev/null || true
     HPA_SAMPLE_PID=""

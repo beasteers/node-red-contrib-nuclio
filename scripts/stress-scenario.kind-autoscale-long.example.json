@@ -1,0 +1,21 @@
+{
+  "name": "kind-autoscale-sustained-and-cooldown",
+  "defaults": {
+    "trigger": "http",
+    "function": "demo-autoscaled-echo",
+    "dashboard": "http://nuclio-dashboard:8070",
+    "namespace": "nuclio",
+    "project": "demo-runtime",
+    "endpoint": "internal",
+    "concurrency": 512,
+    "timeout": 10000,
+    "warmup": 0,
+    "sampleInterval": 1000
+  },
+  "phases": [
+    {"name": "cold-start", "rate": 10, "duration": 30},
+    {"name": "ramp", "rate": 100, "duration": 60},
+    {"name": "sustained-peak", "rate": 500, "duration": 180},
+    {"name": "cooldown", "rate": 10, "duration": 360}
+  ]
+}

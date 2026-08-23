@@ -11,6 +11,7 @@ All notable changes to this project are documented here.
 - Add a configuration-driven sequential stress matrix runner for comparing trigger and load cases.
 - Add phased stress scenarios for sustained saturation and autoscaling ramp, hold, and recovery tests.
 - Add an opt-in KinD autoscaling canary with metrics-server and replica-range reporting.
+- Add a long KinD autoscaling scenario for sustained peak load and HPA cooldown observation.
 
 ## [3.1.0] - 2026-08-23
 
