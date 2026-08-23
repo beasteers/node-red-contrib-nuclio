@@ -445,4 +445,6 @@ autoscaling scenario therefore requires a function already configured with its d
 `minReplicas`, `maxReplicas`, and scaling trigger. Its result can show scale-up lag, observed
 replica bounds, recovery after a load drop, and the latency/error impact of scaling. Resource
 metrics such as Kubernetes CPU and memory should be collected separately with `kubectl top` or
-the cluster's monitoring system.
+the cluster's monitoring system. The opt-in KinD canary also samples the HPA directly; when
+`KIND_CANARY_KEEP_CLUSTER=1` is set, its retained log directory contains the HPA timeline and
+scenario JSON.

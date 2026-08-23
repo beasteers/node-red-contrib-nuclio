@@ -51,12 +51,13 @@ CLUSTER_CREATED=0
 DASHBOARD_FORWARD_PID=""
 FUNCTION_FORWARD_PID=""
 NODE_RED_PID=""
+HPA_SAMPLE_PID=""
 
 cleanup() {
     local exit_code=$?
     trap - EXIT INT TERM
 
-    for pid in "$DASHBOARD_FORWARD_PID" "$FUNCTION_FORWARD_PID" "$NODE_RED_PID"; do
+    for pid in "$DASHBOARD_FORWARD_PID" "$FUNCTION_FORWARD_PID" "$NODE_RED_PID" "$HPA_SAMPLE_PID"; do
         if [ -n "$pid" ]; then kill "$pid" 2>/dev/null || true; fi
     done
 
@@ -287,6 +288,21 @@ echo "Canary function is ready and invocation succeeded."
 
 if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
     echo "Running phased autoscaling scenario"
+    HPA_SAMPLE_FILE="$LOG_DIR/hpa-samples.tsv"
+    hpa_name="nuclio-$CANARY_FUNCTION_NAME"
+    (
+        while true; do
+            current="$(kubectl get hpa "$hpa_name" -n "$NUCLIO_NAMESPACE" -o jsonpath='{.status.currentReplicas}' 2>/dev/null || true)"
+            desired="$(kubectl get hpa "$hpa_name" -n "$NUCLIO_NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || true)"
+            utilization="$(kubectl get hpa "$hpa_name" -n "$NUCLIO_NAMESPACE" -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null || true)"
+            if [ -n "$current" ]; then
+                printf '%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$current" "$desired" "$utilization"
+            fi
+            sleep 5
+        done
+    ) >"$HPA_SAMPLE_FILE" 2>/dev/null &
+    HPA_SAMPLE_PID=$!
+    scenario_exit=0
     node "$PROJECT_DIR/scripts/stress-scenario.js" \
         --config "$PROJECT_DIR/scripts/stress-scenario.kind-autoscale.example.json" \
         --url "http://127.0.0.1:$FUNCTION_PORT" \
@@ -295,7 +311,13 @@ if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
         --namespace "$NUCLIO_NAMESPACE" \
         --project "$NUCLIO_PROJECT" \
         --duration "$AUTOSCALE_PHASE_DURATION" \
-        --output "$LOG_DIR/autoscale-scenario.json"
+        --output "$LOG_DIR/autoscale-scenario.json" || scenario_exit=$?
+    kill "$HPA_SAMPLE_PID" 2>/dev/null || true
+    wait "$HPA_SAMPLE_PID" 2>/dev/null || true
+    HPA_SAMPLE_PID=""
+    if [ "$scenario_exit" != "0" ]; then
+        exit "$scenario_exit"
+    fi
     echo "Autoscaling scenario result: $LOG_DIR/autoscale-scenario.json"
     python3 - "$LOG_DIR/autoscale-scenario.json" <<'PY_AUTOSCALE_SUMMARY'
 import json
@@ -310,6 +332,25 @@ if replicas:
 else:
     print("Observed replica range: unavailable")
 PY_AUTOSCALE_SUMMARY
+    python3 - "$HPA_SAMPLE_FILE" <<'PY_HPA_SUMMARY'
+import sys
+
+rows = []
+with open(sys.argv[1], encoding="utf-8") as stream:
+    for line in stream:
+        parts = line.rstrip().split("\t")
+        if len(parts) >= 3:
+            rows.append(parts)
+if rows:
+    current = [int(row[1]) for row in rows]
+    desired = [int(row[2]) for row in rows if row[2].isdigit()]
+    print(f"HPA replica range: {min(current)}-{max(current)} current across {len(rows)} samples")
+    if desired:
+        print(f"HPA desired replica range: {min(desired)}-{max(desired)}")
+else:
+    print("HPA replica range: unavailable")
+PY_HPA_SUMMARY
+    echo "HPA samples: $HPA_SAMPLE_FILE"
     kubectl get hpa -n "$NUCLIO_NAMESPACE" -o wide || true
     kubectl top pods -n "$NUCLIO_NAMESPACE" 2>/dev/null || true
 fi
