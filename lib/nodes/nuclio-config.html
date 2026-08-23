@@ -9,6 +9,34 @@
         max-width: 600px;
     }
 
+    .nuclio-config-section {
+        margin: 18px 0 8px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid var(--red-ui-secondary-border-color, #ddd);
+        font-size: 1.05em;
+        font-weight: 600;
+    }
+
+    .nuclio-config-section:first-child {
+        margin-top: 0;
+    }
+
+    .nuclio-config-subsection {
+        margin: 12px 0 6px;
+        font-size: 0.95em;
+        font-weight: 600;
+    }
+
+    .nuclio-config-details {
+        margin-top: 12px;
+    }
+
+    .nuclio-config-details > summary {
+        padding: 4px 0;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
     #node-config-input-request-headers .red-ui-editableList-item-content {
         display: flex;
         align-items: center;
@@ -225,9 +253,10 @@
 </script>
 
 <script type="text/html" data-template-name="nuclio-config">
+    <h3 class="nuclio-config-section">Dashboard connection</h3>
     <div class="form-row">
         <label for="node-config-input-address">
-            <span>Nuclio Dashboard URL:</span>
+            <span>Dashboard URL</span>
         </label>
         <input type="text" id="node-config-input-address" placeholder="http://localhost:8070" />
         <div>
@@ -235,23 +264,74 @@
         </div>
     </div>    
     <div class="form-row">
-        <label for="node-config-input-publicAddress">
-            <span>Public Nuclio Dashboard URL (optional)</span>
-        </label>
-        <input type="text" id="node-config-input-publicAddress" placeholder="http://localhost:8070" />
-        <div>
-            <small>The address that YOU (and your browser) can reach nuclio by. This is just used for links to the nuclio dashboard and is not critical to operation. This could just be your local port forward address for simplicity.</small>
-        </div>
-    </div>
-    <div class="form-row">
         <label for="node-config-input-namespace">
-            <span>Nuclio Namespace</span>
+            <span>Nuclio function namespace</span>
         </label>
         <input type="text" id="node-config-input-namespace" placeholder="nuclio" />
         <div>
             <small>Namespace used to scope function and project requests. Defaults to <code>nuclio</code>.</small>
         </div>
     </div>
+    <div class="form-row">
+        <label for="node-config-input-publicAddress">
+            <span>Dashboard URL for editor links (optional)</span>
+        </label>
+        <input type="text" id="node-config-input-publicAddress" placeholder="http://localhost:8070" />
+        <div>
+            <small>Address used only for Dashboard links in the editor. It does not affect deployment or invocation.</small>
+        </div>
+    </div>
+
+    <details class="nuclio-config-details">
+        <summary>Dashboard access</summary>
+        <div class="form-row">
+            <label for="node-config-input-authType">Dashboard authentication</label>
+            <select id="node-config-input-authType" class="form-control">
+                <option value="none">None</option>
+                <option value="basic">Basic authentication</option>
+                <option value="bearer">Bearer token</option>
+            </select>
+            <div>
+                <small>Authentication is sent to the Nuclio dashboard from Node-RED. Credentials are not included in flow JSON, status, logs, or metrics.</small>
+            </div>
+        </div>
+        <div id="nuclio-basic-auth-fields">
+            <div class="form-row">
+                <label for="node-config-input-authUsername">Username</label>
+                <input type="text" id="node-config-input-authUsername" placeholder="username" />
+            </div>
+            <div class="form-row">
+                <label for="node-config-input-authPassword">Password</label>
+                <input type="text" id="node-config-input-authPassword" placeholder="password or environment variable" />
+            </div>
+        </div>
+        <div id="nuclio-bearer-auth-fields">
+            <div class="form-row">
+                <label for="node-config-input-authToken">Bearer token</label>
+                <input type="text" id="node-config-input-authToken" placeholder="token or environment variable" />
+            </div>
+        </div>
+        <div class="form-row node-input-list-row">
+            <label for="node-config-input-request-headers">Dashboard request headers</label>
+            <div>
+                <small>Optional headers sent with every dashboard request. Values support literals, environment variables, and credentials. Nuclio scope and transport headers are reserved.</small>
+            </div>
+            <ol id="node-config-input-request-headers"></ol>
+        </div>
+    </details>
+
+    <details class="nuclio-config-details">
+        <summary>Deployment policy</summary>
+        <div class="form-row">
+            <label for="node-config-input-deploymentPolicy">Deployment policy</label>
+            <input type="text" id="node-config-input-deploymentPolicy" placeholder="managed (default)" />
+            <div>
+                <small>Use <code>managed</code> to create, update, and self-heal functions. Use <code>disabled</code> to prevent writes in this environment. Existing remote functions are not deleted.</small>
+            </div>
+        </div>
+    </details>
+
+    <h3 class="nuclio-config-section">Invocation routing</h3>
     <div class="form-row">
         <label for="node-config-input-invocationUrlPreference">Invocation endpoint source</label>
         <select id="node-config-input-invocationUrlPreference" class="form-control">
@@ -281,90 +361,40 @@
         </div>
     </div>
 
-    <div class="form-row">
-        <label for="node-config-input-authType">Dashboard authentication</label>
-        <select id="node-config-input-authType" class="form-control">
-            <option value="none">None</option>
-            <option value="basic">Basic authentication</option>
-            <option value="bearer">Bearer token</option>
-        </select>
-        <div>
-            <small>Authentication is sent to the Nuclio dashboard from Node-RED. Credentials are not included in flow JSON, status, logs, or metrics.</small>
-        </div>
-    </div>
-    <div id="nuclio-basic-auth-fields">
-        <div class="form-row">
-            <label for="node-config-input-authUsername">Username</label>
-            <input type="text" id="node-config-input-authUsername" placeholder="username" />
-        </div>
-        <div class="form-row">
-            <label for="node-config-input-authPassword">Password</label>
-            <input type="text" id="node-config-input-authPassword" placeholder="password or environment variable" />
-        </div>
-    </div>
-    <div id="nuclio-bearer-auth-fields">
-        <div class="form-row">
-            <label for="node-config-input-authToken">Bearer token</label>
-            <input type="text" id="node-config-input-authToken" placeholder="token or environment variable" />
-        </div>
-    </div>
-    <div class="form-row node-input-list-row">
-        <label for="node-config-input-request-headers">Request headers</label>
-        <div>
-            <small>Optional headers sent with every dashboard request. Values support literals, environment variables, and credentials. Nuclio scope and transport headers are reserved.</small>
-        </div>
-        <ol id="node-config-input-request-headers"></ol>
-    </div>
-
-    <div class="form-row">
-        <label for="node-config-input-deploymentPolicy">Deployment policy</label>
-        <input type="text" id="node-config-input-deploymentPolicy" placeholder="managed (default)" />
-        <div>
-            <small>Use <code>managed</code> to create, update, and self-heal functions. Use <code>disabled</code> to prevent writes in this environment. Existing remote functions are not deleted.</small>
-        </div>
-    </div>
-
-    <!-- ------------------------- Reconciliation / timeouts ------------------------- -->
-
-    <details style="margin-top: 12px;">
-        <summary style="cursor: pointer; font-weight: 600;">Reconciliation (optional)</summary>
+    <details class="nuclio-config-details">
+        <summary style="cursor: pointer; font-weight: 600;">Operations (advanced)</summary>
         <div style="margin-top: 8px;">
-            <small>Controls how Node-RED polls and recovers functions on this server. Leave blank to use the built-in default. These values are shared by every function using this server.</small>
+            <small>These controls are shared by every function using this server. Leave them blank to use the built-in defaults.</small>
         </div>
-        <div class="form-row" style="margin-top: 10px;">
-            <label for="node-config-input-pollMs">Poll interval (ms)</label>
-            <input type="text" id="node-config-input-pollMs" placeholder="1000 ms (default)" />
-        </div>
+        <h4 class="nuclio-config-subsection">Request timeouts</h4>
         <div class="form-row">
-            <label for="node-config-input-readyPollMs">Ready poll (ms)</label>
-            <input type="text" id="node-config-input-readyPollMs" placeholder="5000 ms (default)" />
-        </div>
-        <div class="form-row">
-            <label for="node-config-input-backoffMs">Backoff (ms)</label>
-            <input type="text" id="node-config-input-backoffMs" placeholder="5000 ms (default)" />
-        </div>
-        <div class="form-row">
-            <label for="node-config-input-backoffMaxMs">Backoff max (ms)</label>
-            <input type="text" id="node-config-input-backoffMaxMs" placeholder="60000 ms (default)" />
-        </div>
-        <div class="form-row">
-            <label for="node-config-input-startStaggerMs">Start stagger (ms)</label>
-            <input type="text" id="node-config-input-startStaggerMs" placeholder="2000 ms (default)" />
-        </div>
-    </details>
-
-    <details style="margin-top: 8px;">
-        <summary style="cursor: pointer; font-weight: 600;">Timeouts (optional)</summary>
-        <div style="margin-top: 8px;">
-            <small>Controls HTTP and deployment request deadlines. Leave blank to use the built-in default. These values are shared by every function using this server.</small>
-        </div>
-        <div class="form-row" style="margin-top: 10px;">
-            <label for="node-config-input-requestTimeoutMs">Request timeout (ms)</label>
+            <label for="node-config-input-requestTimeoutMs">Dashboard request timeout (ms)</label>
             <input type="text" id="node-config-input-requestTimeoutMs" placeholder="10000 ms (default)" />
         </div>
         <div class="form-row">
-            <label for="node-config-input-deployTimeoutMs">Deploy timeout (ms)</label>
+            <label for="node-config-input-deployTimeoutMs">Deployment request timeout (ms)</label>
             <input type="text" id="node-config-input-deployTimeoutMs" placeholder="60000 ms (default)" />
+        </div>
+        <h4 class="nuclio-config-subsection">Status polling and recovery</h4>
+        <div class="form-row">
+            <label for="node-config-input-pollMs">Transition status interval (ms)</label>
+            <input type="text" id="node-config-input-pollMs" placeholder="1000 ms (default)" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-readyPollMs">Healthy status interval (ms)</label>
+            <input type="text" id="node-config-input-readyPollMs" placeholder="5000 ms (default)" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-backoffMs">Dashboard failure backoff (ms)</label>
+            <input type="text" id="node-config-input-backoffMs" placeholder="5000 ms (default)" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-backoffMaxMs">Maximum failure backoff (ms)</label>
+            <input type="text" id="node-config-input-backoffMaxMs" placeholder="60000 ms (default)" />
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-startStaggerMs">Startup deployment stagger (ms)</label>
+            <input type="text" id="node-config-input-startStaggerMs" placeholder="2000 ms (default)" />
         </div>
     </details>
 </script>

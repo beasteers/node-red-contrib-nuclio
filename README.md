@@ -64,22 +64,43 @@ be able to reach the repository or URL.
 
 ### Server settings
 
-Connection and reconciliation settings live on the **Nuclio Server** node.
+Dashboard connection, deployment policy, invocation routing, and shared operational settings live
+on the **Nuclio Server** node.
+
+#### Dashboard connection and access
 
 | Setting | Default | Description |
 | --- | --- | --- |
+| Dashboard URL | `NUCLIO_ADDRESS` | Address reachable by Node-RED. |
 | Namespace | `nuclio` | Namespace sent with dashboard requests. |
+| Dashboard URL for editor links | `http://localhost:8070` | Optional address used only for Dashboard links in the editor. |
+| Dashboard authentication | `none` | Optional Basic or Bearer authentication for dashboard requests. |
+| Dashboard request headers | blank | Additional credential-backed headers sent with every dashboard request. |
+
+#### Deployment policy
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| Deployment policy | `managed` | Set to `disabled` to prevent creates, updates, and self-healing. Existing functions are left untouched. |
+
+#### Invocation routing
+
+| Setting | Default | Description |
+| --- | --- | --- |
 | Invocation source | `service` | Use a stable service hostname or a Nuclio-reported internal/external URL. |
 | Service hostname template | `nuclio-{function}` | Stable function hostname. Docker Compose commonly uses `nuclio-nuclio-{function}`. |
 | External URL protocol | `https` | Protocol for scheme-less external URLs. |
-| Dashboard authentication | `none` | Optional Basic or Bearer authentication for dashboard requests. |
-| Request headers | blank | Additional credential-backed headers sent with every dashboard request. |
-| Deployment policy | `managed` | Set to `disabled` to prevent creates, updates, and self-healing. Existing functions are left untouched. |
-| Poll interval | `1000` | Poll interval while a function is building or transitioning. |
-| Ready poll | `5000` | Poll interval while a function is healthy. |
-| Backoff / maximum | `5000` / `60000` | Exponential backoff after dashboard errors. |
-| Start stagger | `2000` | Spreads initial deployments across startup. |
-| Request / deploy timeout | `10000` / `60000` | HTTP timeouts for reads and writes. |
+
+#### Operations (advanced)
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| Dashboard request timeout | `10000` | Timeout for dashboard reads and status requests. |
+| Deployment request timeout | `60000` | Timeout for dashboard deployment writes. |
+| Transition status interval | `1000` | Poll interval while a function is building or transitioning. |
+| Healthy status interval | `5000` | Poll interval while a function is healthy. |
+| Dashboard failure backoff / maximum | `5000` / `60000` | Exponential backoff after dashboard errors. |
+| Startup deployment stagger | `2000` | Spreads initial deployments across startup. |
 
 Blank settings use the built-in defaults. Settings that support typed input can read a value from
 the Node-RED process environment.
