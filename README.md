@@ -63,6 +63,18 @@ seconds and writes a timestamped event to the function logs; open the Status tab
 logs to observe it. This demonstrates trigger ownership, not durable batch scheduling, backfills,
 or workflow orchestration.
 
+The **07 Direct NATS trigger** tab demonstrates Nuclio request/reply messaging. Start the local
+NATS service with `docker compose up -d`, deploy the flow, then run:
+
+```bash
+docker run --rm --network node-red-contrib-nuclio_default natsio/nats-box:latest \
+  nats request -s nats://nats:4222 demo.nats.input '{"message":"hello"}'
+```
+
+The response is produced by Nuclio and returned on the NATS reply subject. Node-RED owns the
+function declaration and status view, while NATS and Nuclio own the message path. Nuclio currently
+documents the NATS trigger as a tech-preview feature.
+
 ## Function sources
 
 The Function tab supports these source types:

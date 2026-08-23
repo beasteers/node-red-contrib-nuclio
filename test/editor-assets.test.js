@@ -55,3 +55,16 @@ test('demo flow includes a Nuclio-owned Cron trigger', () => {
     assert.match(fn.configCode, /interval:\s*30s/);
     assert.match(fn.configCode, /body:/);
 });
+
+test('demo flow includes a direct NATS request/reply trigger', () => {
+    const flows = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'flows.json'), 'utf8'));
+    const tab = flows.find(node => node.type === 'tab' && node.label === '07 Direct NATS trigger');
+    const fn = flows.find(node => node.type === 'nuclio-function' && node.name === 'demo-nats-request');
+
+    assert.ok(tab, 'expected the NATS demo tab');
+    assert.ok(fn, 'expected the NATS-triggered Nuclio function');
+    assert.match(fn.configCode, /kind:\s*nats/);
+    assert.match(fn.configCode, /url:\s*nats:\/\/nats:4222/);
+    assert.match(fn.configCode, /topic:\s*demo\.nats\.input/);
+    assert.match(fn.configCode, /reply:\s*true/);
+});

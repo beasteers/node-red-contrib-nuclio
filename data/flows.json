@@ -289,6 +289,54 @@
         "wires": []
     },
     {
+        "id": "0000000000000090",
+        "type": "tab",
+        "label": "07 Direct NATS trigger",
+        "disabled": false,
+        "info": "Nuclio subscribes directly to NATS and replies to requesters. Use the documented nats-box command to send a request.",
+        "env": []
+    },
+    {
+        "id": "0000000000000091",
+        "type": "nuclio-project",
+        "name": "demo-messaging",
+        "nameType": "str"
+    },
+    {
+        "id": "0000000000000092",
+        "type": "nuclio-function",
+        "z": "0000000000000090",
+        "server": "0000000000000001",
+        "project": "0000000000000091",
+        "name": "demo-nats-request",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "import json\nfrom datetime import datetime, timezone\n\ndef handler(context, event):\n    body = getattr(event, 'body', None)\n    if isinstance(body, bytes):\n        body = body.decode('utf-8')\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    result = {\n        'trigger': 'nats',\n        'ran_at': datetime.now(timezone.utc).isoformat(),\n        'received': body,\n    }\n    context.logger.info(json.dumps(result))\n    return result",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  triggers:\n    nats:\n      kind: nats\n      url: nats://nats:4222\n      attributes:\n        topic: demo.nats.input\n        queueName: demo-nats\n        reply: true",
+        "env_vars": [],
+        "deploymentMode": "eager",
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "0000000000000093",
+        "type": "comment",
+        "z": "0000000000000090",
+        "name": "NATS request/reply",
+        "info": "Nuclio consumes demo.nats.input directly and returns the handler result on the NATS request reply subject. Run: docker run --rm --network node-red-contrib-nuclio_default natsio/nats-box:latest nats request -s nats://nats:4222 demo.nats.input '{\"message\":\"hello\"}'. NATS triggers are currently a Nuclio tech-preview feature.",
+        "x": 230,
+        "y": 100,
+        "wires": []
+    },
+    {
         "id": "0000000000000007",
         "type": "nuclio-function",
         "z": "0000000000000005",

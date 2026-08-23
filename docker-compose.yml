@@ -42,6 +42,13 @@ services:
     volumes:
       - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
 
+  nats:
+    image: nats:2.10-alpine
+    container_name: nats
+    restart: unless-stopped
+    ports:
+      - 4222:4222
+
   # # --------------------------------- Testing -------------------------------- #
 
   # grafana:
