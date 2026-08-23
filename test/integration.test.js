@@ -101,6 +101,7 @@ test('server authentication and custom headers are sent to the dashboard', async
     flow[0].authType = 'basic';
     flow[0].authUsername = 'dashboard-user';
     flow[0].authUsernameType = 'str';
+    flow[0].authPasswordType = 'cred';
     await load(flow, {
         srv: {
             authPassword: 'dashboard-password',
@@ -113,6 +114,26 @@ test('server authentication and custom headers are sent to the dashboard', async
     assert.equal(req.headers['x-organization'], 'team-a');
     assert.equal(req.headers['x-nuclio-project-name'], 'default');
     assert.equal(req.headers['x-nuclio-function-namespace'], 'nuclio');
+});
+
+test('server bearer authentication resolves an environment-typed token', async () => {
+    mock = await startMockNuclio();
+    const envName = 'NUCLIO_TEST_DASHBOARD_TOKEN';
+    const previous = process.env[envName];
+    process.env[envName] = 'environment-token';
+    try {
+        const flow = baseFlow(mock);
+        flow[0].authType = 'bearer';
+        flow[0].authToken = envName;
+        flow[0].authTokenType = 'env';
+        await load(flow);
+
+        const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+        assert.equal(req.headers.authorization, 'Bearer environment-token');
+    } finally {
+        if (previous === undefined) delete process.env[envName];
+        else process.env[envName] = previous;
+    }
 });
 
 test('execution controls merge into the configured HTTP trigger', async () => {

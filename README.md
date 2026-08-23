@@ -84,10 +84,11 @@ Connection and reconciliation settings live on the **Nuclio Server** node.
 Blank settings use the built-in defaults. Settings that support typed input can read a value from
 the Node-RED process environment.
 
-Dashboard authentication credentials and custom request-header values are stored as Node-RED
-credentials. Required Nuclio namespace and project headers cannot be overridden. The dashboard
-authentication mode is intentionally separate from custom headers so an integration-specific
-header can be used alongside Basic or Bearer authentication.
+Dashboard authentication values support literal, environment-variable, and credential typed
+inputs. Credential values and custom request-header values are stored as Node-RED credentials;
+choose the credential type for secrets. Required Nuclio namespace and project headers cannot be
+overridden. The dashboard authentication mode is intentionally separate from custom headers so
+an integration-specific header can be used alongside Basic or Bearer authentication.
 
 ### Function settings
 

@@ -59,6 +59,12 @@
         return headers;
     };
 
+    const nuclioServerAuthValue = (node, field) => {
+        const type = node[`${field}Type`] || (node.credentials?.[field] ? 'cred' : 'str');
+        if (type === 'cred') return node.credentials?.[field] === '__PWRD__' ? '' : (node.credentials?.[field] || '');
+        return node[field] || '';
+    };
+
     RED.nodes.registerType('nuclio-config', {
         category: 'config',
         icon: "nuclio.io.ico",
@@ -76,6 +82,10 @@
             authType: { value: 'none' },
             authUsername: { value: '' },
             authUsernameType: { value: 'str' },
+            authPassword: { value: '' },
+            authPasswordType: { value: 'cred' },
+            authToken: { value: '' },
+            authTokenType: { value: 'cred' },
             deploymentPolicy: { value: 'managed' },
             deploymentPolicyType: { value: 'str' },
             // Shared connection, timeout, and reconciliation settings
@@ -121,10 +131,18 @@
                 default: this.authUsernameType || 'str',
                 types: ['str', 'env'],
             });
+            $('#node-config-input-authPassword').typedInput({
+                default: this.authPasswordType || 'cred',
+                types: ['str', 'env', 'cred'],
+            });
+            $('#node-config-input-authToken').typedInput({
+                default: this.authTokenType || 'cred',
+                types: ['str', 'env', 'cred'],
+            });
             $('#node-config-input-authType').val(this.authType || 'none');
             $('#node-config-input-authUsername').val(this.authUsername || '');
-            $('#node-config-input-authPassword').val(this.credentials?.authPassword || '');
-            $('#node-config-input-authToken').val(this.credentials?.authToken || '');
+            $('#node-config-input-authPassword').val(nuclioServerAuthValue(this, 'authPassword'));
+            $('#node-config-input-authToken').val(nuclioServerAuthValue(this, 'authToken'));
 
             let requestHeaders = [];
             try {
@@ -158,17 +176,35 @@
             this.authUsernameType = $('#node-config-input-authUsername').typedInput('type');
             this.credentials = this.credentials || {};
 
-            const password = $('#node-config-input-authPassword').val() || '';
-            const token = $('#node-config-input-authToken').val() || '';
+            const saveAuthValue = field => {
+                const input = $(`#node-config-input-${field}`);
+                const type = input.typedInput('type');
+                const value = input.typedInput('value') || '';
+                this[`${field}Type`] = type;
+                if (type === 'cred') {
+                    delete this[field];
+                    if (value) this.credentials[field] = value;
+                    else if (this.credentials[field] !== '__PWRD__') delete this.credentials[field];
+                } else {
+                    this[field] = value;
+                    delete this.credentials[field];
+                }
+            };
             if (this.authType === 'basic') {
-                if (password) this.credentials.authPassword = password;
-                else if (this.credentials.authPassword !== '__PWRD__') delete this.credentials.authPassword;
+                saveAuthValue('authPassword');
+                delete this.authToken;
+                delete this.authTokenType;
                 delete this.credentials.authToken;
             } else if (this.authType === 'bearer') {
-                if (token) this.credentials.authToken = token;
-                else if (this.credentials.authToken !== '__PWRD__') delete this.credentials.authToken;
+                saveAuthValue('authToken');
+                delete this.authPassword;
+                delete this.authPasswordType;
                 delete this.credentials.authPassword;
             } else {
+                delete this.authPassword;
+                delete this.authPasswordType;
+                delete this.authToken;
+                delete this.authTokenType;
                 delete this.credentials.authPassword;
                 delete this.credentials.authToken;
             }
@@ -263,13 +299,13 @@
         </div>
         <div class="form-row">
             <label for="node-config-input-authPassword">Password</label>
-            <input type="password" id="node-config-input-authPassword" placeholder="password" />
+            <input type="text" id="node-config-input-authPassword" placeholder="password or environment variable" />
         </div>
     </div>
     <div id="nuclio-bearer-auth-fields">
         <div class="form-row">
             <label for="node-config-input-authToken">Bearer token</label>
-            <input type="password" id="node-config-input-authToken" placeholder="token" />
+            <input type="text" id="node-config-input-authToken" placeholder="token or environment variable" />
         </div>
     </div>
     <div class="form-row node-input-list-row">
@@ -350,6 +386,6 @@
         <dt>Deployment policy</dt>
         <dd><code>managed</code> (the default) allows deployment and self-healing. <code>disabled</code> prevents writes and leaves existing remote functions untouched. The value can use the <code>env</code> type.</dd>
         <dt>Dashboard authentication</dt>
-        <dd>Optional Basic or Bearer authentication sent to the dashboard. Additional request headers are configured separately and stored as credentials.</dd>
+        <dd>Optional Basic or Bearer authentication sent to the dashboard. Passwords and tokens support literal, environment, and credential typed inputs; choose credentials for secrets. Additional request headers are configured separately.</dd>
     </dl>
 </script>

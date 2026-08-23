@@ -14,8 +14,15 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
     for (const [index, script] of scripts.entries()) {
         assert.doesNotThrow(() => new Function(script), `inline editor script ${index + 1}`);
     }
+    const serverHtml = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-config.html'), 'utf8');
     assert.match(html, /deploymentVariables:\s*\{\s*type:\s*["']text["']/,
         'deployment variables must be declared in the editor credential definition');
+    assert.match(serverHtml, /authPasswordType:\s*\{\s*value:\s*["']cred["']\s*\}/,
+        'dashboard passwords must expose a typed-input mode');
+    assert.match(serverHtml, /authTokenType:\s*\{\s*value:\s*["']cred["']\s*\}/,
+        'dashboard tokens must expose a typed-input mode');
+    assert.match(serverHtml, /types:\s*\[["']str["'],\s*["']env["'],\s*["']cred["']\]/,
+        'dashboard credentials must support literal, environment, and credential values');
     assert.doesNotMatch(html, /secret_vars|Credential Overrides/,
         'deprecated credential override fields must not remain in the editor');
 });
