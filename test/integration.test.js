@@ -510,6 +510,10 @@ test('status summary and details are selectively returned', async () => {
     assert.equal(summary.body.status.state, 'ready');
     assert.equal(summary.body.spec.build, undefined);
     assert.equal(summary.body.spec.runtime, 'python:3.12');
+    assert.equal(summary.body.invocation.preference, 'internal');
+    assert.deepEqual(summary.body.invocation.internalUrls, [`http://127.0.0.1:${mock.port}`]);
+    assert.deepEqual(summary.body.invocation.externalUrls, []);
+    assert.deepEqual(summary.body.invocation.serviceUrls, [`http://nuclio-${FN}:8080`]);
     assert.equal(
         mock.requests.filter(r => r.method === 'GET' && r.url === `/api/functions/${FN}`).length,
         statusReadsBeforeSummary,

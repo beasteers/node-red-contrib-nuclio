@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getInvocationUrl, getInvocationUrls, serviceInvocationUrl } = require('../lib/nuclio-invocation-urls');
+const { getInvocationUrl, getInvocationUrlOptions, getInvocationUrls, serviceInvocationUrl } = require('../lib/nuclio-invocation-urls');
 
 
 test('internal preference uses the reported internal url', () => {
@@ -25,6 +25,23 @@ test('getInvocationUrls preserves explicit schemes and supports external prefere
         },
     }, { server: { invocationUrlPreference: 'external' } });
     assert.deepEqual(urls, ['http://fn.example.com']);
+});
+
+test('getInvocationUrlOptions exposes every configured invocation endpoint source', () => {
+    const options = getInvocationUrlOptions({
+        status: {
+            internalInvocationUrls: ['10.0.0.1:8080'],
+            externalInvocationUrls: ['fn.example.com'],
+        },
+    }, {
+        name: 'echo',
+        server: { invocationUrlPreference: 'internal' },
+    });
+    assert.equal(options.preference, 'internal');
+    assert.deepEqual(options.urls, ['http://10.0.0.1:8080']);
+    assert.deepEqual(options.serviceUrls, ['http://nuclio-echo:8080']);
+    assert.deepEqual(options.internalUrls, ['http://10.0.0.1:8080']);
+    assert.deepEqual(options.externalUrls, ['https://fn.example.com']);
 });
 
 test('getInvocationUrls applies the configured protocol to scheme-less external urls', () => {

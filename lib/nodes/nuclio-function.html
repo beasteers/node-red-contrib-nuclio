@@ -347,7 +347,7 @@
     .nuclio-endpoint-list { display: grid; gap: 6px; }
     .nuclio-endpoint-row {
         display: grid;
-        grid-template-columns: 70px minmax(0, 1fr);
+        grid-template-columns: 70px minmax(0, 1fr) auto;
         align-items: center;
         gap: 6px;
         padding: 4px 0;
@@ -356,6 +356,18 @@
     }
     .nuclio-endpoint-row:first-child { border-top: 0; }
     .nuclio-endpoint-label { color: var(--nuclio-muted); }
+    .nuclio-endpoint-active {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 5px;
+        border: 1px solid var(--nuclio-success-border);
+        border-radius: 999px;
+        color: var(--nuclio-success);
+        font-size: 9px;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+    }
     .nuclio-endpoint-value {
         min-width: 0;
         overflow: hidden;
@@ -461,7 +473,7 @@
         .nuclio-status-actions a,
         .nuclio-status-actions button { flex: 1 1 auto; text-align: center; }
         .nuclio-status-summary-grid { grid-template-columns: 1fr; }
-        .nuclio-endpoint-row { grid-template-columns: 62px minmax(0, 1fr); }
+        .nuclio-endpoint-row { grid-template-columns: 62px minmax(0, 1fr) auto; }
     }
 
     </style>
@@ -1281,20 +1293,25 @@ rev /dev/stdin
             const asList = (value) => Array.isArray(value) ? value.filter(Boolean) : (value ? [value] : []);
 
             const renderEndpoints = (status, invocation) => {
-                const effective = asList(invocation?.urls);
-                const endpoints = effective.length
-                    ? effective.map((url, index) => ({ label: index === 0 ? 'Active' : 'Candidate', url }))
-                    : [
-                        ...asList(status.internalInvocationUrls).map(url => ({ label: 'Reported internal', url })),
-                        ...asList(status.externalInvocationUrls).map(url => ({ label: 'Reported external', url })),
-                    ];
+                const preference = invocation?.preference || 'service';
+                const activeUrls = new Set(asList(invocation?.urls));
+                const groups = [
+                    { key: 'service', label: 'Service', urls: asList(invocation?.serviceUrls) },
+                    { key: 'internal', label: 'Internal', urls: asList(invocation?.internalUrls || status.internalInvocationUrls) },
+                    { key: 'external', label: 'External', urls: asList(invocation?.externalUrls || status.externalInvocationUrls) },
+                ];
+                const endpoints = groups.flatMap(({ key, label, urls }) => urls.map(url => ({
+                    label,
+                    url,
+                    active: activeUrls.has(url) && key === preference,
+                })));
                 const container = $('#nuclio-endpoints');
                 if (!endpoints.length) {
                     container.html('<div class="nuclio-status-section-note">No invocation endpoint available.</div>');
                     return;
                 }
-                container.html(endpoints.map(({ label, url }) =>
-                    `<div class="nuclio-endpoint-row"><span class="nuclio-endpoint-label">${esc(label)}</span><span class="nuclio-endpoint-value" title="${esc(url)}">${esc(url)}</span></div>`
+                container.html(endpoints.map(({ label, url, active }) =>
+                    `<div class="nuclio-endpoint-row"><span class="nuclio-endpoint-label">${esc(label)}</span><span class="nuclio-endpoint-value" title="${esc(url)}">${esc(url)}</span>${active ? '<span class="nuclio-endpoint-active">Active</span>' : '<span></span>'}</div>`
                 ).join(''));
             };
 
@@ -1307,13 +1324,11 @@ rev /dev/stdin
                 const tone = statusTone(state);
                 const server = RED.nodes.node(node.server);
                 const preference = invocation.preference || server?.invocationUrlPreference || 'service';
-                const mode = preference === 'service'
-                    ? 'Service name'
-                    : preference === 'internal'
-                        ? 'Dashboard internal URL'
-                        : preference === 'external'
-                            ? 'External URL'
-                            : 'Service name';
+                const mode = preference === 'internal'
+                    ? 'Internal'
+                    : preference === 'external'
+                        ? 'External'
+                        : 'Service';
                 const numberValue = value => {
                     if (typeof value === 'number' && Number.isFinite(value)) return value;
                     if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
@@ -1345,7 +1360,7 @@ rev /dev/stdin
                 $('#nuclio-runtime-meta').text(spec.handler ? `Handler: ${spec.handler}` : 'Handler not reported');
                 $('#nuclio-scale-value').text(scaleValue);
                 $('#nuclio-scale-meta').text(scaleMeta);
-                $('#nuclio-invocation-mode').text(mode);
+                $('#nuclio-invocation-mode').text(`Strategy: ${mode}`);
                 if (canUpdateElement(statusElement('nuclio-status'))) {
                     const signals = { ...status };
                     delete signals.state;

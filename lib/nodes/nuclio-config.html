@@ -331,35 +331,37 @@
         </div>
     </details>
 
-    <h3 class="nuclio-config-section">Invocation routing</h3>
-    <div class="form-row">
-        <label for="node-config-input-invocationUrlPreference">Invocation endpoint source</label>
-        <select id="node-config-input-invocationUrlPreference" class="form-control">
-            <option value="service">Stable service hostname</option>
-            <option value="internal">Nuclio-reported internal URL</option>
-            <option value="external">Nuclio-reported external URL</option>
-        </select>
-        <div>
-            <small>Choose exactly which endpoint source Node-RED should call. A stable service hostname avoids stale container or pod IP metadata.</small>
+    <details class="nuclio-config-details">
+        <summary>Invocation routing</summary>
+        <div class="form-row">
+            <label for="node-config-input-invocationUrlPreference">Invocation endpoint source</label>
+            <select id="node-config-input-invocationUrlPreference" class="form-control">
+                <option value="service">Stable service hostname</option>
+                <option value="internal">Nuclio-reported internal URL</option>
+                <option value="external">Nuclio-reported external URL</option>
+            </select>
+            <div>
+                <small>Choose exactly which endpoint source Node-RED should call. A stable service hostname avoids stale container or pod IP metadata.</small>
+            </div>
         </div>
-    </div>
-    <div class="form-row" id="nuclio-service-host-row">
-        <label for="node-config-input-internalInvocationServiceHost">Stable service hostname template</label>
-        <input type="text" id="node-config-input-internalInvocationServiceHost" placeholder="nuclio-{function} (Kubernetes default)" />
-        <div>
-            <small>Used only with Stable service hostname. Use <code>{function}</code> for the function name. Leave blank to use the Kubernetes default <code>nuclio-{function}</code>. Docker Compose commonly needs <code>nuclio-nuclio-{function}</code>.</small>
+        <div class="form-row" id="nuclio-service-host-row">
+            <label for="node-config-input-internalInvocationServiceHost">Stable service hostname template</label>
+            <input type="text" id="node-config-input-internalInvocationServiceHost" placeholder="nuclio-{function} (Kubernetes default)" />
+            <div>
+                <small>Used only with Stable service hostname. Use <code>{function}</code> for the function name. Leave blank to use the Kubernetes default <code>nuclio-{function}</code>. Docker Compose commonly needs <code>nuclio-nuclio-{function}</code>.</small>
+            </div>
         </div>
-    </div>
-    <div class="form-row" id="nuclio-external-protocol-row">
-        <label for="node-config-input-externalInvocationProtocol">External URL protocol</label>
-        <select id="node-config-input-externalInvocationProtocol" class="form-control">
-            <option value="https">HTTPS</option>
-            <option value="http">HTTP</option>
-        </select>
-        <div>
-            <small>Used only when Nuclio reports an external host without a scheme. Explicit http:// or https:// URLs are preserved.</small>
+        <div class="form-row" id="nuclio-external-protocol-row">
+            <label for="node-config-input-externalInvocationProtocol">External URL protocol</label>
+            <select id="node-config-input-externalInvocationProtocol" class="form-control">
+                <option value="https">HTTPS</option>
+                <option value="http">HTTP</option>
+            </select>
+            <div>
+                <small>Used only when Nuclio reports an external host without a scheme. Explicit http:// or https:// URLs are preserved.</small>
+            </div>
         </div>
-    </div>
+    </details>
 
     <details class="nuclio-config-details">
         <summary style="cursor: pointer; font-weight: 600;">Operations (advanced)</summary>
