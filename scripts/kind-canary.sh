@@ -18,6 +18,18 @@ NUCLIO_VERSION="${NUCLIO_VERSION:-1.17.3}"
 NUCLIO_CHART_VERSION="${NUCLIO_CHART_VERSION:-0.23.3}"
 CANARY_IMAGE="${CANARY_IMAGE:-node-red-nuclio-kind-canary:latest}"
 KIND_CANARY_KEEP_CLUSTER="${KIND_CANARY_KEEP_CLUSTER:-0}"
+KIND_CANARY_AUTOSCALE="${KIND_CANARY_AUTOSCALE:-0}"
+CANARY_MIN_REPLICAS="${CANARY_MIN_REPLICAS:-1}"
+CANARY_MAX_REPLICAS="${CANARY_MAX_REPLICAS:-1}"
+CANARY_TARGET_CPU="${CANARY_TARGET_CPU:-50}"
+CANARY_CPU_BURN_MS="${CANARY_CPU_BURN_MS:-0}"
+METRICS_SERVER_VERSION="${METRICS_SERVER_VERSION:-v0.7.2}"
+AUTOSCALE_PHASE_DURATION="${AUTOSCALE_PHASE_DURATION:-60}"
+
+if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
+    [ "$CANARY_MAX_REPLICAS" = "1" ] && CANARY_MAX_REPLICAS=3
+    [ "$CANARY_CPU_BURN_MS" = "0" ] && CANARY_CPU_BURN_MS=20
+fi
 
 DASHBOARD_PORT="${DASHBOARD_PORT:-18070}"
 NODE_RED_PORT="${NODE_RED_PORT:-18880}"
@@ -125,6 +137,17 @@ kind "${kind_args[@]}" \
 CLUSTER_CREATED=1
 kubectl --context "kind-$KIND_CLUSTER_NAME" config use-context "kind-$KIND_CLUSTER_NAME" >/dev/null
 
+if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
+    echo "Installing Kubernetes metrics-server $METRICS_SERVER_VERSION"
+    kubectl apply -f "https://github.com/kubernetes-sigs/metrics-server/releases/download/$METRICS_SERVER_VERSION/components.yaml" \
+        >"$LOG_DIR/metrics-server.log" 2>&1
+    kubectl patch deployment metrics-server -n kube-system --type='json' \
+        -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"},{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP"}]' \
+        >>"$LOG_DIR/metrics-server.log" 2>&1
+    kubectl rollout status deployment/metrics-server -n kube-system --timeout=5m \
+        >>"$LOG_DIR/metrics-server.log" 2>&1
+fi
+
 echo "Installing Nuclio $NUCLIO_VERSION from Helm chart $NUCLIO_CHART_VERSION"
 helm repo add nuclio https://nuclio.github.io/nuclio/charts --force-update >/dev/null
 helm repo update >/dev/null
@@ -162,7 +185,17 @@ CMD ["processor"]
 EOF_DOCKERFILE
 
 cat >"$BUILD_DIR/main.py" <<'EOF_FUNCTION'
+import math
+import os
+import time
+
+
 def handler(context, event):
+    burn_ms = int(os.environ.get("NUCLIO_CANARY_CPU_BURN_MS", "0"))
+    deadline = time.perf_counter() + (burn_ms / 1000)
+    value = 0.0
+    while time.perf_counter() < deadline:
+        value = math.sqrt(value + 1.0)
     return {"ok": True, "echo": event.body}
 EOF_FUNCTION
 
@@ -197,7 +230,7 @@ cat >"$NODE_RED_USER_DIR/flows.json" <<EOF_FLOWS
   {"id":"canary-tab","type":"tab","label":"KinD Canary","disabled":false,"info":""},
   {"id":"canary-server","type":"nuclio-config","address":"$dashboard_url","addressType":"str","namespace":"$NUCLIO_NAMESPACE","namespaceType":"str","publicAddress":"$dashboard_url","publicAddressType":"str","invocationUrlPreference":"service","internalInvocationServiceHost":"127.0.0.1:$FUNCTION_PORT","internalInvocationServiceHostType":"str","deploymentPolicy":"managed","requestTimeoutMs":"10000","deployTimeoutMs":"60000"},
   {"id":"canary-project","type":"nuclio-project","name":"$NUCLIO_PROJECT","nameType":"str"},
-  {"id":"canary-function","type":"nuclio-function","server":"canary-server","project":"canary-project","name":"$CANARY_FUNCTION_NAME","runtime":"python:3.12","sourceType":"image","codeEntryPath":"$CANARY_IMAGE","deploymentMode":"eager","maxSelfHealAttempts":"1","redeployDeadlineMs":"120000","autoRedeployOnError":"false","autoRedeployOnErrorType":"bool","configCode":"spec:\\n  imagePullPolicy: IfNotPresent\\n"},
+  {"id":"canary-function","type":"nuclio-function","server":"canary-server","project":"canary-project","name":"$CANARY_FUNCTION_NAME","runtime":"python:3.12","sourceType":"image","codeEntryPath":"$CANARY_IMAGE","deploymentMode":"eager","maxSelfHealAttempts":"1","redeployDeadlineMs":"120000","autoRedeployOnError":"false","autoRedeployOnErrorType":"bool","configCode":"spec:\\n  imagePullPolicy: IfNotPresent\\n  minReplicas: $CANARY_MIN_REPLICAS\\n  maxReplicas: $CANARY_MAX_REPLICAS\\n  targetCPU: $CANARY_TARGET_CPU\\n  env:\\n    - name: NUCLIO_CANARY_CPU_BURN_MS\\n      value: \"$CANARY_CPU_BURN_MS\"\\n"},
   {"id":"canary-http-in","type":"http in","z":"canary-tab","name":"","url":"/kind-canary","method":"post","upload":false,"swaggerDoc":"","x":120,"y":120,"wires":[["canary-invoke"]]},
   {"id":"canary-invoke","type":"nuclio","z":"canary-tab","function":"canary-function","name":"","timeoutMs":"30000","maxInFlight":"1","retries":"0","retryDelayMs":"500","headers":[],"x":320,"y":120,"wires":[["canary-http-response"],[]]},
   {"id":"canary-http-response","type":"http response","z":"canary-tab","name":"","statusCode":"","headers":{},"x":530,"y":120,"wires":[]}
@@ -251,3 +284,32 @@ assert value.get("echo") == {"hello": "kind"}, value
 '
 
 echo "Canary function is ready and invocation succeeded."
+
+if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
+    echo "Running phased autoscaling scenario"
+    node "$PROJECT_DIR/scripts/stress-scenario.js" \
+        --config "$PROJECT_DIR/scripts/stress-scenario.kind-autoscale.example.json" \
+        --url "http://127.0.0.1:$FUNCTION_PORT" \
+        --dashboard "$dashboard_url" \
+        --function "$CANARY_FUNCTION_NAME" \
+        --namespace "$NUCLIO_NAMESPACE" \
+        --project "$NUCLIO_PROJECT" \
+        --duration "$AUTOSCALE_PHASE_DURATION" \
+        --output "$LOG_DIR/autoscale-scenario.json"
+    echo "Autoscaling scenario result: $LOG_DIR/autoscale-scenario.json"
+    python3 - "$LOG_DIR/autoscale-scenario.json" <<'PY_AUTOSCALE_SUMMARY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    result = json.load(stream)
+samples = [sample for phase in result.get("phases", []) for sample in phase.get("samples", [])]
+replicas = [sample["replicas"] for sample in samples if isinstance(sample.get("replicas"), int)]
+if replicas:
+    print(f"Observed replica range: {min(replicas)}-{max(replicas)} across {len(replicas)} status samples")
+else:
+    print("Observed replica range: unavailable")
+PY_AUTOSCALE_SUMMARY
+    kubectl get hpa -n "$NUCLIO_NAMESPACE" -o wide || true
+    kubectl top pods -n "$NUCLIO_NAMESPACE" 2>/dev/null || true
+fi

@@ -34,6 +34,13 @@ const parseCli = argv => {
         quiet: argv.includes('--quiet'),
         failFast: argv.includes('--fail-fast'),
         overrides: Object.fromEntries([
+            ['trigger', optionValue(argv, 'trigger')],
+            ['url', optionValue(argv, 'url')],
+            ['function', optionValue(argv, 'function')],
+            ['dashboard', optionValue(argv, 'dashboard')],
+            ['namespace', optionValue(argv, 'namespace')],
+            ['project', optionValue(argv, 'project')],
+            ['endpoint', optionValue(argv, 'endpoint')],
             ['duration', optionValue(argv, 'duration')],
             ['concurrency', optionValue(argv, 'concurrency')],
             ['timeout', optionValue(argv, 'timeout')],
@@ -48,6 +55,12 @@ const usage = () => `Usage:
 Options:
   --config <path>             JSON scenario definition (required)
   --output <path>             Write the complete JSON result
+  --url <url>                 Override the HTTP target
+  --function <name>           Override the function used for status samples
+  --dashboard <url>           Override the dashboard used for status samples
+  --namespace <name>          Override the dashboard namespace
+  --project <name>            Override the dashboard project
+  --endpoint external|internal Override the endpoint family
   --duration <seconds>        Override every phase duration
   --concurrency <count>       Override every phase client limit
   --timeout <ms>              Override every phase timeout

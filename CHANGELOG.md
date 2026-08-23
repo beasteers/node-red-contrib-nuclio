@@ -10,6 +10,7 @@ All notable changes to this project are documented here.
 - Add a direct HTTP, MQTT, and NATS stress-test harness with latency, throughput, error, and status-sample reporting.
 - Add a configuration-driven sequential stress matrix runner for comparing trigger and load cases.
 - Add phased stress scenarios for sustained saturation and autoscaling ramp, hold, and recovery tests.
+- Add an opt-in KinD autoscaling canary with metrics-server and replica-range reporting.
 
 ## [3.1.0] - 2026-08-23
 
