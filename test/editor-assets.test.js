@@ -163,7 +163,7 @@ test('function editor uses typeField for recovery-policy types', () => {
     const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
     assert.match(html, /typeField: typeFieldSelector/,
         'function typed inputs must delegate type persistence to Node-RED');
-    for (const field of ['maxSelfHealAttempts', 'redeployDeadlineMs', 'autoRedeployOnError']) {
+    for (const field of ['maxSelfHealAttempts', 'redeployDeadlineMs', 'autoRedeployOnUnhealthy', 'autoRedeployOnError']) {
         assert.match(html, new RegExp(`id=["']node-config-input-${field}Type["']`),
             `${field} must have a persisted type field`);
     }

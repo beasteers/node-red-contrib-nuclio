@@ -552,9 +552,12 @@ test('failed deploy does not wedge the node (redeploying clears, retries continu
     await waitReady(fn, { timeout: 10000 });
 });
 
-test('unhealthy function is redeployed automatically', async () => {
+test('opt-in unhealthy recovery redeploys after consecutive observations', async () => {
     mock = await startMockNuclio();
-    await load(baseFlow(mock));
+    await load(baseFlow(mock, {
+        autoRedeployOnUnhealthy: 'true',
+        autoRedeployOnUnhealthyType: 'bool',
+    }));
     const fn = helper.getNode('fn');
     await waitReady(fn);
 
@@ -563,6 +566,25 @@ test('unhealthy function is redeployed automatically', async () => {
     // config is unchanged, so recovery is a desiredState PATCH
     const patch = await mock.waitFor(r => r.method === 'PATCH', { timeout: 10000 });
     assert.deepEqual(patch.body, { desiredState: 'ready' });
+});
+
+test('Nuclio can recover an unhealthy function without a Node-RED redeploy', async () => {
+    mock = await startMockNuclio();
+    const flow = baseFlow(mock);
+    flow[0].pollMs = '25';
+    flow[0].readyPollMs = '50';
+    await load(flow);
+    const fn = helper.getNode('fn');
+    await waitReady(fn);
+
+    mock.requests.length = 0;
+    mock.setFnState(FN, 'ready', ['unhealthy', 'ready']);
+
+    await waitUntil(() => fn.fnState === 'unhealthy', { timeout: 3000, msg: 'Nuclio unhealthy observation' });
+    assert.equal(mock.requests.filter(isDeployWrite).length, 0);
+
+    await waitUntil(() => fn.fnState === 'ready', { timeout: 3000, msg: 'Nuclio recovery to ready' });
+    assert.equal(mock.requests.filter(isDeployWrite).length, 0);
 });
 
 /* -------------------------------------------------------------------------- */
@@ -579,7 +601,14 @@ test('server cadence + function recovery resolve from node config', async () => 
         invocationUrlPreference: 'external',
         externalInvocationProtocol: 'http',
     });  // server node
-    Object.assign(flow[1], { maxSelfHealAttempts: '9', redeployDeadlineMs: '30000', autoRedeployOnError: 'true', autoRedeployOnErrorType: 'bool' });  // function node
+    Object.assign(flow[1], {
+        maxSelfHealAttempts: '9',
+        redeployDeadlineMs: '30000',
+        autoRedeployOnUnhealthy: 'true',
+        autoRedeployOnUnhealthyType: 'bool',
+        autoRedeployOnError: 'true',
+        autoRedeployOnErrorType: 'bool',
+    });  // function node
     await load(flow);
 
     const srv = helper.getNode('srv');
@@ -592,6 +621,7 @@ test('server cadence + function recovery resolve from node config', async () => 
     const fn = helper.getNode('fn');
     assert.equal(fn.maxSelfHealAttempts, 9);
     assert.equal(fn.redeployDeadlineMs, 30000);
+    assert.equal(fn.autoRedeployOnUnhealthy, true);
     assert.equal(fn.autoRedeployOnError, true);
 });
 
@@ -625,6 +655,7 @@ test('blank config fields use built-in defaults, not process environment fallbac
         assert.equal(helper.getNode('fn').project.name, 'default');
         assert.equal(helper.getNode('fn').maxSelfHealAttempts, 5);
         assert.equal(helper.getNode('fn').redeployDeadlineMs, 120000);
+        assert.equal(helper.getNode('fn').autoRedeployOnUnhealthy, false);
         assert.equal(helper.getNode('fn').autoRedeployOnError, false);
         assert.equal(helper.getNode('inv').timeoutMs, 30000);
         assert.equal(helper.getNode('inv').maxInFlight, 0);

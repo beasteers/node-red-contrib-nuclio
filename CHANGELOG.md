@@ -9,6 +9,9 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- Make unhealthy-state recovery opt-in, keep unknown states observational, and preserve Nuclio-owned
+  platform recovery as the default.
+
 ## [3.1.1] - 2026-08-24
 
 - Persist top-level typed-input selections through Node-RED `typeField` companions instead of manual editor save handling.

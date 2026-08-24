@@ -150,14 +150,18 @@ test('scaledToZero polls at the scaledToZero interval without self-healing', asy
     assert.equal(mock.requests.filter(isDeployWrite).length, 0);
 });
 
-test('state null is treated as unhealthy-unknown with debounce', async () => {
+test('state null is observed as unknown without mutation', async () => {
     mock = await startMockNuclio({ functions: { [FN]: { metadata: { name: FN }, spec: {} } }, state: null });
     await load(baseFlow(mock));
 
     const fn = helper.getNode('fn');
     await waitUntil(() => fn.fnState === null, { timeout: 5000 });
-    // first poll: unhealthyStreak=1, debounce holds (no deploy)
+    mock.requests.length = 0;
+    // Missing status is not evidence that Node-RED should redeploy, even when
+    // an unhealthy recovery policy is configured elsewhere.
     await waitUntil(() => fn.lastStatus?.text === 'Unhealthy?', { timeout: 5000 });
+    assert.equal(mock.requests.filter(isDeployWrite).length, 0);
+    assert.equal(fn.unhealthyStreak, 0);
 });
 
 test('legacy migration works against server-enriched config', async () => {
@@ -311,4 +315,3 @@ test('invoke node mirrors outage status from function node', async () => {
         { msg: 'invoke node mirrors outage status from function node' },
     );
 });
-

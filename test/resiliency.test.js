@@ -25,6 +25,7 @@ const makeNode = (address, overrides = {}) => ({
     selfHealAttempts: 0,
     maxSelfHealAttempts: 3,
     redeployDeadlineMs: 50,
+    autoRedeployOnUnhealthy: false,
     autoRedeployOnError: false,
     fnInvocationStatus: -1,
     counter: 0,
@@ -102,7 +103,7 @@ test('a freshly-succeeding function still polls status, at the ready interval', 
     assert.ok(mock.requests.some(r => r.method === 'GET' && r.url === '/api/functions/fn'));
 });
 
-test('a stale success does not suppress observation or self-heal evidence', async () => {
+test('a stale success does not suppress status observation', async () => {
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'ready' });
     const node = makeNode(mock.url, { fnInvocationStatus: 200, lastInvocationAt: Date.now() - 60000 });
     const ms = await reconcileStep(node);
@@ -143,7 +144,7 @@ test('backoff resets the moment the dashboard answers again', async () => {
 test('unhealthy self-heal is bounded, then gives up with an honest status', async () => {
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
     const clock = createClock();
-    const node = makeNode(mock.url, { clock });
+    const node = makeNode(mock.url, { clock, autoRedeployOnUnhealthy: true });
 
     // Advance the injected clock instead of waiting for each redeploy deadline.
     await reconcileStep(node); // first unhealthy reading: debounce holds
@@ -161,7 +162,7 @@ test('unhealthy self-heal is bounded, then gives up with an honest status', asyn
 test('self-heal waits for two consecutive unhealthy readings', async () => {
     // debounce: one flaky health verdict must not churn a redeploy
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
-    const node = makeNode(mock.url);
+    const node = makeNode(mock.url, { autoRedeployOnUnhealthy: true });
 
     await reconcileStep(node);  // reading 1: debounce holds
     assert.equal(deployWrites(mock).length, 0);
@@ -172,21 +173,22 @@ test('self-heal waits for two consecutive unhealthy readings', async () => {
     assert.equal(node.selfHealAttempts, 1);
 });
 
-test('fresh succeeding invocations suppress self-heal despite unhealthy state', async () => {
+test('unhealthy state is observed without self-healing by default', async () => {
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
     const node = makeNode(mock.url, { fnInvocationStatus: 200, lastInvocationAt: Date.now() });
 
     await reconcileStep(node);
     await reconcileStep(node);
-    assert.equal(deployWrites(mock).length, 0);  // still serving traffic -> no redeploy
+    assert.equal(deployWrites(mock).length, 0);
     assert.equal(node.lastStatus.text, 'Unhealthy');
+    assert.equal(node.unhealthyStreak, 0);
 });
 
 test('a redeploy that never restores health cannot pin "Redeploying" forever', async () => {
     // the deadline lets a stuck redeploy lapse so the next attempt (or give-up) proceeds
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
     const clock = createClock();
-    const node = makeNode(mock.url, { clock });
+    const node = makeNode(mock.url, { clock, autoRedeployOnUnhealthy: true });
 
     await reconcileStep(node);                 // reading 1: debounce, no deploy yet
     assert.equal(node.redeploying, false);
@@ -228,15 +230,27 @@ test('autoRedeployOnError: true triggers self-heal from error state', async () =
     assert.ok(node.lastStatus.text.includes('Redeploying'));
 });
 
-test('autoRedeployOnError skips self-heal when invocations are succeeding', async () => {
-    // if invocations are still ok, we should observe the error state
-    // but not trigger a redeploy (same guard as unhealthy)
+test('autoRedeployOnError does not depend on recent invocation traffic', async () => {
+    // An explicit error-recovery policy is authoritative. Recent traffic is
+    // useful for observation cadence, but must not silently disable it.
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'error' });
     const node = makeNode(mock.url, { autoRedeployOnError: true, fnInvocationStatus: 200, lastInvocationAt: Date.now() });
 
     await reconcileStep(node);
+    assert.equal(deployWrites(mock).length, 1);
+    assert.equal(node.selfHealAttempts, 1);
+    assert.ok(node.lastStatus.text.includes('Redeploying'));
+});
+
+test('unknown function state never triggers opt-in unhealthy recovery', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: null });
+    const node = makeNode(mock.url, { autoRedeployOnUnhealthy: true });
+
+    await reconcileStep(node);
+    await reconcileStep(node);
     assert.equal(deployWrites(mock).length, 0);
-    assert.equal(node.lastStatus.text, 'Error');
+    assert.equal(node.lastStatus.text, 'Unhealthy?');
+    assert.equal(node.unhealthyStreak, 0);
 });
 
 test('dashboard 502 during status GET backs off and shows error', async () => {

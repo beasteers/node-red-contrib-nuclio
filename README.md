@@ -151,8 +151,9 @@ an integration-specific header can be used alongside Basic or Bearer authenticat
 | Setting | Default | Description |
 | --- | --- | --- |
 | Deployment mode | `eager` | Deploy on startup, or wait for an explicit `deploy` command in `lazy` mode. |
-| Self-heal attempts | `5` | Maximum automatic redeploys after unhealthy observations. |
+| Self-heal attempts | `5` | Maximum automatic redeploys when an opt-in recovery policy is enabled. |
 | Redeploy deadline | `120000` | Maximum time allowed for a redeploy to become healthy. |
+| Auto-redeploy on unhealthy | `false` | Whether Node-RED should redeploy after repeated `unhealthy` observations; Nuclio recovery is used by default. |
 | Auto-redeploy on error | `false` | Whether Nuclio's `error` state should trigger self-healing. |
 
 ### Environment variables and deployment variables
@@ -331,9 +332,12 @@ functions are not redeployed. Changes that do not affect the build can update th
 The **Redeploy** action reuses the existing image. **Rebuild** forces a new image build, which is
 useful for picking up new commits behind an unchanged Git URL.
 
-Nuclio reports container health; Node-RED performs reconciliation and self-healing. Status is
-still polled after successful invocations, and self-healing waits for two consecutive unhealthy
-observations before acting.
+Nuclio reports container health and owns platform-resource recovery; Node-RED performs desired-state
+reconciliation and observes that health. By default, `unhealthy` and `error` states are reported
+without a Node-RED redeploy so Nuclio can recover transient platform failures. The optional
+`Auto-redeploy on unhealthy` and `Auto-redeploy on error` policies make Node-RED an explicit recovery
+actuator; unhealthy recovery waits for two consecutive observations before acting. Status is still
+polled after successful invocations.
 
 Dashboard requests use a shared per-server circuit breaker. Repeated transient dashboard failures
 pause API traffic and recover through a single probe, while already-known function invocation

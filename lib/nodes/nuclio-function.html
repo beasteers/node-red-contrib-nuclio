@@ -989,6 +989,7 @@ rev /dev/stdin
             // Recovery policy (blank = built-in default).
             maxSelfHealAttempts: { value: '' }, maxSelfHealAttemptsType: { value: 'num' },
             redeployDeadlineMs:  { value: '' }, redeployDeadlineMsType:  { value: 'num' },
+            autoRedeployOnUnhealthy: { value: 'false' }, autoRedeployOnUnhealthyType: { value: 'bool' },
             autoRedeployOnError: { value: 'false' }, autoRedeployOnErrorType: { value: 'bool' },
         },
         credentials: {
@@ -1304,6 +1305,7 @@ rev /dev/stdin
             ['maxSelfHealAttempts','redeployDeadlineMs'].forEach(function(f){
                 initTypedInput(f, ['num', 'env'], 'num');
             });
+            initTypedInput('autoRedeployOnUnhealthy', ['bool', 'env'], 'bool');
             initTypedInput('autoRedeployOnError', ['bool', 'env'], 'bool');
 
             // Track edits made in the dialog so operational actions can state
@@ -1596,6 +1598,7 @@ rev /dev/stdin
             ['maxSelfHealAttempts', 'redeployDeadlineMs'].forEach(field => {
                 this[field] = $('#node-config-input-' + field).typedInput('value') || '';
             });
+            this.autoRedeployOnUnhealthy = $('#node-config-input-autoRedeployOnUnhealthy').typedInput('value') || '';
             this.autoRedeployOnError = $('#node-config-input-autoRedeployOnError').typedInput('value') || '';
 
         },
@@ -1875,12 +1878,23 @@ rev /dev/stdin
                     <label for="node-config-input-maxSelfHealAttempts">Self-heal attempts</label>
                     <input type="text" id="node-config-input-maxSelfHealAttempts" placeholder="5 (default)" />
                     <input type="hidden" id="node-config-input-maxSelfHealAttemptsType" />
+                    <div>
+                        <small>Maximum attempts used by either opt-in recovery policy below. Nuclio's own unhealthy recovery is used by default.</small>
+                    </div>
                 </div>
 
                 <div class="form-row">
                     <label for="node-config-input-redeployDeadlineMs">Redeploy deadline (ms)</label>
                     <input type="text" id="node-config-input-redeployDeadlineMs" placeholder="120000 ms (default)" />
                     <input type="hidden" id="node-config-input-redeployDeadlineMsType" />
+                </div>
+                <div class="form-row">
+                    <label for="node-config-input-autoRedeployOnUnhealthy">Auto-redeploy on unhealthy</label>
+                    <input type="text" id="node-config-input-autoRedeployOnUnhealthy" />
+                    <input type="hidden" id="node-config-input-autoRedeployOnUnhealthyType" />
+                    <div>
+                        <small>Opt in to Node-RED redeploying after repeated <code>unhealthy</code> observations. Disabled by default so Nuclio can recover platform resources first.</small>
+                    </div>
                 </div>
                 <div class="form-row">
                     <label for="node-config-input-autoRedeployOnError">Auto-redeploy on error</label>
