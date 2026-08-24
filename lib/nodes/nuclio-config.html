@@ -135,38 +135,23 @@
             return this.publicAddress || this.address || 'Nuclio Server';
         },
         oneditprepare: function () {
-            $('#node-config-input-address').typedInput({
-                default: this.addressType,
-                types: ['str', 'global', 'env'],
-            });
-            $('#node-config-input-publicAddress').typedInput({
-                default: this.publicAddressType,
-                types: ['str', 'global', 'env'],
-            });
-            $('#node-config-input-namespace').typedInput({
-                default: this.namespaceType || 'str',
-                types: ['str', 'global', 'env'],
-            });
-            $('#node-config-input-internalInvocationServiceHost').typedInput({
-                default: this.internalInvocationServiceHostType || 'str',
-                types: ['str', 'env'],
-            });
-            $('#node-config-input-deploymentPolicy').typedInput({
-                default: this.deploymentPolicyType || 'str',
-                types: ['str', 'env'],
-            });
-            $('#node-config-input-authUsername').typedInput({
-                default: this.authUsernameType || 'str',
-                types: ['str', 'env'],
-            });
-            $('#node-config-input-authPassword').typedInput({
-                default: this.authPasswordType || 'cred',
-                types: ['str', 'env', 'cred'],
-            });
-            $('#node-config-input-authToken').typedInput({
-                default: this.authTokenType || 'cred',
-                types: ['str', 'env', 'cred'],
-            });
+            const initTypedInput = (field, types, fallback) => {
+                const typeFieldSelector = '#node-config-input-' + field + 'Type';
+                const typeField = $(typeFieldSelector);
+                if (!typeField.val()) typeField.val(this[field + 'Type'] || fallback);
+                $('#node-config-input-' + field).typedInput({
+                    typeField: typeFieldSelector,
+                    types,
+                });
+            };
+            initTypedInput('address', ['str', 'global', 'env'], 'env');
+            initTypedInput('publicAddress', ['str', 'global', 'env'], 'str');
+            initTypedInput('namespace', ['str', 'global', 'env'], 'str');
+            initTypedInput('internalInvocationServiceHost', ['str', 'env'], 'str');
+            initTypedInput('deploymentPolicy', ['str', 'env'], 'str');
+            initTypedInput('authUsername', ['str', 'env'], 'str');
+            initTypedInput('authPassword', ['str', 'env', 'cred'], 'cred');
+            initTypedInput('authToken', ['str', 'env', 'cred'], 'cred');
             $('#node-config-input-authType').val(this.authType || 'none');
             $('#node-config-input-authUsername').val(this.authUsername || '');
             $('#node-config-input-authPassword').val(nuclioServerAuthValue(this, 'authPassword'));
@@ -188,7 +173,7 @@
             updateAuthVisibility();
             // Shared settings: numeric literal or an env-var reference, resolved on deploy.
             ['requestTimeoutMs','deployTimeoutMs','pollMs','readyPollMs','backoffMs','backoffMaxMs','startStaggerMs']
-                .forEach(function(f){ $('#node-config-input-'+f).typedInput({ default: this[f+'Type'] || 'num', types: ['num','env'] }); }.bind(this));
+                .forEach(f => initTypedInput(f, ['num', 'env'], 'num'));
 
             const updateInvocationOptionVisibility = function () {
                 const preference = $('#node-config-input-invocationUrlPreference').val();
@@ -201,14 +186,12 @@
         oneditsave: function() {
             this.authType = $('#node-config-input-authType').val() || 'none';
             this.authUsername = $('#node-config-input-authUsername').typedInput('value') || '';
-            this.authUsernameType = $('#node-config-input-authUsername').typedInput('type');
             this.credentials = this.credentials || {};
 
             const saveAuthValue = field => {
                 const input = $(`#node-config-input-${field}`);
                 const type = input.typedInput('type');
                 const value = input.typedInput('value') || '';
-                this[`${field}Type`] = type;
                 if (type === 'cred') {
                     delete this[field];
                     if (value) this.credentials[field] = value;
@@ -259,6 +242,7 @@
             <span>Dashboard URL</span>
         </label>
         <input type="text" id="node-config-input-address" placeholder="http://localhost:8070" />
+        <input type="hidden" id="node-config-input-addressType" />
         <div>
             <small>The address that node-red can reach nuclio at. (typically port 8070)</small>
         </div>
@@ -268,6 +252,7 @@
             <span>Nuclio function namespace</span>
         </label>
         <input type="text" id="node-config-input-namespace" placeholder="nuclio" />
+        <input type="hidden" id="node-config-input-namespaceType" />
         <div>
             <small>Namespace used to scope function and project requests. Defaults to <code>nuclio</code>.</small>
         </div>
@@ -277,6 +262,7 @@
             <span>Dashboard URL for editor links (optional)</span>
         </label>
         <input type="text" id="node-config-input-publicAddress" placeholder="http://localhost:8070" />
+        <input type="hidden" id="node-config-input-publicAddressType" />
         <div>
             <small>Address used only for Dashboard links in the editor. It does not affect deployment or invocation.</small>
         </div>
@@ -299,16 +285,19 @@
             <div class="form-row">
                 <label for="node-config-input-authUsername">Username</label>
                 <input type="text" id="node-config-input-authUsername" placeholder="username" />
+                <input type="hidden" id="node-config-input-authUsernameType" />
             </div>
             <div class="form-row">
                 <label for="node-config-input-authPassword">Password</label>
                 <input type="text" id="node-config-input-authPassword" placeholder="password or environment variable" />
+                <input type="hidden" id="node-config-input-authPasswordType" />
             </div>
         </div>
         <div id="nuclio-bearer-auth-fields">
             <div class="form-row">
                 <label for="node-config-input-authToken">Bearer token</label>
                 <input type="text" id="node-config-input-authToken" placeholder="token or environment variable" />
+                <input type="hidden" id="node-config-input-authTokenType" />
             </div>
         </div>
         <div class="form-row node-input-list-row">
@@ -325,6 +314,7 @@
         <div class="form-row">
             <label for="node-config-input-deploymentPolicy">Deployment policy</label>
             <input type="text" id="node-config-input-deploymentPolicy" placeholder="managed (default)" />
+            <input type="hidden" id="node-config-input-deploymentPolicyType" />
             <div>
                 <small>Use <code>managed</code> to create, update, and self-heal functions. Use <code>disabled</code> to prevent writes in this environment. Existing remote functions are not deleted.</small>
             </div>
@@ -347,6 +337,7 @@
         <div class="form-row" id="nuclio-service-host-row">
             <label for="node-config-input-internalInvocationServiceHost">Stable service hostname template</label>
             <input type="text" id="node-config-input-internalInvocationServiceHost" placeholder="nuclio-{function} (Kubernetes default)" />
+            <input type="hidden" id="node-config-input-internalInvocationServiceHostType" />
             <div>
                 <small>Used only with Stable service hostname. Use <code>{function}</code> for the function name. Leave blank to use the Kubernetes default <code>nuclio-{function}</code>. Docker Compose commonly needs <code>nuclio-nuclio-{function}</code>.</small>
             </div>
@@ -372,31 +363,38 @@
         <div class="form-row">
             <label for="node-config-input-requestTimeoutMs">Dashboard request timeout (ms)</label>
             <input type="text" id="node-config-input-requestTimeoutMs" placeholder="10000 ms (default)" />
+            <input type="hidden" id="node-config-input-requestTimeoutMsType" />
         </div>
         <div class="form-row">
             <label for="node-config-input-deployTimeoutMs">Deployment request timeout (ms)</label>
             <input type="text" id="node-config-input-deployTimeoutMs" placeholder="60000 ms (default)" />
+            <input type="hidden" id="node-config-input-deployTimeoutMsType" />
         </div>
         <h4 class="nuclio-config-subsection">Status polling and recovery</h4>
         <div class="form-row">
             <label for="node-config-input-pollMs">Transition status interval (ms)</label>
             <input type="text" id="node-config-input-pollMs" placeholder="1000 ms (default)" />
+            <input type="hidden" id="node-config-input-pollMsType" />
         </div>
         <div class="form-row">
             <label for="node-config-input-readyPollMs">Healthy status interval (ms)</label>
             <input type="text" id="node-config-input-readyPollMs" placeholder="5000 ms (default)" />
+            <input type="hidden" id="node-config-input-readyPollMsType" />
         </div>
         <div class="form-row">
             <label for="node-config-input-backoffMs">Dashboard failure backoff (ms)</label>
             <input type="text" id="node-config-input-backoffMs" placeholder="5000 ms (default)" />
+            <input type="hidden" id="node-config-input-backoffMsType" />
         </div>
         <div class="form-row">
             <label for="node-config-input-backoffMaxMs">Maximum failure backoff (ms)</label>
             <input type="text" id="node-config-input-backoffMaxMs" placeholder="60000 ms (default)" />
+            <input type="hidden" id="node-config-input-backoffMaxMsType" />
         </div>
         <div class="form-row">
             <label for="node-config-input-startStaggerMs">Startup deployment stagger (ms)</label>
             <input type="text" id="node-config-input-startStaggerMs" placeholder="2000 ms (default)" />
+            <input type="hidden" id="node-config-input-startStaggerMsType" />
         </div>
     </details>
 </script>

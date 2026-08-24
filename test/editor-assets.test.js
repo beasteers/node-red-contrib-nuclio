@@ -29,18 +29,16 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
 
 test('function editor restores stored typed-input types on open', () => {
     const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
-    assert.match(html, /this\.executionBatchSizeType \|\| ['"]num['"]/,
-        'execution batch size must restore its stored typed-input type');
-    assert.match(html, /this\.executionWorkersType \|\| ['"]num['"]/,
-        'execution workers must restore its stored typed-input type');
-    assert.match(html, /this\.executionBatchTimeoutType \|\| ['"]str['"]/,
-        'execution batch timeout must restore its stored typed-input type');
-    assert.match(html, /this\.executionEventTimeoutType \|\| ['"]str['"]/,
-        'execution event timeout must restore its stored typed-input type');
-    assert.match(html, /this\[field \+ ['"]Type['"]\] \|\| ['"]num['"]/,
-        'scaling fields must restore their stored typed-input types');
-    assert.match(html, /this\[field \+ ['"]Type['"]\] \|\| ['"]str['"]/,
-        'resource fields must restore their stored typed-input types');
+    assert.match(html, /const typeFieldSelector = '#node-config-input-' \+ field \+ 'Type'/,
+        'function typed inputs must use their companion type fields');
+    for (const field of [
+        'executionBatchSize', 'executionBatchTimeout', 'executionWorkers', 'executionEventTimeout',
+        'scalingReplicas', 'scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU',
+        'resourceRequestsCpu', 'resourceRequestsMemory', 'resourceLimitsCpu', 'resourceLimitsMemory',
+    ]) {
+        assert.match(html, new RegExp(`id=["']node-config-input-${field}Type["']`),
+            `${field} must have a persisted type field`);
+    }
 });
 
 test('function editor validates scaling values through field validators', () => {
@@ -77,6 +75,97 @@ test('function editor only links to validated dashboard addresses', () => {
         'the dashboard link must encode the project segment');
     assert.match(html, /encodeURIComponent\(name\)/,
         'the dashboard link must encode the function name segment');
+});
+
+test('nuclio-config editor uses typeField for top-level typed fields', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-config.html'), 'utf8');
+    assert.match(html, /typeField: typeFieldSelector/,
+        'top-level typed inputs must delegate type persistence to Node-RED');
+    for (const field of [
+        'address', 'publicAddress', 'namespace', 'internalInvocationServiceHost',
+        'deploymentPolicy', 'authUsername', 'authPassword', 'authToken',
+        'requestTimeoutMs', 'deployTimeoutMs', 'pollMs', 'readyPollMs',
+        'backoffMs', 'backoffMaxMs', 'startStaggerMs',
+    ]) {
+        assert.match(html, new RegExp(`id=["']node-config-input-${field}Type["']`),
+            `${field} must have a persisted type field`);
+    }
+    assert.doesNotMatch(html, /this\[field \+ ['"]Type['"]\] = input\.typedInput\(['"]type['"]\)/,
+        'ordinary typed-input types should not be copied manually in oneditsave');
+});
+
+test('nuclio invoke editor uses typeField for top-level typed settings', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio.html'), 'utf8');
+    assert.match(html, /typeField: typeFieldSelector/,
+        'invoke settings must delegate type persistence to Node-RED');
+    for (const field of ['timeoutMs', 'maxInFlight', 'retries', 'retryDelayMs']) {
+        assert.match(html, new RegExp(`id=["']node-input-${field}Type["']`),
+            `${field} must have a persisted type field`);
+    }
+    assert.doesNotMatch(html, /this\[field \+ ['"]Type['"]\] = input\.typedInput\(['"]type['"]\)/,
+        'ordinary typed-input types should not be copied manually in oneditsave');
+});
+
+test('nuclio-project editor uses a typeField-backed config-node input', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-project.html'), 'utf8');
+    assert.match(html, /node-config-input-name/,
+        'the project name field must use the config-node input id');
+    assert.doesNotMatch(html, /node-project-input-name/,
+        'the old non-config input id must be gone');
+    assert.match(html, /typeField: '#node-config-input-nameType'/,
+        'the project name type must be persisted by typedInput');
+    assert.match(html, /id=["']node-config-input-nameType["']/,
+        'the project name must have a persisted type field');
+    assert.doesNotMatch(html, /oneditsave:/,
+        'the project editor should not need manual type persistence');
+});
+
+test('function editor dirty tracking binds to the config-node dialog form', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.match(html, /\$\(['"]#node-config-dialog-edit-form['"]\)/,
+        'dirty tracking must bind to the config-node dialog form');
+    assert.doesNotMatch(html, /#dialog-form/,
+        'the regular node dialog form selector must not be used');
+    assert.match(html, /#node-config-input-env_secret_refs-x button/,
+        'secret reference list edits must mark the editor dirty');
+});
+
+test('function editor uses typeField for recovery-policy types', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.match(html, /typeField: typeFieldSelector/,
+        'function typed inputs must delegate type persistence to Node-RED');
+    for (const field of ['maxSelfHealAttempts', 'redeployDeadlineMs', 'autoRedeployOnError']) {
+        assert.match(html, new RegExp(`id=["']node-config-input-${field}Type["']`),
+            `${field} must have a persisted type field`);
+    }
+    assert.doesNotMatch(html, /this\.autoRedeployOnErrorType = .*typedInput\(['"]type['"]\)/,
+        'recovery policy types should not be copied manually in oneditsave');
+});
+
+test('function editor marks an auto-generated name as dirty', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.match(html, /node\.name = generateUniqueName\(\)/,
+        'auto-naming must happen in oneditprepare, not in the validator');
+    assert.doesNotMatch(html, /this\.name = v/,
+        'the name validator must not mutate node state');
+    assert.match(html, /node\.nuclioEditorDirty = true/,
+        'an auto-generated name must mark the editor dirty');
+});
+
+test('function editor resets async mode when switching to a non-Python runtime', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.match(html, /executionMode\.val\(\) === ['"]async['"]/,
+        'the runtime change handler must detect a stale async selection');
+    assert.match(html, /executionMode\.val\(['"]inherit['"]\)/,
+        'the runtime change handler must reset async to inherit');
+});
+
+test('function editor leaves no stale cleanup or debug logging', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.doesNotMatch(html, /delete this\.secretList|resolvedSecretVars|redactSecrets/,
+        'dead cleanup and redaction helpers must not remain');
+    assert.doesNotMatch(html, /console\.log\("Changing runtime/,
+        'runtime change debug logging must not remain');
 });
 
 test('demo flow includes a direct MQTT trigger path', () => {

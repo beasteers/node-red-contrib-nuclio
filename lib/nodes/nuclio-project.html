@@ -24,8 +24,10 @@
             return this.name || 'default';
         },
         oneditprepare: function () {
-            $('#node-project-input-name').typedInput({
-                default: this.nameType,
+            const typeField = $('#node-config-input-nameType');
+            if (!typeField.val()) typeField.val(this.nameType || 'str');
+            $('#node-config-input-name').typedInput({
+                typeField: '#node-config-input-nameType',
                 types: ['str', 'global', 'env'],
             });
         },
@@ -36,10 +38,11 @@
 
 <script type="text/html" data-template-name="nuclio-project">
     <div class="form-row">
-        <label for="node-project-input-name">
+        <label for="node-config-input-name">
             <span>Nuclio Project Name</span>
         </label>
-        <input type="text" id="node-project-input-name" placeholder="default" />
+        <input type="text" id="node-config-input-name" placeholder="default" />
+        <input type="hidden" id="node-config-input-nameType" />
     </div>
 </script>
 

@@ -481,6 +481,7 @@
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-runtime-metadata.js"></script>
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-validation.js"></script>
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-config-schema.js"></script>
+<script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-source-parser.js"></script>
 
 <script type="text/javascript">
     const RUNTIME_METADATA = window.NUCLIO_RUNTIME_METADATA || [];
@@ -639,51 +640,12 @@ rev /dev/stdin
 
     const langFor = runtime => runtimeMetadata(runtime).language;
 
-    const SOURCE_TYPE_LABELS = {
-        sourceCode: 'Source code',
-        image: 'Image',
-        git: 'Git',
-        archive: 'Archive',
-        advanced: 'Advanced configuration',
-    };
-
-    const yamlScalarInPath = (text, parentPath, key) => {
-        const stack = [];
-        const lines = `${text || ''}`.split(/\\r?\\n/);
-        for (const line of lines) {
-            const match = line.match(/^(\\s*)([A-Za-z0-9_.-]+):\\s*(.*?)\\s*$/);
-            if (!match) continue;
-            const indent = match[1].replace(/\\t/g, '    ').length;
-            while (stack.length && indent <= stack[stack.length - 1].indent) stack.pop();
-            const currentPath = stack.map(item => item.key);
-            let value = match[3].replace(/\\s+#.*$/, '').trim();
-            if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-                value = value.slice(1, -1);
-            }
-            if (match[2] === key && currentPath.join('.') === parentPath.join('.')) return value;
-            if (!value) stack.push({ key: match[2], indent });
-        }
-        return '';
-    };
-
-    const sourceFromConfigCode = (text) => {
-        const codeEntryType = yamlScalarInPath(text, ['spec', 'build'], 'codeEntryType');
-        const normalizedType = codeEntryType === 'github' ? 'git' : codeEntryType;
-        if (SOURCE_TYPE_LABELS[normalizedType]) {
-            return {
-                type: normalizedType,
-                path: yamlScalarInPath(text, ['spec', 'build'], 'path'),
-                branch: yamlScalarInPath(text, ['spec', 'build'], 'branch'),
-                tag: yamlScalarInPath(text, ['spec', 'build'], 'tag'),
-                reference: yamlScalarInPath(text, ['spec', 'build'], 'reference'),
-                username: yamlScalarInPath(text, ['spec', 'build'], 'username'),
-                workDir: yamlScalarInPath(text, ['spec', 'build'], 'workDir'),
-            };
-        }
-        if (codeEntryType || yamlScalarInPath(text, ['spec', 'build'], 'path')) return { type: 'advanced' };
-        const image = yamlScalarInPath(text, ['spec'], 'image');
-        return image ? { type: 'image', path: image } : { type: 'sourceCode' };
-    };
+    // Shared YAML source parser (resources/nuclio-source-parser.js). It runs
+    // in the editor to open legacy flows with their source settings intact.
+    const NUCLIO_SOURCE_PARSER = window.NUCLIO_SOURCE_PARSER || {};
+    const SOURCE_TYPE_LABELS = NUCLIO_SOURCE_PARSER.SOURCE_TYPE_LABELS || {};
+    const sourceFromConfigCode = NUCLIO_SOURCE_PARSER.sourceFromConfigCode
+        || (() => ({ type: 'sourceCode' }));
 
     const defaultHandlerFor = runtime => runtimeMetadata(runtime).handler;
 </script>
@@ -816,8 +778,12 @@ rev /dev/stdin
     const initKeyValueList = (selector, items, { placeholder, defaultType, types }) => {
         const list = $(selector).editableList({
             addItem: function(row, index, data) {
-                $(`<input class='node-input-key' type="text" placeholder="${placeholder}" aria-label="Name" />`).appendTo(row).val(data.name)
-                $(`<input class='node-input-value' placeholder="value" aria-label="Value" />`).appendTo(row).attr('value', data.value).typedInput({
+                $(`<input class='node-input-key' type="text" aria-label="Name" />`)
+                    .attr('placeholder', placeholder)
+                    .appendTo(row).val(data.name || '');
+                const valueInput = $(`<input class='node-input-value' type="text" placeholder="value" aria-label="Value" />`)
+                    .appendTo(row).val(data.value);
+                valueInput.typedInput({
                     default: data.type || defaultType,
                     types: types,
                 });
@@ -1049,6 +1015,9 @@ rev /dev/stdin
             if (!node.name) {
                 node.name = generateUniqueName();
                 $('#node-config-input-name').val(node.name);
+                // The generated name is an unsaved edit: redeploy/rebuild must
+                // warn that they use the last saved configuration.
+                node.nuclioEditorDirty = true;
             }
 
             const runtimeSelect = $('#node-config-input-runtime');
@@ -1235,6 +1204,14 @@ rev /dev/stdin
                 }
                 node.editor.setMode(`ace/mode/${lang}`);
                 $('#nuclio-handler-preview').val(defaultHandlerFor(runtime));
+                // `async` mode is Python-only. Reset it when switching to
+                // another runtime so a non-Python function cannot be saved
+                // with an execution mode that Nuclio will reject at deploy.
+                const executionMode = $('#node-config-input-executionMode');
+                if (!runtime.startsWith('python') && executionMode.val() === 'async') {
+                    executionMode.val('inherit');
+                    markEditorDirty();
+                }
                 updateExecutionOptions();
             });
 
@@ -1262,22 +1239,19 @@ rev /dev/stdin
             $('#node-config-input-executionBatchTimeout').val(this.executionBatchTimeout || '');
             $('#node-config-input-executionWorkers').val(this.executionWorkers || '');
             $('#node-config-input-executionEventTimeout').val(this.executionEventTimeout || '');
-            $('#node-config-input-executionBatchSize').typedInput({
-                default: this.executionBatchSizeType || 'num',
-                types: ['num', 'env'],
-            });
-            $('#node-config-input-executionWorkers').typedInput({
-                default: this.executionWorkersType || 'num',
-                types: ['num', 'env'],
-            });
-            $('#node-config-input-executionBatchTimeout').typedInput({
-                default: this.executionBatchTimeoutType || 'str',
-                types: ['str', 'env'],
-            });
-            $('#node-config-input-executionEventTimeout').typedInput({
-                default: this.executionEventTimeoutType || 'str',
-                types: ['str', 'env'],
-            });
+            const initTypedInput = (field, types, fallback) => {
+                const typeFieldSelector = '#node-config-input-' + field + 'Type';
+                const typeField = $(typeFieldSelector);
+                if (!typeField.val()) typeField.val(node[field + 'Type'] || fallback);
+                $('#node-config-input-' + field).typedInput({
+                    typeField: typeFieldSelector,
+                    types,
+                });
+            };
+            initTypedInput('executionBatchSize', ['num', 'env'], 'num');
+            initTypedInput('executionWorkers', ['num', 'env'], 'num');
+            initTypedInput('executionBatchTimeout', ['str', 'env'], 'str');
+            initTypedInput('executionEventTimeout', ['str', 'env'], 'str');
 
             const updateExecutionOptions = () => {
                 const isPython = ($('#node-config-input-runtime').val() || '').startsWith('python');
@@ -1292,10 +1266,10 @@ rev /dev/stdin
                 $('#node-config-input-' + field).val(this[field] ?? '');
             });
             scalingNumberFields.forEach(field => {
-                $('#node-config-input-' + field).typedInput({ default: this[field + 'Type'] || 'num', types: ['num', 'env'] });
+                initTypedInput(field, ['num', 'env'], 'num');
             });
             resourceFields.forEach(field => {
-                $('#node-config-input-' + field).typedInput({ default: this[field + 'Type'] || 'str', types: ['str', 'env'] });
+                initTypedInput(field, ['str', 'env'], 'str');
             });
 
             const scalingFieldsHaveValues = ['scalingReplicas', 'scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU']
@@ -1325,15 +1299,15 @@ rev /dev/stdin
 
             // Recovery policy: numeric literal or env-var reference, resolved on deploy.
             ['maxSelfHealAttempts','redeployDeadlineMs'].forEach(function(f){
-                $('#node-config-input-' + f).typedInput({ default: node[f + 'Type'] || 'num', types: ['num','env'] });
+                initTypedInput(f, ['num', 'env'], 'num');
             });
-            $('#node-config-input-autoRedeployOnError').typedInput({ default: node.autoRedeployOnErrorType || 'bool', types: ['bool','env'] });
+            initTypedInput('autoRedeployOnError', ['bool', 'env'], 'bool');
 
             // Track edits made in the dialog so operational actions can state
             // clearly that they use the last saved node configuration.
-            const dialogForm = $('#dialog-form');
+            const dialogForm = $('#node-config-dialog-edit-form');
             dialogForm.on('input.nuclioFunctionDirty change.nuclioFunctionDirty', 'input, select, textarea', markEditorDirty);
-            dialogForm.on('click.nuclioFunctionDirty', '#node-config-input-deploymentVariables-x button, #node-config-input-env_vars-x button', markEditorDirty);
+            dialogForm.on('click.nuclioFunctionDirty', '#node-config-input-deploymentVariables-x button, #node-config-input-env_vars-x button, #node-config-input-env_secret_refs-x button', markEditorDirty);
 
             /* --------------------------------- Status Page -------------------------------- */
 
@@ -1558,7 +1532,7 @@ rev /dev/stdin
             delete this.configEditorAssist;
             this.statusPoller.stop();
             delete this.statusPoller;
-            $('#dialog-form').off('.nuclioFunctionDirty');
+            $('#node-config-dialog-edit-form').off('.nuclioFunctionDirty');
             delete this.nuclioEditorDirty;
 
             this.sourceType = $('#node-config-input-sourceType').val() || 'sourceCode';
@@ -1589,39 +1563,36 @@ rev /dev/stdin
             this.executionMode = $('#node-config-input-executionMode').val() || 'inherit';
             this.executionBatchMode = $('#node-config-input-executionBatchMode').val() || 'inherit';
             this.executionBatchSize = $('#node-config-input-executionBatchSize').typedInput('value') || '';
-            this.executionBatchSizeType = $('#node-config-input-executionBatchSize').typedInput('type');
             this.executionBatchTimeout = $('#node-config-input-executionBatchTimeout').typedInput('value') || '';
-            this.executionBatchTimeoutType = $('#node-config-input-executionBatchTimeout').typedInput('type');
             this.executionWorkers = $('#node-config-input-executionWorkers').typedInput('value') || '';
-            this.executionWorkersType = $('#node-config-input-executionWorkers').typedInput('type');
             this.executionEventTimeout = $('#node-config-input-executionEventTimeout').typedInput('value') || '';
-            this.executionEventTimeoutType = $('#node-config-input-executionEventTimeout').typedInput('type');
 
             const scalingNumberFields = ['scalingReplicas', 'scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU'];
             const resourceFields = ['resourceRequestsCpu', 'resourceRequestsMemory', 'resourceLimitsCpu', 'resourceLimitsMemory'];
             this.scalingMode = scalingMode;
             scalingNumberFields.forEach(field => {
                 this[field] = $('#node-config-input-' + field).typedInput('value') || '';
-                this[field + 'Type'] = $('#node-config-input-' + field).typedInput('type');
             });
             if (scalingMode === 'fixed') {
                 ['scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU'].forEach(field => {
                     this[field] = '';
-                    this[field + 'Type'] = 'num';
                 });
             } else if (scalingMode === 'autoscaled') {
                 this.scalingReplicas = '';
-                this.scalingReplicasType = 'num';
             } else {
                 scalingNumberFields.forEach(field => {
                     this[field] = '';
-                    this[field + 'Type'] = 'num';
                 });
             }
             resourceFields.forEach(field => {
                 this[field] = $('#node-config-input-' + field).typedInput('value') || '';
-                this[field + 'Type'] = $('#node-config-input-' + field).typedInput('type');
             });
+
+            // Recovery policy: numeric literal or env-var reference, resolved on deploy.
+            ['maxSelfHealAttempts', 'redeployDeadlineMs'].forEach(field => {
+                this[field] = $('#node-config-input-' + field).typedInput('value') || '';
+            });
+            this.autoRedeployOnError = $('#node-config-input-autoRedeployOnError').typedInput('value') || '';
 
         },
         oneditcancel: function() {
@@ -1633,13 +1604,12 @@ rev /dev/stdin
             delete this.configEditorAssist;
             this.statusPoller.stop();
             delete this.statusPoller;
-            $('#dialog-form').off('.nuclioFunctionDirty');
+            $('#node-config-dialog-edit-form').off('.nuclioFunctionDirty');
             delete this.nuclioEditorDirty;
             this.name = this.originalName;
             delete this.envList;
             delete this.envSecretRefList;
             delete this.deploymentVariableList;
-            delete this.secretList;
         },
     });
 
@@ -1812,18 +1782,22 @@ rev /dev/stdin
                 <div class="form-row">
                     <label for="node-config-input-executionBatchSize">Batch size</label>
                     <input type="text" id="node-config-input-executionBatchSize" placeholder="10" />
+                    <input type="hidden" id="node-config-input-executionBatchSizeType" />
                 </div>
                 <div class="form-row">
                     <label for="node-config-input-executionBatchTimeout">Batch timeout</label>
                     <input type="text" id="node-config-input-executionBatchTimeout" placeholder="1s" />
+                    <input type="hidden" id="node-config-input-executionBatchTimeoutType" />
                 </div>
                 <div class="form-row">
                     <label for="node-config-input-executionWorkers">Trigger workers</label>
                     <input type="text" id="node-config-input-executionWorkers" placeholder="1" />
+                    <input type="hidden" id="node-config-input-executionWorkersType" />
                 </div>
                 <div class="form-row">
                     <label for="node-config-input-executionEventTimeout">Event timeout</label>
                     <input type="text" id="node-config-input-executionEventTimeout" placeholder="30s" />
+                    <input type="hidden" id="node-config-input-executionEventTimeoutType" />
                 </div>
             </details>
 
@@ -1843,31 +1817,39 @@ rev /dev/stdin
                     <div class="form-row">
                         <label for="node-config-input-scalingReplicas">Replicas</label>
                         <input type="text" id="node-config-input-scalingReplicas" placeholder="2" />
+                        <input type="hidden" id="node-config-input-scalingReplicasType" />
                     </div>
                 </div>
                 <div id="nuclio-scaling-autoscaled-fields" class="nuclio-hidden">
                     <div class="form-row">
                         <label for="node-config-input-scalingMinReplicas">Minimum replicas</label>
                         <input type="text" id="node-config-input-scalingMinReplicas" placeholder="1" />
+                        <input type="hidden" id="node-config-input-scalingMinReplicasType" />
                     </div>
                     <div class="form-row">
                         <label for="node-config-input-scalingMaxReplicas">Maximum replicas</label>
                         <input type="text" id="node-config-input-scalingMaxReplicas" placeholder="3" />
+                        <input type="hidden" id="node-config-input-scalingMaxReplicasType" />
                     </div>
                     <div class="form-row">
                         <label for="node-config-input-scalingTargetCPU">Autoscaling target CPU (%)</label>
                         <input type="text" id="node-config-input-scalingTargetCPU" placeholder="75" />
+                        <input type="hidden" id="node-config-input-scalingTargetCPUType" />
                     </div>
                 </div>
                 <div class="form-row">
                     <label>Resource requests</label>
                     <input type="text" id="node-config-input-resourceRequestsCpu" placeholder="CPU, e.g. 250m" />
+                    <input type="hidden" id="node-config-input-resourceRequestsCpuType" />
                     <input type="text" id="node-config-input-resourceRequestsMemory" placeholder="Memory, e.g. 256Mi" />
+                    <input type="hidden" id="node-config-input-resourceRequestsMemoryType" />
                 </div>
                 <div class="form-row">
                     <label>Resource limits</label>
                     <input type="text" id="node-config-input-resourceLimitsCpu" placeholder="CPU, e.g. 1" />
+                    <input type="hidden" id="node-config-input-resourceLimitsCpuType" />
                     <input type="text" id="node-config-input-resourceLimitsMemory" placeholder="Memory, e.g. 512Mi" />
+                    <input type="hidden" id="node-config-input-resourceLimitsMemoryType" />
                 </div>
             </details>
 
@@ -1888,15 +1870,18 @@ rev /dev/stdin
                 <div class="form-row">
                     <label for="node-config-input-maxSelfHealAttempts">Self-heal attempts</label>
                     <input type="text" id="node-config-input-maxSelfHealAttempts" placeholder="5 (default)" />
+                    <input type="hidden" id="node-config-input-maxSelfHealAttemptsType" />
                 </div>
 
                 <div class="form-row">
                     <label for="node-config-input-redeployDeadlineMs">Redeploy deadline (ms)</label>
                     <input type="text" id="node-config-input-redeployDeadlineMs" placeholder="120000 ms (default)" />
+                    <input type="hidden" id="node-config-input-redeployDeadlineMsType" />
                 </div>
                 <div class="form-row">
                     <label for="node-config-input-autoRedeployOnError">Auto-redeploy on error</label>
                     <input type="text" id="node-config-input-autoRedeployOnError" />
+                    <input type="hidden" id="node-config-input-autoRedeployOnErrorType" />
                     <div>
                         <small>Also auto-redeploy functions in Nuclio's <code>error</code> state (treated as terminal by default).</small>
                     </div>
