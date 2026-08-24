@@ -299,14 +299,20 @@ Lifecycle commands are sent in `msg.nuclio.command`:
 
 ```js
 msg.nuclio = { command: 'deploy' }     // create or converge; activates lazy mode
+msg.nuclio = { command: 'undeploy' }   // delete the remote function; deactivates invocation
 msg.nuclio = { command: 'redeploy' }   // reuse the existing image
 msg.nuclio = { command: 'rebuild' }    // force a full image build
 msg.nuclio = { command: 'status' }     // return current local status
 ```
 
 Command acknowledgements leave through output 1. Command failures leave through output 2 with
-the error attached to the message. Ordinary messages sent to a lazy function are routed to the
-fallback output until a deploy command completes successfully.
+the error attached to the message. Ordinary messages sent to an inactive function are routed to
+the fallback output until a deploy command completes successfully. Eager and lazy functions use
+the same activation state after startup: eager functions begin active, while lazy functions begin
+inactive. An `undeploy` command deletes the Node-RED-owned remote function and makes either mode
+inactive until `deploy` is sent. It is idempotent when the function is already absent and refuses
+to delete an unowned function. Use scale-to-zero when the function should remain registered while
+its processors are stopped.
 
 Transient connection and `429`/`502`/`503`/`504` failures are retried when **Retries** is greater
 than zero. Retries are at-least-once: a dropped connection may still have delivered the request,

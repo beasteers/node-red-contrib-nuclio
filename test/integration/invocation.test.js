@@ -71,6 +71,41 @@ test('lazy functions wait for a deploy command before accepting invocations', as
     assert.deepEqual(invocation.payload, { echo: 'after-deploy' });
 });
 
+test('undeploy deactivates eager functions until an explicit deploy command', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    mock.requests.length = 0;
+    const undeployReply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ nuclio: { command: 'undeploy' }, payload: 'control' });
+    const undeployed = await undeployReply;
+
+    assert.deepEqual(undeployed.nuclio.result, {
+        accepted: true,
+        deleted: true,
+        name: FN,
+        state: null,
+        ready: false,
+        deploying: false,
+        deploymentMode: 'eager',
+        activated: false,
+    });
+    assert.equal(mock.functions[FN], undefined);
+    assert.ok(mock.requests.some(request => request.method === 'DELETE'));
+
+    const blockedReply = nextMsg(helper.getNode('out2'));
+    helper.getNode('inv').receive({ payload: 'while-undeployed' });
+    assert.equal((await blockedReply).payload, 'while-undeployed');
+
+    const deployReply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ nuclio: { command: 'deploy' }, payload: 'control' });
+    const deployed = await deployReply;
+    assert.equal(deployed.nuclio.result.accepted, true);
+    assert.equal(deployed.nuclio.result.activated, true);
+    assert.ok(mock.requests.some(request => request.method === 'POST' && request.url === '/api/functions'));
+});
+
 test('invoke lifecycle commands map to idempotent deploy, redeploy, and rebuild operations', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));
