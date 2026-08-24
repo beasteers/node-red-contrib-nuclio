@@ -23,6 +23,12 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
         'dashboard tokens must expose a typed-input mode');
     assert.match(serverHtml, /types:\s*\[["']str["'],\s*["']env["'],\s*["']cred["']\]/,
         'dashboard credentials must support literal, environment, and credential values');
+    assert.match(serverHtml, /this\[\x60\$\{field\}Type\x60\]\s*=\s*type/,
+        'dashboard auth typed-input modes must be persisted explicitly');
+    assert.match(serverHtml, /value !== ["']__PWRD__["']/,
+        'dashboard auth save handling must preserve Node-RED password sentinels');
+    assert.match(serverHtml, /typedInput\('value',\s*nuclioServerAuthValue\(this, 'authPassword'\)\)/,
+        'dashboard password values must be restored through typedInput');
     assert.doesNotMatch(html, /secret_vars|Credential Overrides/,
         'deprecated credential override fields must not remain in the editor');
 });

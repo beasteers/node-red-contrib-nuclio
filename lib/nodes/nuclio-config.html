@@ -89,7 +89,14 @@
 
     const nuclioServerAuthValue = (node, field) => {
         const type = node[`${field}Type`] || (node.credentials?.[field] ? 'cred' : 'str');
-        if (type === 'cred') return node.credentials?.[field] === '__PWRD__' ? '' : (node.credentials?.[field] || '');
+        if (type === 'cred') {
+            // Preserve Node-RED's password sentinel so typedInput can render
+            // the existing credential without copying it into the flow.
+            if (node.credentials?.[field]) return node.credentials[field];
+            // Legacy versions could leave a credential-typed value in the
+            // ordinary flow property. Show it once so the next save migrates it.
+            return node[field] || '';
+        }
         return node[field] || '';
     };
 
@@ -153,9 +160,9 @@
             initTypedInput('authPassword', ['str', 'env', 'cred'], 'cred');
             initTypedInput('authToken', ['str', 'env', 'cred'], 'cred');
             $('#node-config-input-authType').val(this.authType || 'none');
-            $('#node-config-input-authUsername').val(this.authUsername || '');
-            $('#node-config-input-authPassword').val(nuclioServerAuthValue(this, 'authPassword'));
-            $('#node-config-input-authToken').val(nuclioServerAuthValue(this, 'authToken'));
+            $('#node-config-input-authUsername').typedInput('value', this.authUsername || '');
+            $('#node-config-input-authPassword').typedInput('value', nuclioServerAuthValue(this, 'authPassword'));
+            $('#node-config-input-authToken').typedInput('value', nuclioServerAuthValue(this, 'authToken'));
 
             let requestHeaders = [];
             try {
@@ -192,10 +199,14 @@
                 const input = $(`#node-config-input-${field}`);
                 const type = input.typedInput('type');
                 const value = input.typedInput('value') || '';
+                this[`${field}Type`] = type;
                 if (type === 'cred') {
                     delete this[field];
-                    if (value) this.credentials[field] = value;
-                    else if (this.credentials[field] !== '__PWRD__') delete this.credentials[field];
+                    if (value && value !== '__PWRD__') {
+                        this.credentials[field] = value;
+                    } else if (value !== '__PWRD__' && this.credentials[field] !== '__PWRD__') {
+                        delete this.credentials[field];
+                    }
                 } else {
                     this[field] = value;
                     delete this.credentials[field];

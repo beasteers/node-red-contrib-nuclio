@@ -5,6 +5,7 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 - Store credential-typed invocation headers and function environment variables in Node-RED credentials instead of ordinary flow properties.
+- Migrate credential-typed dashboard passwords and bearer tokens out of ordinary config-node properties on save.
 
 ## [3.1.1] - 2026-08-24
 
