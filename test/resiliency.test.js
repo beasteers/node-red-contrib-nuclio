@@ -118,6 +118,15 @@ test('a recent invocation failure on a ready function polls fast', async () => {
     assert.equal(ms, 1000);  // fresh failure -> watch closely
 });
 
+test('transition states do not request supplemental replica status', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'building' });
+    const node = makeNode(mock.url);
+
+    await reconcileStep(node);
+
+    assert.equal(mock.requests.filter(r => r.method === 'GET' && r.url.endsWith('/replicas')).length, 0);
+});
+
 
 /* ------------------------------ Backoff / jitter --------------------------- */
 

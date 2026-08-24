@@ -11,6 +11,8 @@ All notable changes to this project are documented here.
 
 - Make unhealthy-state recovery opt-in, keep unknown states observational, and preserve Nuclio-owned
   platform recovery as the default.
+- Reduce replica-status control-plane traffic with ready-state gating, per-function caching, request
+  coalescing, and explicit stale-capacity reporting.
 
 ## [3.1.1] - 2026-08-24
 

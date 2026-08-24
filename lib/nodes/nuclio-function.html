@@ -1382,6 +1382,11 @@ rev /dev/stdin
                 const scaleMeta = autoscaled
                     ? `Autoscaling ${scaleMin ?? '—'}–${scaleMax ?? '—'} · target ${spec.targetCPU ?? 75}% CPU`
                     : `Fixed · ${fixedReplicas ?? 'YAML-configured'} replica(s)`;
+                const replicaMeta = status.replicaStatusStale
+                    ? `Replica data stale${status.replicaStatusError ? ` (${status.replicaStatusError})` : ''}`
+                    : status.replicaStatusError
+                        ? `Replica data unavailable (${status.replicaStatusError})`
+                        : '';
 
                 $('#nuclio-status-function-name').text(metadata.name || node.name || '—');
                 $('#nuclio-status-state').text(state);
@@ -1392,7 +1397,7 @@ rev /dev/stdin
                 $('#nuclio-runtime-value').text(spec.runtime || '—');
                 $('#nuclio-runtime-meta').text(spec.handler ? `Handler: ${spec.handler}` : 'Handler not reported');
                 $('#nuclio-scale-value').text(scaleValue);
-                $('#nuclio-scale-meta').text(scaleMeta);
+                $('#nuclio-scale-meta').text([scaleMeta, replicaMeta].filter(Boolean).join(' · '));
                 $('#nuclio-invocation-mode').text(`Strategy: ${mode}`);
                 if (canUpdateElement(statusElement('nuclio-status'))) {
                     const signals = { ...status };
@@ -1404,6 +1409,8 @@ rev /dev/stdin
                     delete signals.readyReplicas;
                     delete signals.desiredReplicas;
                     delete signals.activeReplicas;
+                    delete signals.replicaStatusError;
+                    delete signals.replicaStatusStale;
                     const signalHtml = statusChips(signals);
                     $('#nuclio-status').html(signalHtml);
                     $('#nuclio-status-signals').toggleClass('nuclio-hidden', !signalHtml);

@@ -1,4 +1,5 @@
 const { HASH_ANNOTATION, BUILD_HASH_ANNOTATION } = require('../../lib/nuclio-deploy.js');
+const { getReplicaStatus } = require('../../lib/nuclio-status.js');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
@@ -506,6 +507,39 @@ test('status summary reports replica-health failures without inventing capacity'
     const summary = await helper.request().get('/nuclio/api/functions?id=fn&view=summary').expect(200);
     assert.equal(summary.body.status.replicaStatusError, 'HTTP 503');
     assert.equal(summary.body.status.activeReplicas, undefined);
+});
+
+test('replica status is coalesced, cached, and marked stale after a refresh failure', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    const fn = helper.getNode('fn');
+    await waitReady(fn);
+
+    // Use a short test-only cache window so the refresh behavior is observable
+    // without making the production cache more eager.
+    fn.server.replicaPollMs = 250;
+    mock.requests.length = 0;
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const results = await Promise.all([getReplicaStatus(fn), getReplicaStatus(fn)]);
+    const replicaReads = () => mock.requests.filter(
+        r => r.method === 'GET' && r.url.endsWith('/replicas'),
+    );
+    assert.equal(replicaReads().length, 1);
+    assert.deepEqual(results[0], { activeReplicas: 2 });
+    assert.deepEqual(results[1], results[0]);
+
+    // A failed refresh keeps the last observed count for display but marks it
+    // stale. It must not be interpreted as zero replicas.
+    mock.replicaStatus = 503;
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const stale = await getReplicaStatus(fn);
+    assert.equal(replicaReads().length, 2);
+    assert.deepEqual(stale, {
+        activeReplicas: 2,
+        replicaStatusError: 'HTTP 503',
+        replicaStatusStale: true,
+    });
 });
 
 test('metrics endpoint returns authenticated Prometheus-compatible metrics', async () => {

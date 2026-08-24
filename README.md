@@ -339,6 +339,11 @@ without a Node-RED redeploy so Nuclio can recover transient platform failures. T
 actuator; unhealthy recovery waits for two consecutive observations before acting. Status is still
 polled after successful invocations.
 
+Replica capacity is supplemental status information. Node-RED samples it only for ready functions,
+coalesces concurrent reads, and caches each function's observation briefly. If a refresh fails, the
+last observed count may remain visible with a stale indicator; missing capacity is never interpreted
+as zero replicas and replica data never drives reconciliation decisions.
+
 Dashboard requests use a shared per-server circuit breaker. Repeated transient dashboard failures
 pause API traffic and recover through a single probe, while already-known function invocation
 endpoints remain available. In-flight dashboard and invocation requests are cancelled when their
