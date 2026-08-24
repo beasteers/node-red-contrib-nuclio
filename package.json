@@ -7,7 +7,7 @@
   "files": [
     "lib",
     "resources",
-    "scripts",
+    "scripts/migrate-nuclio-config.js",
     "CHANGELOG.md"
   ],
   "scripts": {
