@@ -705,10 +705,10 @@
         "y": 160,
         "wires": [
             [
-                "0000000000000015"
+                "f775d182e5388fbb"
             ],
             [
-                "0000000000000016"
+                "878827bbd2a50d73"
             ]
         ]
     },
@@ -780,7 +780,7 @@
         "type": "debug",
         "z": "0000000000000005",
         "name": "Python response",
-        "active": true,
+        "active": false,
         "tosidebar": true,
         "console": false,
         "tostatus": false,
@@ -788,7 +788,7 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 790,
+        "x": 930,
         "y": 140,
         "wires": []
     },
@@ -797,7 +797,7 @@
         "type": "debug",
         "z": "0000000000000005",
         "name": "Python error",
-        "active": true,
+        "active": false,
         "tosidebar": true,
         "console": false,
         "tostatus": false,
@@ -805,7 +805,7 @@
         "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 790,
+        "x": 910,
         "y": 200,
         "wires": []
     },
@@ -1123,14 +1123,14 @@
                 "vt": "str"
             }
         ],
-        "repeat": "",
+        "repeat": "0.01",
         "crontab": "",
         "once": false,
         "onceDelay": 0.1,
         "topic": "",
         "payload": "{\"message\":\"hello from Python\"}",
         "payloadType": "json",
-        "x": 230,
+        "x": 240,
         "y": 160,
         "wires": [
             [
@@ -1222,6 +1222,46 @@
         "wires": [
             [
                 "0000000000000014"
+            ]
+        ]
+    },
+    {
+        "id": "f775d182e5388fbb",
+        "type": "msg-speed",
+        "z": "0000000000000005",
+        "name": "",
+        "frequency": "sec",
+        "interval": 1,
+        "estimation": false,
+        "ignore": false,
+        "pauseAtStartup": false,
+        "topicDependent": false,
+        "x": 710,
+        "y": 140,
+        "wires": [
+            [],
+            [
+                "0000000000000015"
+            ]
+        ]
+    },
+    {
+        "id": "878827bbd2a50d73",
+        "type": "msg-speed",
+        "z": "0000000000000005",
+        "name": "",
+        "frequency": "sec",
+        "interval": 1,
+        "estimation": false,
+        "ignore": false,
+        "pauseAtStartup": false,
+        "topicDependent": false,
+        "x": 710,
+        "y": 200,
+        "wires": [
+            [],
+            [
+                "0000000000000016"
             ]
         ]
     },
