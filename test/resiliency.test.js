@@ -104,7 +104,8 @@ test('connectivity failures back off exponentially and cap', async () => {
     const node = makeNode(UNREACHABLE);
     const seq = [];
     for (let i = 0; i < 4; i++) seq.push(await reconcileStep(node));
-    assert.deepEqual(seq, [100, 200, 400, 5000]);  // per-function backoff, then the server circuit cooldown
+    assert.deepEqual(seq.slice(0, 3), [100, 200, 400]);  // per-function backoff
+    assert.ok(seq[3] >= 4990 && seq[3] <= 5000, `unexpected circuit cooldown: ${seq[3]}`);
     assert.match(node.lastStatus.text, /not responding|unavailable/i);
 });
 

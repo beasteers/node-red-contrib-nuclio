@@ -46,7 +46,7 @@ jobs:
       - uses: helm/kind-action@v1.12.0
         if: matrix.fixture == 'kind'
         with:
-          cluster_name: nuclio-node-red-canary
+          install_only: true
       - uses: azure/setup-helm@v4
         if: matrix.fixture == 'kind'
       - run: npm ci

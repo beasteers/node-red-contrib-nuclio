@@ -5,16 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { parseArgs, runBenchmark } = require('./stress-test');
-
-const optionValue = (argv, name) => {
-    const prefix = `--${name}`;
-    const argument = argv.find(value => value === prefix || value.startsWith(`${prefix}=`));
-    if (!argument) return undefined;
-    const inline = argument.slice(prefix.length + 1);
-    if (inline) return inline;
-    const index = argv.indexOf(argument);
-    return argv[index + 1];
-};
+const { optionValue, toStressArgs } = require('./stress-cli');
 
 const parseCli = argv => {
     if (argv.includes('--help') || argv.includes('-h')) return { help: true };
@@ -51,10 +42,6 @@ Options:
   --output <path>             Write the complete JSON result
   --fail-fast                 Stop after the first failed case
 `;
-
-const toStressArgs = (values, rate) => Object.entries({ ...values, rate })
-    .filter(([, value]) => value !== undefined && value !== null)
-    .flatMap(([name, value]) => [`--${name.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`, String(value)]);
 
 const runMatrix = async ({ config, rates, overrides, failFast }, { benchmark = runBenchmark } = {}) => {
     const matrixPath = path.resolve(config);

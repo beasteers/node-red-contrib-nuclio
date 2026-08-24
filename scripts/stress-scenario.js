@@ -8,21 +8,7 @@ const {
     parseArgs,
     runBenchmark,
 } = require('./stress-test');
-
-const kebabCase = name => name.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
-
-const toStressArgs = values => Object.entries(values)
-    .filter(([, value]) => value !== undefined && value !== null && value !== false)
-    .flatMap(([name, value]) => [`--${kebabCase(name)}`, String(value)]);
-
-const optionValue = (argv, name) => {
-    const prefix = `--${name}`;
-    const argument = argv.find(value => value === prefix || value.startsWith(`${prefix}=`));
-    if (!argument) return undefined;
-    const inline = argument.slice(prefix.length + 1);
-    if (inline) return inline;
-    return argv[argv.indexOf(argument) + 1];
-};
+const { optionValue, toStressArgs } = require('./stress-cli');
 
 const parseCli = argv => {
     if (argv.includes('--help') || argv.includes('-h')) return { help: true };

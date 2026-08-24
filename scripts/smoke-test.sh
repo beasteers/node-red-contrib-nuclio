@@ -62,9 +62,9 @@ if [ -f "$FLOWS_FILE" ]; then
     cp "$FLOWS_FILE" "$FLOWS_BACKUP"
 fi
 
-# Minimal flow: nuclio-config + nuclio-function + nuclio invoke
+# Minimal flow: nuclio-config + nuclio-function + HTTP-in + nuclio invoke.
 cat >"$FLOWS_FILE" <<EOFLOW
-[ {"id":"smoke-tab","type":"tab","label":"Smoke","disabled":false,"info":"","env":[]},{"id":"smoke-srv","type":"nuclio-config","address":"http://nuclio-dashboard:8070","addressType":"str","publicAddress":"","publicAddressType":"str","requestTimeoutMs":"","deployTimeoutMs":"","pollMs":"","readyPollMs":"","backoffMs":"","backoffMaxMs":"","startStaggerMs":""},{"id":"smoke-fn","type":"nuclio-function","server":"smoke-srv","name":"$SMOKE_FN","runtime":"python:3.12","code":"async def handler(context, event):\n    return {\\"ok\\": True, \\"echo\\": event.body}\n","configCode":"","env_vars":[],"maxSelfHealAttempts":"","redeployDeadlineMs":"","autoRedeployOnError":"false","autoRedeployOnErrorType":"bool"},{"id":"smoke-inv","type":"nuclio","function":"smoke-fn","name":"","timeoutMs":"","maxInFlight":"","retries":"","retryDelayMs":"","headers":[],"x":120,"y":120,"z":"smoke-tab","wires":[[],[]]}]
+[ {"id":"smoke-tab","type":"tab","label":"Smoke","disabled":false,"info":"","env":[]},{"id":"smoke-srv","type":"nuclio-config","address":"http://nuclio-dashboard:8070","addressType":"str","publicAddress":"","publicAddressType":"str","invocationUrlPreference":"service","internalInvocationServiceHost":"nuclio-nuclio-{function}","internalInvocationServiceHostType":"str","requestTimeoutMs":"","deployTimeoutMs":"","pollMs":"","readyPollMs":"","backoffMs":"","backoffMaxMs":"","startStaggerMs":""},{"id":"smoke-fn","type":"nuclio-function","server":"smoke-srv","name":"$SMOKE_FN","runtime":"python:3.12","code":"async def handler(context, event):\n    return {\\"ok\\": True, \\"echo\\": event.body}\n","configCode":"","env_vars":[],"maxSelfHealAttempts":"","redeployDeadlineMs":"","autoRedeployOnError":"false","autoRedeployOnErrorType":"bool"},{"id":"smoke-http-in","type":"http in","z":"smoke-tab","name":"","url":"/smoke-test","method":"post","upload":false,"swaggerDoc":"","x":120,"y":120,"wires":[["smoke-inv"]]},{"id":"smoke-inv","type":"nuclio","function":"smoke-fn","name":"","timeoutMs":"","maxInFlight":"","retries":"","retryDelayMs":"","headers":[],"x":320,"y":120,"z":"smoke-tab","wires":[["smoke-http-out"],[]]},{"id":"smoke-http-out","type":"http response","z":"smoke-tab","name":"","statusCode":"","headers":{},"x":530,"y":120,"wires":[]}]
 EOFLOW
 
 # ------ Step 1: start the stack ------------------------------------------
@@ -131,24 +131,37 @@ while true; do
     sleep "$POLL_INTERVAL"
 done
 
+# Node-RED may observe the dashboard function a little after the dashboard
+# itself reports it ready. Wait for the local invoke node to have a usable
+# endpoint before sending an HTTP request that would otherwise remain open.
+echo -e "${YELLOW}==> Waiting for Node-RED function state...${NC}"
+for i in $(seq 1 60); do
+    if curl -fsS --max-time 5 \
+        "$NR_URL/nuclio/api/functions?id=smoke-fn&view=summary" 2>/dev/null \
+        | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("status", {}).get("state") == "ready"; assert d.get("invocation", {}).get("urls")' 2>/dev/null; then
+        echo -e "${GREEN}  Node-RED function is ready.${NC}"
+        break
+    fi
+    if [ "$i" -eq 60 ]; then
+        echo -e "${RED}Node-RED function did not become ready in time.${NC}"
+        EXIT_CODE=1; exit 1
+    fi
+    sleep 2
+done
+
 # ------ Step 4: invoke the function ---------------------------------------
 
 echo -e "${YELLOW}==> Invoking function...${NC}"
 
-# In Docker-local Nuclio, the internal hostname is nuclio-<namespace>-<name>.
-# Invoke from inside the nodered container so it's on the same Docker network.
-RESPONSE=$(docker exec nodered-nuclio curl -sf -X POST \
+# Invoke through Node-RED's HTTP-in -> nuclio -> HTTP-response path. This
+# validates both deployment and the public node invocation contract.
+RESPONSE=$(curl -sf -X POST \
+    --max-time "$TIMEOUT" \
     -H 'Content-Type: application/json' \
     -d '{"hello":"world"}' \
-    "http://nuclio-nuclio-$SMOKE_FN:8080" 2>&1) || {
-    # Fallback: try the Nuclio dashboard container
-    RESPONSE=$(docker exec nuclio curl -sf -X POST \
-        -H 'Content-Type: application/json' \
-        -d '{"hello":"world"}' \
-        "http://nuclio-nuclio-$SMOKE_FN:8080" 2>&1) || {
-        echo -e "${RED}Invocation failed:${NC} $RESPONSE"
-        EXIT_CODE=1; exit 1
-    }
+    "$NR_URL/smoke-test" 2>&1) || {
+    echo -e "${RED}Invocation through Node-RED failed:${NC} $RESPONSE"
+    EXIT_CODE=1; exit 1
 }
 
 echo "  Response: $RESPONSE"
