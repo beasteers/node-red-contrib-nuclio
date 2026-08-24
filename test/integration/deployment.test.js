@@ -165,6 +165,9 @@ test('autoscaled scaling mode emits replicas zero and autoscaling bounds', async
     mock = await startMockNuclio();
     await load(baseFlow(mock, {
         scalingMode: 'autoscaled',
+        // This simulates switching from fixed scaling while the hidden fixed
+        // replica field still contains its previous value.
+        scalingReplicas: '2',
         scalingMinReplicas: '1',
         scalingMaxReplicas: '3',
         scalingTargetCPU: '70',
