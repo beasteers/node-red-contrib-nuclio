@@ -13,6 +13,7 @@ All notable changes to this project are documented here.
   platform recovery as the default.
 - Reduce replica-status control-plane traffic with ready-state gating, per-function caching, request
   coalescing, and explicit stale-capacity reporting.
+- Extract the function status controller and runtime starter samples into packaged browser resources.
 
 ## [3.1.1] - 2026-08-24
 

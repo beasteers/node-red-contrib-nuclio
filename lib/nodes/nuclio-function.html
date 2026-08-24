@@ -479,6 +479,8 @@
     </style>
 
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-runtime-metadata.js"></script>
+<script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-function-samples.js"></script>
+<script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-function-status.js"></script>
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-validation.js"></script>
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-config-schema.js"></script>
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-source-parser.js"></script>
@@ -488,140 +490,12 @@
     const RUNTIME_METADATA = window.NUCLIO_RUNTIME_METADATA || [];
     const VALIDATION = window.NUCLIO_VALIDATION || {};
 
-    // Starter YAML shown in the Config editor (shared by all runtime samples).
-    const configCode = `
-apiVersion: "nuclio.io/v1"
-kind: NuclioFunction
-metadata:
-  labels: {}
-  annotations: {}
-spec:
-  build:
-    commands: []
-    # - pip install requests numpy pandas
-
-  # # add multiple workers:
-  # triggers:
-  #   mh:
-  #     kind: http
-  #     numWorkers: 4
-      
-  #############
-  # Kubernetes:
-  
-  # env: []
-  # envFrom: []
-  # volumes: []
-
-  # # Pod replica auto-scaling:
-  # minReplicas: 1
-  # maxReplicas: 1
-  # resources: {}
-  #   # Kubernetes Limits & Requests for the function's CPU and memory usage.
-  #   requests:
-  #     cpu: 1
-  #     memory: 128M
-  #   limits:
-  #     cpu: 2
-  #     memory: 256M
-  #     nvidia.com/gpu: 1
-    `.trim();
+    const FUNCTION_SAMPLES = window.NUCLIO_FUNCTION_SAMPLES || { configCode: '', samples: {} };
+    const configCode = FUNCTION_SAMPLES.configCode;
+    const SAMPLES = FUNCTION_SAMPLES.samples;
 
     // Starter code per runtime, pre-filled in the Code editor.
-    const SAMPLES = {
-        python: {
-            config: configCode,
-            entrypoint: 'handler',
-            code: `
-import nuclio_sdk
-
-async def handler(context: nuclio_sdk.Context, event: nuclio_sdk.Event):
-    # reverse the input, return JSON
-    return {
-        "some-output": event.body[::-1],
-        "hi": "Hello, from Nuclio :]",
-    }
-    `.trim()
-        },
-        golang: {
-            config: configCode,
-            entrypoint: 'Handler',
-            code: `
-package main
-
-import (
-	"github.com/nuclio/nuclio-sdk-go"
-)
-
-func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
-	context.Logger.Info("This is an unstructured %s", "log")
-
-	return nuclio.Response{
-		StatusCode:  200,
-		ContentType: "application/text",
-		Body:        []byte("Hello, from Nuclio :]"),
-	}, nil
-}
-    `.trim()
-        },
-        java: {
-            config: configCode,
-            entrypoint: 'EmptyHandler',
-            code: `
-import io.nuclio.Context;
-import io.nuclio.Event;
-import io.nuclio.EventHandler;
-import io.nuclio.Response;
-
-public class EmptyHandler implements EventHandler {
-    @Override
-    public Response handleEvent(Context context, Event event) {
-        return new Response().setBody("Hello, from Nuclio :]");
-    }
-}
-    `.trim()
-        },
-        dotnetcore: {
-            config: configCode,
-            entrypoint: 'nuclio:empty',
-            code: `
-using Nuclio.Sdk;
-
-public class nuclio
-{
-    public object empty(Context context, Event eventBase)
-    {
-        return new Response()
-        {
-            StatusCode = 200,
-            ContentType = "application/text",
-            Body = "Hello, from Nuclio :)"
-        };
-    }
-}
-    `.trim()
-        },
-        nodejs: {
-            config: configCode,
-            entrypoint: 'handler',
-            code: `
-exports.handler = function(context, event) {
-    var body = event.body.toString();
-    context.logger.info('reversing: ' + body);
-    context.callback(body.split('').reverse().join(''));
-};
-        `.trim()
-        },
-        shell: {
-            config: configCode,
-            code: `
-#!/bin/sh
-
-# reverse the input
-rev /dev/stdin
-        `.trim()
-        },
-    };
+    // Starter code is loaded from resources/nuclio-function-samples.js.
 
     // Random unique-ish function names ("adjective-noun").
     const sampleList = (list) => list[Math.floor(Math.random() * list.length)];
@@ -661,91 +535,6 @@ rev /dev/stdin
             endpoints[key(n)] = n.id;
         });
         return endpoints;
-    };
-
-    class Poller {
-        constructor(fn, interval) {
-            this.fn = fn;
-            this.interval = interval;
-            this.timer = null;
-            this.running = false;
-            this.inFlight = false;
-        }
-
-        start() {
-            if (this.running) return;
-            this.running = true;
-            this.tick();
-        }
-
-        async tick() {
-            if (!this.running || this.inFlight) return;
-            this.inFlight = true;
-            try {
-                await this.fn();
-            } catch {
-                // The poll callback owns its display of request failures.
-            } finally {
-                this.inFlight = false;
-                if (this.running) this.timer = setTimeout(() => this.tick(), this.interval);
-            }
-        }
-
-        stop() {
-            this.running = false;
-            if (this.timer) clearTimeout(this.timer);
-            this.timer = null;
-        }
-    }
-
-    // escape anything API/log-derived before it goes into innerHTML
-    const esc = (s) => `${s}`.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-    const stripAnsi = (value) => `${value ?? ''}`
-        .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '')
-        .replace(/\u009B[0-?]*[ -/]*[@-~]/g, '')
-        .replace(/\r\n/g, '\n');
-
-    const humanizeKey = (key) => `${key}`
-        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-        .replace(/[_-]+/g, ' ')
-        .replace(/\bhttp\b/gi, 'HTTP')
-        .replace(/\burl(s?)\b/gi, 'URL$1')
-        .replace(/\bapi\b/gi, 'API')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .replace(/^\w/, c => c.toUpperCase());
-
-    const fmt = (obj) => Object.entries(obj).map(([k,v]) => {
-        if (typeof v === 'string' && v.includes('\n')) {
-            return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${esc(humanizeKey(k))}</span><span class="nuclio-kv-value nuclio-kv-multiline">${esc(stripAnsi(v))}</span></div>`;
-        }
-        return `<div class="nuclio-kv-row"><span class="nuclio-kv-key">${esc(humanizeKey(k))}</span><span class="nuclio-kv-value">${esc(stripAnsi(JSON.stringify(v)))}</span></div>`;
-    }).join('');
-
-    const statusChips = (obj) => Object.entries(obj || {}).map(([k,v]) => {
-        const value = stripAnsi(typeof v === 'string' ? v : JSON.stringify(v));
-        return `<span class="nuclio-chip"><span class="nuclio-chip-key">${esc(humanizeKey(k))}</span><span class="nuclio-chip-value">${esc(value)}</span></span>`;
-    }).join('');
-
-    // don't clobber text the user is selecting/reading
-    const canUpdateElement = (element) => {
-        if (!element) return true;
-        const selection = window.getSelection();
-        if (!selection || selection.isCollapsed) return true;
-        if (!selection.rangeCount) return true;
-        const range = selection.getRangeAt(0);
-        return !element.contains(range.commonAncestorContainer);
-    };
-
-    const statusTone = (state) => {
-        if (!state || typeof state !== 'string') return 'unknown';
-        if (state === 'unavailable') return 'unavailable';
-        if (state === 'ready') return 'ok';
-        if (state === 'error' || state === 'unhealthy') return 'error';
-        if (state === 'scaledToZero') return 'idle';
-        if (state.includes('waiting') || state === 'building' || state === 'configuringResources') return 'working';
-        return 'warn';
     };
 
     const getAuthHeaders = () => {
@@ -1316,189 +1105,9 @@ rev /dev/stdin
 
             /* --------------------------------- Status Page -------------------------------- */
 
-            const detailRequests = {};
-            const detailCodeIds = {
-                runLogs: 'nuclio-logs',
-                buildLogs: 'nuclio-deploy-logs',
-                spec: 'nuclio-spec',
-            };
-            const statusElement = (id) => document.getElementById(id);
-            const asList = (value) => Array.isArray(value) ? value.filter(Boolean) : (value ? [value] : []);
-
-            const renderEndpoints = (status, invocation) => {
-                const preference = invocation?.preference || 'service';
-                const activeUrls = new Set(asList(invocation?.urls));
-                const groups = [
-                    { key: 'service', label: 'Service', urls: asList(invocation?.serviceUrls) },
-                    { key: 'internal', label: 'Internal', urls: asList(invocation?.internalUrls || status.internalInvocationUrls) },
-                    { key: 'external', label: 'External', urls: asList(invocation?.externalUrls || status.externalInvocationUrls) },
-                ];
-                const endpoints = groups.flatMap(({ key, label, urls }) => urls.map(url => ({
-                    label,
-                    url,
-                    active: activeUrls.has(url) && key === preference,
-                })));
-                const container = $('#nuclio-endpoints');
-                if (!endpoints.length) {
-                    container.html('<div class="nuclio-status-section-note">No invocation endpoint available.</div>');
-                    return;
-                }
-                container.html(endpoints.map(({ label, url, active }) =>
-                    `<div class="nuclio-endpoint-row"><span class="nuclio-endpoint-label">${esc(label)}</span><span class="nuclio-endpoint-value" title="${esc(url)}">${esc(url)}</span>${active ? '<span class="nuclio-endpoint-active">Active</span>' : '<span></span>'}</div>`
-                ).join(''));
-            };
-
-            const renderSummary = (data) => {
-                const status = data?.status || {};
-                const invocation = data?.invocation || {};
-                const metadata = data?.metadata || {};
-                const spec = data?.spec || {};
-                const state = status.state || 'unknown';
-                const tone = statusTone(state);
-                const server = RED.nodes.node(node.server);
-                const preference = invocation.preference || server?.invocationUrlPreference || 'service';
-                const mode = preference === 'internal'
-                    ? 'Internal'
-                    : preference === 'external'
-                        ? 'External'
-                        : 'Service';
-                const numberValue = value => {
-                    if (typeof value === 'number' && Number.isFinite(value)) return value;
-                    if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
-                    return undefined;
-                };
-                const readyReplicas = numberValue(status.readyReplicas ?? status.availableReplicas ?? status.activeReplicas);
-                const desiredReplicas = numberValue(status.desiredReplicas ?? status.replicas ?? spec.replicas);
-                const observedReplicas = readyReplicas === undefined
-                    ? desiredReplicas === undefined ? '' : `${desiredReplicas}`
-                    : desiredReplicas === undefined ? `${readyReplicas}` : `${readyReplicas}/${desiredReplicas}`;
-                const fixedReplicas = numberValue(spec.replicas);
-                const autoscaled = fixedReplicas === 0 || spec.targetCPU !== undefined;
-                const scaleMin = numberValue(spec.minReplicas);
-                const scaleMax = numberValue(spec.maxReplicas);
-                const scaleValue = observedReplicas || (autoscaled
-                    ? `${scaleMin ?? '—'}–${scaleMax ?? '—'}`
-                    : fixedReplicas === undefined ? '—' : `${fixedReplicas}`);
-                const scaleMeta = autoscaled
-                    ? `Autoscaling ${scaleMin ?? '—'}–${scaleMax ?? '—'} · target ${spec.targetCPU ?? 75}% CPU`
-                    : `Fixed · ${fixedReplicas ?? 'YAML-configured'} replica(s)`;
-                const replicaMeta = status.replicaStatusStale
-                    ? `Replica data stale${status.replicaStatusError ? ` (${status.replicaStatusError})` : ''}`
-                    : status.replicaStatusError
-                        ? `Replica data unavailable (${status.replicaStatusError})`
-                        : '';
-
-                $('#nuclio-status-function-name').text(metadata.name || node.name || '—');
-                $('#nuclio-status-state').text(state);
-                $('#nuclio-status-chip').attr('data-tone', tone);
-                $('#nuclio-status-updated').text(`Updated ${new Date().toLocaleTimeString()}`);
-                $('#nuclio-deployment-value').text(state);
-                $('#nuclio-deployment-meta').text(status.error || status.message || metadata.namespace || 'Nuclio deployment state');
-                $('#nuclio-runtime-value').text(spec.runtime || '—');
-                $('#nuclio-runtime-meta').text(spec.handler ? `Handler: ${spec.handler}` : 'Handler not reported');
-                $('#nuclio-scale-value').text(scaleValue);
-                $('#nuclio-scale-meta').text([scaleMeta, replicaMeta].filter(Boolean).join(' · '));
-                $('#nuclio-invocation-mode').text(`Strategy: ${mode}`);
-                if (canUpdateElement(statusElement('nuclio-status'))) {
-                    const signals = { ...status };
-                    delete signals.state;
-                    delete signals.internalInvocationUrls;
-                    delete signals.externalInvocationUrls;
-                    delete signals.replicas;
-                    delete signals.availableReplicas;
-                    delete signals.readyReplicas;
-                    delete signals.desiredReplicas;
-                    delete signals.activeReplicas;
-                    delete signals.replicaStatusError;
-                    delete signals.replicaStatusStale;
-                    const signalHtml = statusChips(signals);
-                    $('#nuclio-status').html(signalHtml);
-                    $('#nuclio-status-signals').toggleClass('nuclio-hidden', !signalHtml);
-                }
-                renderEndpoints(status, invocation);
-            };
-
-            const detailError = (key, error) => {
-                const message = error?.responseJSON?.error || error?.statusText || 'Unable to load this detail.';
-                $(`#${detailCodeIds[key]}`).text(stripAnsi(message));
-            };
-
-            const loadDetail = (key, force = false) => {
-                const details = {
-                    runLogs: {
-                        url: `/nuclio/api/functions/logs?id=${node.id}`,
-                        render: (data) => {
-                            const entries = Object.entries(data || {}).map(([replica, log]) => {
-                                const text = stripAnsi(typeof log === 'string' ? log : JSON.stringify(log));
-                                return `<div class="nuclio-log-entry"><b class="nuclio-log-level">${esc(replica)}</b><div>${esc(text || '-- no logs --')}</div></div>`;
-                            }).join('');
-                            $('#nuclio-logs').html(entries || 'No replica logs available.');
-                        },
-                    },
-                    buildLogs: {
-                        url: `/nuclio/api/functions?id=${node.id}&view=logs`,
-                        render: (data) => {
-                            const entries = (data?.logs || []).map(({ level, message, time, name, requestID, ...log }) =>
-                                `<div class="nuclio-log-entry"><b class="nuclio-log-level">${esc(stripAnsi(level || 'log'))}</b> ${esc(stripAnsi(message || ''))}${Object.keys(log).length ? `<div style="padding-left: 12px;">${fmt(log)}</div>` : ''}</div>`
-                            ).join('');
-                            $('#nuclio-deploy-logs').html(entries || 'No build logs available.');
-                        },
-                    },
-                    spec: {
-                        url: `/nuclio/api/functions?id=${node.id}&view=spec`,
-                        render: (data) => {
-                            // Secret paths are redacted server-side before this
-                            // response leaves Node-RED.
-                            $('#nuclio-spec').text(JSON.stringify({ metadata: data?.metadata, spec: data?.spec }, null, 2));
-                        },
-                    },
-                }[key];
-                if (!details || (!force && detailRequests[key])) return detailRequests[key];
-                $(`#${detailCodeIds[key]}`).text('Loading…');
-                detailRequests[key] = ajaxJson({ url: details.url, method: 'GET' })
-                    .done(details.render)
-                    .fail((e) => detailError(key, e))
-                    .always(() => { delete detailRequests[key]; });
-                return detailRequests[key];
-            };
-
-            ['runLogs', 'buildLogs', 'spec'].forEach((key) => {
-                const detailsId = key === 'runLogs' ? 'nuclio-detail-run-logs' : key === 'buildLogs' ? 'nuclio-detail-build-logs' : 'nuclio-detail-spec';
-                statusElement(detailsId)?.addEventListener('toggle', function () {
-                    if (this.open) loadDetail(key);
-                });
-            });
-            $('#nuclio-refresh-run-logs').on('click', () => loadDetail('runLogs', true));
-            $('#nuclio-refresh-build-logs').on('click', () => loadDetail('buildLogs', true));
-            $('#nuclio-refresh-spec').on('click', () => loadDetail('spec', true));
-
-            this.statusPoller = new Poller(() => {
-                // bail if the editor dialog was closed without save/cancel
-                if (!statusElement('nuclio-status-state')) {
-                    node.statusPoller?.stop();
-                    return;
-                }
-                return ajaxJson({
-                    url: `/nuclio/api/functions?id=${this.id}&view=summary`,
-                    method: 'GET',
-                }).done(renderSummary).fail((e) => {
-                    const message = e?.responseJSON?.error || e?.statusText || 'Unable to load function status.';
-                    if (!canUpdateElement(statusElement('nuclio-status'))) return;
-                    $('#nuclio-status').empty();
-                    $('#nuclio-status-signals').addClass('nuclio-hidden');
-                    $('#nuclio-status-state').text('unavailable');
-                    $('#nuclio-status-chip').attr('data-tone', 'unavailable');
-                    $('#nuclio-status-updated').text(`Last checked ${new Date().toLocaleTimeString()}`);
-                    $('#nuclio-deployment-value').text('Status unavailable');
-                    $('#nuclio-deployment-meta').text(`Nuclio status API unavailable: ${message}`);
-                    $('#nuclio-runtime-value').text('Unavailable');
-                    $('#nuclio-runtime-meta').text('Nuclio status API unavailable');
-                    $('#nuclio-scale-value').text('Unavailable');
-                    $('#nuclio-scale-meta').text('Nuclio status API unavailable');
-                    $('#nuclio-invocation-mode').text('Unavailable');
-                    $('#nuclio-endpoints').html('<div class="nuclio-status-section-note">Invocation endpoints unavailable.</div>');
-                });
-            }, 2400);
+            node.statusController = window.NUCLIO_FUNCTION_STATUS
+                ? window.NUCLIO_FUNCTION_STATUS.create({ node, RED, $, ajaxJson })
+                : null;
 
             /* ------------------------------------ Tabs ----------------------------------- */
 
@@ -1507,11 +1116,7 @@ rev /dev/stdin
                 onchange: function(tab) {
                     $("#nuclio-tabs-content").children().hide();
                     $("#" + tab.id).show();
-                    if (tab.id === "nuclio-tab-status") {
-                        node.statusPoller.start();
-                    } else {
-                        node.statusPoller.stop();
-                    }
+                    node.statusController?.onTabChange(tab.id);
                 }
             });
             tabs.addTab({
@@ -1542,8 +1147,8 @@ rev /dev/stdin
             delete this.configeditor;
             this.configEditorAssist?.destroy();
             delete this.configEditorAssist;
-            this.statusPoller.stop();
-            delete this.statusPoller;
+            this.statusController?.destroy();
+            delete this.statusController;
             $('#node-config-dialog-edit-form').off('.nuclioFunctionDirty');
             delete this.nuclioEditorDirty;
 
@@ -1616,8 +1221,8 @@ rev /dev/stdin
             delete this.configeditor;
             this.configEditorAssist?.destroy();
             delete this.configEditorAssist;
-            this.statusPoller.stop();
-            delete this.statusPoller;
+            this.statusController?.destroy();
+            delete this.statusController;
             $('#node-config-dialog-edit-form').off('.nuclioFunctionDirty');
             delete this.nuclioEditorDirty;
             this.name = this.originalName;

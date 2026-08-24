@@ -39,6 +39,28 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
         'deprecated credential override fields must not remain in the editor');
 });
 
+test('function editor loads extracted browser resources', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    const samples = require('../resources/nuclio-function-samples');
+    const status = require('../resources/nuclio-function-status');
+
+    assert.match(html, /nuclio-function-samples\.js/,
+        'runtime samples must be loaded as a browser resource');
+    assert.match(html, /nuclio-function-status\.js/,
+        'status UI must be loaded as a browser resource');
+    assert.match(html, /NUCLIO_FUNCTION_STATUS\.create/,
+        'the editor must construct the extracted status controller');
+    assert.doesNotMatch(html, /class Poller/,
+        'the status poller must not remain embedded in the editor');
+    assert.deepEqual(Object.keys(samples.samples).sort(),
+        ['dotnetcore', 'golang', 'java', 'nodejs', 'python', 'shell'],
+        'all supported runtime samples must remain available');
+    assert.match(samples.configCode, /apiVersion:\s*["']?nuclio\.io\/v1/,
+        'the shared sample configuration must remain available');
+    assert.equal(typeof status.create, 'function',
+        'the status browser resource must expose a controller factory');
+});
+
 test('function editor restores stored typed-input types on open', () => {
     const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
     assert.match(html, /const typeFieldSelector = '#node-config-input-' \+ field \+ 'Type'/,
