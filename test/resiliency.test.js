@@ -4,7 +4,10 @@ const { reconcileStep } = require('../lib/nuclio-reconcile');
 const { deployFunction, ensureProject } = require('../lib/nuclio-deploy');
 const { startMockNuclio } = require('./helpers/mock-nuclio');
 
-const delay = (ms) => new Promise(r => setTimeout(r, ms));
+const createClock = (value = 0) => ({
+    now: () => value,
+    advance: (ms) => { value += ms; },
+});
 
 // Deterministic, fast tuning - now read off the node (server cadence + function
 // recovery policy) rather than module-load env, so set them on the stub directly.
@@ -50,7 +53,7 @@ test('project discovery is coalesced and cached per server', async () => {
     const client = {
         listProjects: async () => {
             listCalls++;
-            await delay(5);
+            await new Promise(resolve => setImmediate(resolve));
             return { data: { default: { metadata: { name: 'default' } } } };
         },
         createProject: async () => {
@@ -122,10 +125,16 @@ test('backoff resets the moment the dashboard answers again', async () => {
 
 test('unhealthy self-heal is bounded, then gives up with an honest status', async () => {
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
-    const node = makeNode(mock.url);
+    const clock = createClock();
+    const node = makeNode(mock.url, { clock });
 
-    // drive ticks, waiting out the (tiny) redeploy deadline between attempts
-    for (let i = 0; i < 12; i++) { await reconcileStep(node); await delay(70); }
+    // Advance the injected clock instead of waiting for each redeploy deadline.
+    await reconcileStep(node); // first unhealthy reading: debounce holds
+    for (let attempt = 0; attempt < 3; attempt++) {
+        await reconcileStep(node);
+        clock.advance(node.redeployDeadlineMs + 1);
+    }
+    await reconcileStep(node); // max attempts reached: give up
 
     assert.equal(deployWrites(mock).length, 3);  // MAX_SELF_HEAL_ATTEMPTS, then stops
     assert.match(node.lastStatus.text, /gave up/i);
@@ -159,7 +168,8 @@ test('fresh succeeding invocations suppress self-heal despite unhealthy state', 
 test('a redeploy that never restores health cannot pin "Redeploying" forever', async () => {
     // the deadline lets a stuck redeploy lapse so the next attempt (or give-up) proceeds
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
-    const node = makeNode(mock.url);
+    const clock = createClock();
+    const node = makeNode(mock.url, { clock });
 
     await reconcileStep(node);                 // reading 1: debounce, no deploy yet
     assert.equal(node.redeploying, false);
@@ -167,7 +177,7 @@ test('a redeploy that never restores health cannot pin "Redeploying" forever', a
     assert.equal(node.redeploying, true);
     await reconcileStep(node);                 // still within deadline -> holds "Redeploying"
     assert.equal(node.lastStatus.text, 'Redeploying...');
-    await delay(70);                           // deadline lapses
+    clock.advance(node.redeployDeadlineMs + 1); // deadline lapses
     await reconcileStep(node);                 // attempt 2 proceeds
     assert.equal(node.selfHealAttempts, 2);
 });
