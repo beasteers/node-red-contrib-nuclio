@@ -195,6 +195,91 @@ The YAML editor provides completion and conservative type warnings for documente
 Unknown fields remain valid so platform-specific and newer Nuclio configuration can be used
 without waiting for a plugin update.
 
+### Kubernetes scale-to-zero
+
+Scale-to-zero is a Kubernetes/Nuclio platform feature. It requires Nuclio's Distributed Lazy
+Loading (DLX) component and the platform scale-to-zero controller; it is not provided by the
+local Docker platform.
+
+Enable the platform components when installing Nuclio. The DLX image must match the Nuclio
+version and node architecture used by the controller and dashboard:
+
+```bash
+helm upgrade --install nuclio nuclio/nuclio \
+  --set dlx.enabled=true \
+  --set-string dlx.image.tag="${NUCLIO_VERSION}-${NUCLIO_ARCH}" \
+  --set platform.scaleToZero.mode=enabled
+```
+
+For a function managed by Node-RED, choose **Autoscaled replicas** in the Config tab and set
+**Minimum replicas** to `0`, **Maximum replicas** to a positive value, and optionally set a CPU
+target. The resulting function spec should look like this:
+
+```yaml
+spec:
+  minReplicas: 0
+  maxReplicas: 3
+  targetCPU: 70
+```
+
+Do not add `spec.replicas: 0` alongside these fields. Nuclio treats an explicit `replicas` value
+as authoritative, so `replicas: 0` overrides the autoscaling bounds and prevents the processor
+Deployment from being raised when the DLX receives the first request. The Node-RED autoscaling
+helper removes stale `replicas` values when Autoscaled replicas is selected.
+
+Scale-to-zero also requires an HTTP trigger. The Node-RED invoke node automatically adds the
+`X-Nuclio-Target` header; the DLX uses it to identify the function, scale the processor back up,
+wait for readiness, and proxy the original request. Node-RED treats Nuclio's
+`scaledToZero`/scale-transition states as normal lifecycle states and does not redeploy the
+function or report a false error while it is waking.
+
+#### Request flow
+
+When the function is scaled to zero, Nuclio points its Kubernetes Service at the DLX instead of
+the processor Deployment. The first request follows this path:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant DLX
+    participant RS as NuclioResourceScaler
+    participant K8s as Kubernetes API
+    participant Pod as Function Pod
+
+    Client->>DLX: HTTP request + X-Nuclio-Target
+    DLX->>RS: SetScaleCtx(function, 1)
+    RS->>K8s: Set state: WaitingForScaleResourcesFromZero
+    K8s->>K8s: Controller reconciles Deployment to 1 replica
+    RS->>Pod: GET /internal/health
+    Pod-->>RS: Ready
+    DLX->>Pod: Proxy original request
+    Pod-->>Client: Function response
+```
+
+The readiness check is retried while the Service selector changes back from DLX to the function
+processor. This is why the initial request can take several seconds, and why the invoke timeout
+must accommodate a cold start. The implementation is in Nuclio's [DLX entrypoint](https://github.com/nuclio/nuclio/blob/3747ca0d/cmd/dlx/app/dlx.go#L35-L114),
+[scale-from-zero handler](https://github.com/nuclio/nuclio/blob/3747ca0d/pkg/platform/kube/resourcescaler/resourcescaler.go#L262-L294),
+and [readiness verification](https://github.com/nuclio/nuclio/blob/3747ca0d/pkg/platform/kube/resourcescaler/resourcescaler.go#L411-L454).
+
+Here, DLX is Nuclio's scale-from-zero HTTP proxy. It is separate from a message-broker
+dead-letter exchange and does not indicate that the request was rejected or sent to a dead-letter
+queue.
+
+CPU autoscaling above zero additionally requires a working Kubernetes metrics API, such as
+metrics-server. The DLX handles the zero-to-one transition independently of the Node-RED node;
+Node-RED remains responsible for deployment configuration, invocation, and status display.
+
+The disposable KinD canary exercises the complete path:
+
+```bash
+KIND_CANARY_SCALE_TO_ZERO=1 npm run test:kind
+```
+
+It enables DLX, deploys an autoscaled function with `minReplicas: 0`, explicitly scales it to
+zero, invokes it through Node-RED, and verifies that the invocation succeeds and the function
+returns to `ready`.
+
 ## Projects and status
 
 Functions are grouped by the selected Nuclio Project. The project name is sent with every
@@ -336,6 +421,10 @@ The repository also contains optional integration fixtures:
   CPU-loaded 1-to-3 replica canary, and runs the phased autoscaling scenario from an in-cluster
   load-generator pod through the function Service. This preserves normal Kubernetes load
   balancing; the host port-forward is used only for the one-message canary check. Set
+  `KIND_CANARY_KEEP_CLUSTER=1` to retain the cluster and logs for inspection.
+- `KIND_CANARY_SCALE_TO_ZERO=1 npm run test:kind` enables Nuclio's DLX path, configures an
+  autoscaled function with `minReplicas: 0`, explicitly scales it to zero through the dashboard,
+  then invokes it through Node-RED to verify scale-from-zero and recovery to `ready`. Set
   `KIND_CANARY_KEEP_CLUSTER=1` to retain the cluster and logs for inspection.
 - `node scripts/diagnose-redeploy.js ...` captures a local Docker/Node-RED/Nuclio timeline when
   investigating a specific redeploy problem. It is a troubleshooting aid, not part of normal

@@ -161,7 +161,7 @@ test('fixed scaling mode emits only a fixed replica count', async () => {
     assert.equal(req.body.spec.targetCPU, undefined);
 });
 
-test('autoscaled scaling mode emits replicas zero and autoscaling bounds', async () => {
+test('autoscaled scaling mode emits autoscaling bounds without fixed replicas', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {
         scalingMode: 'autoscaled',
@@ -171,10 +171,11 @@ test('autoscaled scaling mode emits replicas zero and autoscaling bounds', async
         scalingMinReplicas: '1',
         scalingMaxReplicas: '3',
         scalingTargetCPU: '70',
+        configCode: 'spec:\n  replicas: 2\n',
     }));
 
     const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
-    assert.equal(req.body.spec.replicas, 0);
+    assert.equal(req.body.spec.replicas, undefined);
     assert.equal(req.body.spec.minReplicas, 1);
     assert.equal(req.body.spec.maxReplicas, 3);
     assert.equal(req.body.spec.targetCPU, 70);

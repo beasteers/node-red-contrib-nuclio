@@ -265,6 +265,7 @@ test('custom request headers are sent with invocations', async () => {
     await reply;
     const call = mock.requests.find(r => r.method === 'POST' && r.url === '/');
     assert.equal(call.headers['x-test'], 'abc');
+    assert.equal(call.headers['x-nuclio-target'], FN);
 });
 
 test('maxInFlight backpressure routes excess messages to the fallback output', async () => {

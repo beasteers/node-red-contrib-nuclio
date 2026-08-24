@@ -19,6 +19,7 @@ NUCLIO_CHART_VERSION="${NUCLIO_CHART_VERSION:-0.23.3}"
 CANARY_IMAGE="${CANARY_IMAGE:-node-red-nuclio-kind-canary:latest}"
 KIND_CANARY_KEEP_CLUSTER="${KIND_CANARY_KEEP_CLUSTER:-0}"
 KIND_CANARY_AUTOSCALE="${KIND_CANARY_AUTOSCALE:-0}"
+KIND_CANARY_SCALE_TO_ZERO="${KIND_CANARY_SCALE_TO_ZERO:-0}"
 CANARY_MIN_REPLICAS="${CANARY_MIN_REPLICAS:-1}"
 CANARY_MAX_REPLICAS="${CANARY_MAX_REPLICAS:-1}"
 CANARY_TARGET_CPU="${CANARY_TARGET_CPU:-50}"
@@ -29,6 +30,16 @@ AUTOSCALE_CONCURRENCY="${AUTOSCALE_CONCURRENCY:-512}"
 AUTOSCALE_SCENARIO_CONFIG="${AUTOSCALE_SCENARIO_CONFIG:-$PROJECT_DIR/scripts/stress-scenario.kind-autoscale.example.json}"
 
 if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
+    [ "$CANARY_MAX_REPLICAS" = "1" ] && CANARY_MAX_REPLICAS=3
+    [ "$CANARY_CPU_BURN_MS" = "0" ] && CANARY_CPU_BURN_MS=20
+fi
+
+if [ "$KIND_CANARY_SCALE_TO_ZERO" = "1" ]; then
+    # Scale-to-zero is an autoscaled function with a zero lower bound. This
+    # mode exercises Nuclio's DLX path, which lets the Service wake a function
+    # after its processor deployment has reached zero replicas.
+    KIND_CANARY_AUTOSCALE=1
+    CANARY_MIN_REPLICAS=0
     [ "$CANARY_MAX_REPLICAS" = "1" ] && CANARY_MAX_REPLICAS=3
     [ "$CANARY_CPU_BURN_MS" = "0" ] && CANARY_CPU_BURN_MS=20
 fi
@@ -160,14 +171,23 @@ echo "Installing Nuclio $NUCLIO_VERSION from Helm chart $NUCLIO_CHART_VERSION"
 helm repo add nuclio https://nuclio.github.io/nuclio/charts --force-update >/dev/null
 helm repo update >/dev/null
 kubectl create namespace "$NUCLIO_NAMESPACE" >/dev/null
-helm upgrade --install nuclio nuclio/nuclio \
+helm_args=(upgrade --install nuclio nuclio/nuclio \
     --version "$NUCLIO_CHART_VERSION" \
     --namespace "$NUCLIO_NAMESPACE" \
     --wait --timeout 10m \
     --set-string "controller.image.tag=$NUCLIO_VERSION-$NUCLIO_ARCH" \
     --set-string "dashboard.image.tag=$NUCLIO_VERSION-$NUCLIO_ARCH" \
-    --set dashboard.containerBuilderKind=kaniko \
-    >"$LOG_DIR/helm.log" 2>&1
+    --set dashboard.containerBuilderKind=kaniko)
+if [ "$KIND_CANARY_SCALE_TO_ZERO" = "1" ]; then
+    helm_args+=(
+        --set dlx.enabled=true
+        --set-string "dlx.image.tag=$NUCLIO_VERSION-$NUCLIO_ARCH"
+        --set platform.scaleToZero.mode=enabled
+        --set platform.scaleToZero.scalerInterval=10s
+        --set platform.scaleToZero.readinessPollInterval=1s
+    )
+fi
+helm "${helm_args[@]}" >"$LOG_DIR/helm.log" 2>&1
 
 kubectl rollout status deployment/nuclio-controller -n "$NUCLIO_NAMESPACE" --timeout=5m
 kubectl rollout status deployment/nuclio-dashboard -n "$NUCLIO_NAMESPACE" --timeout=5m
@@ -233,12 +253,17 @@ module.exports = {
 };
 EOF_SETTINGS
 
+canary_scaling_fields=""
+if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
+    canary_scaling_fields='"scalingMode":"autoscaled","scalingMinReplicas":"'$CANARY_MIN_REPLICAS'","scalingMaxReplicas":"'$CANARY_MAX_REPLICAS'","scalingTargetCPU":"'$CANARY_TARGET_CPU'","scalingReplicas":"",'
+fi
+
 cat >"$NODE_RED_USER_DIR/flows.json" <<EOF_FLOWS
 [
   {"id":"canary-tab","type":"tab","label":"KinD Canary","disabled":false,"info":""},
   {"id":"canary-server","type":"nuclio-config","address":"$dashboard_url","addressType":"str","namespace":"$NUCLIO_NAMESPACE","namespaceType":"str","publicAddress":"$dashboard_url","publicAddressType":"str","invocationUrlPreference":"service","internalInvocationServiceHost":"127.0.0.1:$FUNCTION_PORT","internalInvocationServiceHostType":"str","deploymentPolicy":"managed","requestTimeoutMs":"10000","deployTimeoutMs":"60000"},
   {"id":"canary-project","type":"nuclio-project","name":"$NUCLIO_PROJECT","nameType":"str"},
-  {"id":"canary-function","type":"nuclio-function","server":"canary-server","project":"canary-project","name":"$CANARY_FUNCTION_NAME","runtime":"python:3.12","sourceType":"image","codeEntryPath":"$CANARY_IMAGE","deploymentMode":"eager","maxSelfHealAttempts":"1","redeployDeadlineMs":"120000","autoRedeployOnError":"false","autoRedeployOnErrorType":"bool","configCode":"spec:\\n  imagePullPolicy: IfNotPresent\\n  minReplicas: $CANARY_MIN_REPLICAS\\n  maxReplicas: $CANARY_MAX_REPLICAS\\n  targetCPU: $CANARY_TARGET_CPU\\n  env:\\n    - name: NUCLIO_CANARY_CPU_BURN_MS\\n      value: \"$CANARY_CPU_BURN_MS\"\\n"},
+  {"id":"canary-function","type":"nuclio-function","server":"canary-server","project":"canary-project",$canary_scaling_fields"name":"$CANARY_FUNCTION_NAME","runtime":"python:3.12","sourceType":"image","codeEntryPath":"$CANARY_IMAGE","deploymentMode":"eager","maxSelfHealAttempts":"1","redeployDeadlineMs":"120000","autoRedeployOnError":"false","autoRedeployOnErrorType":"bool","configCode":"spec:\\n  imagePullPolicy: IfNotPresent\\n  env:\\n    - name: NUCLIO_CANARY_CPU_BURN_MS\\n      value: \"$CANARY_CPU_BURN_MS\"\\n"},
   {"id":"canary-http-in","type":"http in","z":"canary-tab","name":"","url":"/kind-canary","method":"post","upload":false,"swaggerDoc":"","x":120,"y":120,"wires":[["canary-invoke"]]},
   {"id":"canary-invoke","type":"nuclio","z":"canary-tab","function":"canary-function","name":"","timeoutMs":"30000","maxInFlight":"1","retries":"0","retryDelayMs":"500","headers":[],"x":320,"y":120,"wires":[["canary-http-response"],[]]},
   {"id":"canary-http-response","type":"http response","z":"canary-tab","name":"","statusCode":"","headers":{},"x":530,"y":120,"wires":[]}
@@ -259,6 +284,9 @@ for i in $(seq 1 120); do
         2>/dev/null || true)"
     case "$state" in
         ready) break ;;
+        scaledToZero)
+            [ "$KIND_CANARY_SCALE_TO_ZERO" = "1" ] && break
+            ;;
         error|unhealthy)
             echo "Canary function entered state: $state" >&2
             kubectl get nucliofunction "$CANARY_FUNCTION_NAME" -n "$NUCLIO_NAMESPACE" -o yaml >&2 || true
@@ -274,26 +302,108 @@ for i in $(seq 1 120); do
 done
 
 echo "Forwarding the canary function service"
-kubectl port-forward -n "$NUCLIO_NAMESPACE" "service/nuclio-$CANARY_FUNCTION_NAME" "$FUNCTION_PORT:8080" \
-    >"$LOG_DIR/function-port-forward.log" 2>&1 &
-FUNCTION_FORWARD_PID=$!
-sleep 2
+if [ "$KIND_CANARY_SCALE_TO_ZERO" != "1" ]; then
+    kubectl port-forward -n "$NUCLIO_NAMESPACE" "service/nuclio-$CANARY_FUNCTION_NAME" "$FUNCTION_PORT:8080" \
+        >"$LOG_DIR/function-port-forward.log" 2>&1 &
+    FUNCTION_FORWARD_PID=$!
+    sleep 2
+fi
 
-echo "Invoking through the Node-RED nuclio node"
-response="$(curl -fsS -X POST "$node_red_url/kind-canary" \
-    -H 'Content-Type: application/json' \
-    --data '{"hello":"kind"}')"
-printf '%s\n' "$response"
-printf '%s' "$response" | python3 -c '
+if [ "$KIND_CANARY_SCALE_TO_ZERO" != "1" ]; then
+    echo "Invoking through the Node-RED nuclio node"
+    response="$(curl -fsS -X POST "$node_red_url/kind-canary" \
+        -H 'Content-Type: application/json' \
+        --data '{"hello":"kind"}')"
+    printf '%s\n' "$response"
+    printf '%s' "$response" | python3 -c '
 import json, sys
 value = json.load(sys.stdin)
 assert value.get("ok") is True, value
 assert value.get("echo") == {"hello": "kind"}, value
 '
+    echo "Canary function is available and invocation succeeded."
+fi
 
-echo "Canary function is ready and invocation succeeded."
+if [ "$KIND_CANARY_SCALE_TO_ZERO" = "1" ]; then
+    echo "Requesting the function's desired state to become scaledToZero"
+    curl -fsS -X PATCH "$dashboard_url/api/functions/$CANARY_FUNCTION_NAME" \
+        -H "x-nuclio-function-namespace: $NUCLIO_NAMESPACE" \
+        -H "x-nuclio-project-name: $NUCLIO_PROJECT" \
+        -H 'Content-Type: application/json' \
+        --data '{"desiredState":"scaledToZero"}' \
+        >"$LOG_DIR/scale-to-zero-patch.log"
 
-if [ "$KIND_CANARY_AUTOSCALE" = "1" ]; then
+    echo "Waiting for the function to reach zero replicas"
+    state=""
+    replicas=""
+    for i in $(seq 1 90); do
+        state="$(dashboard_get "/api/functions/$CANARY_FUNCTION_NAME" 2>/dev/null \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status", {}).get("state", ""))' \
+            2>/dev/null || true)"
+        replicas="$(dashboard_get "/api/functions/$CANARY_FUNCTION_NAME/replicas" 2>/dev/null \
+            | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("names") or []))' \
+            2>/dev/null || true)"
+        if [ "$state" = "scaledToZero" ] && [ "$replicas" = "0" ]; then break; fi
+        if [ "$state" = "error" ] || [ "$state" = "unhealthy" ]; then
+            echo "Scale-to-zero function entered state: $state" >&2
+            kubectl get nucliofunction "$CANARY_FUNCTION_NAME" -n "$NUCLIO_NAMESPACE" -o yaml >&2 || true
+            exit 1
+        fi
+        if [ "$i" = "90" ]; then
+            echo "Timed out waiting for scale-to-zero; state=${state:-unknown}, replicas=${replicas:-unknown}" >&2
+            kubectl get nucliofunction "$CANARY_FUNCTION_NAME" -n "$NUCLIO_NAMESPACE" -o yaml >&2 || true
+            exit 1
+        fi
+        sleep 2
+    done
+    echo "Function reached scaledToZero with zero active replicas."
+
+    echo "Forwarding the scaled-to-zero function Service through the DLX"
+    kubectl port-forward -n "$NUCLIO_NAMESPACE" "service/nuclio-$CANARY_FUNCTION_NAME" "$FUNCTION_PORT:8080" \
+        >"$LOG_DIR/function-port-forward.log" 2>&1 &
+    FUNCTION_FORWARD_PID=$!
+    sleep 2
+
+    echo "Invoking through Node-RED to verify scale-from-zero"
+    scale_from_zero_started="$(python3 -c 'import time; print(time.monotonic())')"
+    response="$(curl -fsS --max-time 120 -X POST "$node_red_url/kind-canary" \
+        -H 'Content-Type: application/json' \
+        --data '{"hello":"scale-from-zero"}')"
+    scale_from_zero_elapsed="$(python3 -c 'import sys,time; print(f"{time.monotonic() - float(sys.argv[1]):.3f}")' "$scale_from_zero_started")"
+    printf '%s\n' "$response"
+    printf '%s' "$response" | python3 -c '
+import json, sys
+value = json.load(sys.stdin)
+assert value.get("ok") is True, value
+assert value.get("echo") == {"hello": "scale-from-zero"}, value
+'
+    echo "Scale-from-zero invocation succeeded in ${scale_from_zero_elapsed}s."
+
+    echo "Waiting for Nuclio to report the function ready again"
+    for i in $(seq 1 90); do
+        state="$(dashboard_get "/api/functions/$CANARY_FUNCTION_NAME" 2>/dev/null \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status", {}).get("state", ""))' \
+            2>/dev/null || true)"
+        replicas="$(dashboard_get "/api/functions/$CANARY_FUNCTION_NAME/replicas" 2>/dev/null \
+            | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("names") or []))' \
+            2>/dev/null || true)"
+        if [ "$state" = "ready" ] && [ "$replicas" -ge 1 ] 2>/dev/null; then break; fi
+        if [ "$state" = "error" ] || [ "$state" = "unhealthy" ]; then
+            echo "Scale-from-zero function entered state: $state" >&2
+            kubectl get nucliofunction "$CANARY_FUNCTION_NAME" -n "$NUCLIO_NAMESPACE" -o yaml >&2 || true
+            exit 1
+        fi
+        if [ "$i" = "90" ]; then
+            echo "Timed out waiting for scale-from-zero readiness; state=${state:-unknown}, replicas=${replicas:-unknown}" >&2
+            kubectl get nucliofunction "$CANARY_FUNCTION_NAME" -n "$NUCLIO_NAMESPACE" -o yaml >&2 || true
+            exit 1
+        fi
+        sleep 2
+    done
+    echo "Scale-to-zero canary passed: scaled down, woke on invocation, and returned to ready."
+fi
+
+if [ "$KIND_CANARY_AUTOSCALE" = "1" ] && [ "$KIND_CANARY_SCALE_TO_ZERO" != "1" ]; then
     echo "Running phased autoscaling scenario"
     LOADGEN_POD="${CANARY_FUNCTION_NAME}-stress-loadgen"
     scenario_config_name="$(basename "$AUTOSCALE_SCENARIO_CONFIG")"

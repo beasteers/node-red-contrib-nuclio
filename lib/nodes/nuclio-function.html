@@ -1514,11 +1514,6 @@ rev /dev/stdin
                     return scalingError('fixed replicas must be a positive integer');
                 }
             } else if (scalingMode === 'autoscaled') {
-                const replicas = typedValue('scalingReplicas');
-                const literalReplicas = literalNumber('scalingReplicas');
-                if (replicas.value && replicas.type !== 'env' && literalReplicas !== 0) {
-                    return scalingError('autoscaled functions use replicas 0');
-                }
                 const min = literalNumber('scalingMinReplicas');
                 const max = literalNumber('scalingMaxReplicas');
                 const targetCPU = literalNumber('scalingTargetCPU');
@@ -1598,7 +1593,7 @@ rev /dev/stdin
                     this[field + 'Type'] = 'num';
                 });
             } else if (scalingMode === 'autoscaled') {
-                this.scalingReplicas = '0';
+                this.scalingReplicas = '';
                 this.scalingReplicasType = 'num';
             } else {
                 scalingNumberFields.forEach(field => {
