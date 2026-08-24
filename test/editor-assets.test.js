@@ -21,6 +21,10 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
         'dashboard passwords must expose a typed-input mode');
     assert.match(serverHtml, /authTokenType:\s*\{\s*value:\s*["']cred["']\s*\}/,
         'dashboard tokens must expose a typed-input mode');
+    assert.match(serverHtml, /authPasswordValue:\s*\{\s*value:\s*["']{2}\s*\}/,
+        'dashboard literal password values must use an ordinary value property');
+    assert.match(serverHtml, /authTokenValue:\s*\{\s*value:\s*["']{2}\s*\}/,
+        'dashboard literal token values must use an ordinary value property');
     assert.match(serverHtml, /types:\s*\[["']str["'],\s*["']env["'],\s*["']cred["']\]/,
         'dashboard credentials must support literal, environment, and credential values');
     assert.match(serverHtml, /this\[\x60\$\{field\}Type\x60\]\s*=\s*type/,
@@ -29,6 +33,8 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
         'dashboard auth save handling must preserve Node-RED password sentinels');
     assert.match(serverHtml, /typedInput\('value',\s*nuclioServerAuthValue\(this, 'authPassword'\)\)/,
         'dashboard password values must be restored through typedInput');
+    assert.match(serverHtml, /delete this\[field\]/,
+        'dashboard auth save handling must remove legacy ordinary auth properties');
     assert.doesNotMatch(html, /secret_vars|Credential Overrides/,
         'deprecated credential override fields must not remain in the editor');
 });

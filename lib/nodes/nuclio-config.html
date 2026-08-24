@@ -88,16 +88,23 @@
     };
 
     const nuclioServerAuthValue = (node, field) => {
-        const type = node[`${field}Type`] || (node.credentials?.[field] ? 'cred' : 'str');
+        const type = node[`${field}Type`]
+            || (node.credentials?.[field] || node.credentials?.[`has_${field}`] ? 'cred' : 'str');
         if (type === 'cred') {
-            // Preserve Node-RED's password sentinel so typedInput can render
-            // the existing credential without copying it into the flow.
-            if (node.credentials?.[field]) return node.credentials[field];
+            // Password credentials are intentionally hidden in the editor.
+            // Use Node-RED's has_<field> marker so typedInput can render its
+            // sentinel without copying the credential into the flow.
+            if (node.credentials?.[field] && node.credentials[field] !== '__PWRD__') {
+                return node.credentials[field];
+            }
+            if (node.credentials?.[field] === '__PWRD__' || node.credentials?.[`has_${field}`]) {
+                return '__PWRD__';
+            }
             // Legacy versions could leave a credential-typed value in the
             // ordinary flow property. Show it once so the next save migrates it.
-            return node[field] || '';
+            return node[field] ?? node[`${field}Value`] ?? '';
         }
-        return node[field] || '';
+        return node[`${field}Value`] ?? node[field] ?? '';
     };
 
     RED.nodes.registerType('nuclio-config', {
@@ -117,9 +124,9 @@
             authType: { value: 'none' },
             authUsername: { value: '' },
             authUsernameType: { value: 'str' },
-            authPassword: { value: '' },
+            authPasswordValue: { value: '' },
             authPasswordType: { value: 'cred' },
-            authToken: { value: '' },
+            authTokenValue: { value: '' },
             authTokenType: { value: 'cred' },
             deploymentPolicy: { value: 'managed' },
             deploymentPolicyType: { value: 'str' },
@@ -199,36 +206,54 @@
                 const input = $(`#node-config-input-${field}`);
                 const type = input.typedInput('type');
                 const value = input.typedInput('value') || '';
+                const valueField = `${field}Value`;
                 this[`${field}Type`] = type;
                 if (type === 'cred') {
+                    delete this[valueField];
+                    // Remove the legacy ordinary property even when the
+                    // credential editor returns Node-RED's existing sentinel.
                     delete this[field];
                     if (value && value !== '__PWRD__') {
                         this.credentials[field] = value;
-                    } else if (value !== '__PWRD__' && this.credentials[field] !== '__PWRD__') {
+                        this.credentials[`has_${field}`] = true;
+                    } else if (value !== '__PWRD__') {
                         delete this.credentials[field];
+                        this.credentials[`has_${field}`] = false;
                     }
                 } else {
-                    this[field] = value;
+                    this[valueField] = value;
+                    // Remove the legacy ordinary property if it is still
+                    // present in a flow migrated from the old schema.
+                    delete this[field];
                     delete this.credentials[field];
+                    delete this.credentials[`has_${field}`];
                 }
             };
             if (this.authType === 'basic') {
                 saveAuthValue('authPassword');
+                delete this.authTokenValue;
                 delete this.authToken;
                 delete this.authTokenType;
                 delete this.credentials.authToken;
+                delete this.credentials.has_authToken;
             } else if (this.authType === 'bearer') {
                 saveAuthValue('authToken');
+                delete this.authPasswordValue;
                 delete this.authPassword;
                 delete this.authPasswordType;
                 delete this.credentials.authPassword;
+                delete this.credentials.has_authPassword;
             } else {
+                delete this.authPasswordValue;
                 delete this.authPassword;
                 delete this.authPasswordType;
+                delete this.authTokenValue;
                 delete this.authToken;
                 delete this.authTokenType;
                 delete this.credentials.authPassword;
                 delete this.credentials.authToken;
+                delete this.credentials.has_authPassword;
+                delete this.credentials.has_authToken;
             }
 
             const headers = nuclioServerCollectHeaderList('#node-config-input-request-headers');
