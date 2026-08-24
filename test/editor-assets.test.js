@@ -27,6 +27,58 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
         'deprecated credential override fields must not remain in the editor');
 });
 
+test('function editor restores stored typed-input types on open', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.match(html, /this\.executionBatchSizeType \|\| ['"]num['"]/,
+        'execution batch size must restore its stored typed-input type');
+    assert.match(html, /this\.executionWorkersType \|\| ['"]num['"]/,
+        'execution workers must restore its stored typed-input type');
+    assert.match(html, /this\.executionBatchTimeoutType \|\| ['"]str['"]/,
+        'execution batch timeout must restore its stored typed-input type');
+    assert.match(html, /this\.executionEventTimeoutType \|\| ['"]str['"]/,
+        'execution event timeout must restore its stored typed-input type');
+    assert.match(html, /this\[field \+ ['"]Type['"]\] \|\| ['"]num['"]/,
+        'scaling fields must restore their stored typed-input types');
+    assert.match(html, /this\[field \+ ['"]Type['"]\] \|\| ['"]str['"]/,
+        'resource fields must restore their stored typed-input types');
+});
+
+test('function editor validates scaling values through field validators', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.doesNotMatch(html, /scalingError/,
+        'save-time scaling validation that Node-RED ignores must be removed');
+    assert.match(html, /scalingReplicas:\s*\{\s*value:\s*['"]['"],\s*validate:\s*validateScalingField\(['"]scalingReplicas['"]\)/,
+        'scalingReplicas must declare a field validator');
+    assert.match(html, /scalingMinReplicas:\s*\{\s*value:\s*['"]['"],\s*validate:\s*validateScalingField\(['"]scalingMinReplicas['"]\)/,
+        'scalingMinReplicas must declare a field validator');
+    assert.match(html, /scalingMaxReplicas:\s*\{\s*value:\s*['"]['"],\s*validate:\s*validateScalingField\(['"]scalingMaxReplicas['"]\)/,
+        'scalingMaxReplicas must declare a field validator');
+    assert.match(html, /scalingTargetCPU:\s*\{\s*value:\s*['"]['"],\s*validate:\s*validateScalingField\(['"]scalingTargetCPU['"]\)/,
+        'scalingTargetCPU must declare a field validator');
+    assert.match(html, /const scalingFieldError = \(node, field, value\) =>/,
+        'a shared scaling validator must exist');
+});
+
+test('function editor handles stored credentials without leaking the sentinel', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.match(html, /codeEntryPassword === ['"]__PWRD__['"] \?/,
+        'the editor must not display the __PWRD__ sentinel in the password field');
+    assert.match(html, /node\.credentials\.codeEntryPassword !== ['"]__PWRD__['"]\) delete node\.credentials\.codeEntryPassword/,
+        'clearing the password field must preserve an existing stored credential');
+});
+
+test('function editor only links to validated dashboard addresses', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.match(html, /\/\^https\?:/,
+        'the dashboard link must only allow http(s) addresses');
+    assert.match(html, /\.test\(base\)/,
+        'the scheme guard must be applied before linking');
+    assert.match(html, /encodeURIComponent\(project\)/,
+        'the dashboard link must encode the project segment');
+    assert.match(html, /encodeURIComponent\(name\)/,
+        'the dashboard link must encode the function name segment');
+});
+
 test('demo flow includes a direct MQTT trigger path', () => {
     const flows = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'flows.json'), 'utf8'));
     const tab = flows.find(node => node.type === 'tab' && node.label === '05 Direct MQTT trigger');

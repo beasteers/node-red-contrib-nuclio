@@ -785,31 +785,6 @@ rev /dev/stdin
         return 'warn';
     };
 
-    // mirrors lib/util.js splitByDotWithEscape (browser-side copy for redaction)
-    const splitByDotWithEscape = (str) => str.split(/(?<!\\)\./).map(part => part.replace(/\\\./g, '.'));
-
-    const redactSecrets = (obj, secretVars) => {
-        if (!obj) return obj;
-        const redacted = JSON.parse(JSON.stringify(obj));
-        for (const secret of secretVars || []) {
-            if (!secret?.name) continue;
-            const keys = splitByDotWithEscape(secret.name);
-            const lastKey = keys.pop();
-            let c = redacted;
-            for (const key of keys) {
-                if (!c || typeof c !== 'object') {
-                    c = null;
-                    break;
-                }
-                c = c[key];
-            }
-            if (c && Object.prototype.hasOwnProperty.call(c, lastKey)) {
-                c[lastKey] = '[redacted]';
-            }
-        }
-        return redacted;
-    };
-
     const getAuthHeaders = () => {
         const headers = {};
         if (!RED.settings || typeof RED.settings.get !== 'function') return headers;
@@ -935,6 +910,67 @@ rev /dev/stdin
 
 <script type="text/javascript">/* ---------------------------- Nuclio Function ----------------------------- */
 
+    // Validation helpers. These read the live dialog inputs while the editor
+    // is open and fall back to the stored node values when the framework
+    // validates a node outside a dialog (flow load, palette). Cross-field
+    // checks must use these because Node-RED only passes the field's own live
+    // value to a validate function; other properties on `this` are the last
+    // saved values until the dialog's inputs are written back on save.
+    const editorFieldValue = (node, field) => {
+        const input = $('#node-config-input-' + field);
+        return input.length ? (input.val() || '') : (node[field] ?? '');
+    };
+
+    const editorFieldType = (node, field) => {
+        const input = $('#node-config-input-' + field);
+        if (input.length && input.next('.red-ui-typedInput-container').length) {
+            return input.typedInput('type');
+        }
+        return node[field + 'Type'] || 'str';
+    };
+
+    const scalingFieldError = (node, field, value) => {
+        const mode = editorFieldValue(node, 'scalingMode') || 'yaml';
+        if (mode === 'yaml') return null;
+        if (!value) {
+            if (mode === 'fixed' && field === 'scalingReplicas') {
+                return 'Fixed scaling requires a replica count';
+            }
+            return null;
+        }
+        if (editorFieldType(node, field) === 'env') return null;
+        const num = Number(value);
+        if (!Number.isInteger(num)) return 'Must be an integer';
+        if (field === 'scalingReplicas') {
+            return num < 1 ? 'Must be a positive integer' : null;
+        }
+        if (field === 'scalingMinReplicas' || field === 'scalingMaxReplicas') {
+            if (num < 0) return 'Must be a non-negative integer';
+            if (mode === 'autoscaled') {
+                const other = field === 'scalingMinReplicas' ? 'scalingMaxReplicas' : 'scalingMinReplicas';
+                const otherValue = editorFieldValue(node, other);
+                const otherType = editorFieldType(node, other);
+                if (otherValue && otherType !== 'env' && Number.isInteger(Number(otherValue))) {
+                    if (field === 'scalingMinReplicas' && Number(otherValue) < num) {
+                        return 'Minimum cannot exceed maximum replicas';
+                    }
+                    if (field === 'scalingMaxReplicas' && Number(otherValue) > num) {
+                        return 'Maximum cannot be below minimum replicas';
+                    }
+                }
+            }
+            return null;
+        }
+        if (field === 'scalingTargetCPU') {
+            return (num < 1 || num > 100) ? 'Must be an integer from 1 to 100' : null;
+        }
+        return null;
+    };
+
+    const validateScalingField = (field) => function(value) {
+        return scalingFieldError(this, field, value) || true;
+    };
+
     RED.nodes.registerType('nuclio-function', {
         category: 'config',
         icon: "nuclio.io.ico",
@@ -948,14 +984,6 @@ rev /dev/stdin
                 required: false,
             },
             name: { value: '', validate: function(v) {
-                if(!v) {
-                    v = randomEndpoint();
-                    let existing = getUniqueValues(this, n=>n.name);
-                    while (existing[v]) {
-                        v = randomEndpoint();
-                    }
-                    this.name = v;
-                }
                 if (VALIDATION.validateFunctionName?.(v)) return false;
                 return !getUniqueValues(this, n=>n.name)[v];
             } },
@@ -983,10 +1011,10 @@ rev /dev/stdin
             executionWorkers: { value: '' }, executionWorkersType: { value: 'num' },
             executionEventTimeout: { value: '' }, executionEventTimeoutType: { value: 'str' },
             scalingMode: { value: 'yaml' },
-            scalingReplicas: { value: '' }, scalingReplicasType: { value: 'num' },
-            scalingMinReplicas: { value: '' }, scalingMinReplicasType: { value: 'num' },
-            scalingMaxReplicas: { value: '' }, scalingMaxReplicasType: { value: 'num' },
-            scalingTargetCPU: { value: '' }, scalingTargetCPUType: { value: 'num' },
+            scalingReplicas: { value: '', validate: validateScalingField('scalingReplicas') }, scalingReplicasType: { value: 'num' },
+            scalingMinReplicas: { value: '', validate: validateScalingField('scalingMinReplicas') }, scalingMinReplicasType: { value: 'num' },
+            scalingMaxReplicas: { value: '', validate: validateScalingField('scalingMaxReplicas') }, scalingMaxReplicasType: { value: 'num' },
+            scalingTargetCPU: { value: '', validate: validateScalingField('scalingTargetCPU') }, scalingTargetCPUType: { value: 'num' },
             resourceRequestsCpu: { value: '' }, resourceRequestsCpuType: { value: 'str' },
             resourceRequestsMemory: { value: '' }, resourceRequestsMemoryType: { value: 'str' },
             resourceLimitsCpu: { value: '' }, resourceLimitsCpuType: { value: 'str' },
@@ -1007,6 +1035,21 @@ rev /dev/stdin
             let node = this;
             node.originalName = node.name;
             node.nuclioEditorDirty = false;
+
+            const generateUniqueName = () => {
+                let name = randomEndpoint();
+                let existing = getUniqueValues(node, n=>n.name);
+                while (existing[name]) {
+                    name = randomEndpoint();
+                }
+                return name;
+            };
+            // New or legacy functions without a name get one generated here,
+            // where the user can see it, rather than inside the validator.
+            if (!node.name) {
+                node.name = generateUniqueName();
+                $('#node-config-input-name').val(node.name);
+            }
 
             const runtimeSelect = $('#node-config-input-runtime');
             const selectedRuntime = this.runtime || 'python:3.12';
@@ -1043,7 +1086,14 @@ rev /dev/stdin
                 const project = RED.nodes.node(node.project)?.name || 'default';
                 const server = RED.nodes.node(node.server);
                 const publicAddress = server?.publicAddress || '';
-                const fullUrl = publicAddress && name ? `${publicAddress.replace(/\/$/,'')}/projects/${project}/functions/${name}/code` : '';
+                // Only http(s) dashboard addresses may be linked. Flow-authored
+                // data must never reach an href unvalidated, and path segments
+                // are encoded so names with spaces or special characters work.
+                const base = publicAddress.replace(/\/+$/, '');
+                let fullUrl = '';
+                if (name && /^https?:\/\//i.test(base)) {
+                    fullUrl = `${base}/projects/${encodeURIComponent(project)}/functions/${encodeURIComponent(name)}/code`;
+                }
                 if (fullUrl) {
                     $('#nuclio-dashboard-link').attr('href', fullUrl).removeClass('nuclio-hidden');
                 } else {
@@ -1097,12 +1147,7 @@ rev /dev/stdin
             });
             $('#nuclio-generate-name').on('click', function() {
                 markEditorDirty();
-                let name = randomEndpoint();
-                let existing = getUniqueValues(node, n=>n.name);
-                while (existing[name]) {
-                    name = randomEndpoint();
-                }
-                $('#node-config-input-name').val(name);
+                $('#node-config-input-name').val(generateUniqueName());
             });
 
             /* -------------------------------- Code Editors ------------------------------- */
@@ -1135,7 +1180,9 @@ rev /dev/stdin
             $('#node-config-input-codeEntryReference').val(this.codeEntryReference || legacySource.reference || '');
             $('#node-config-input-codeEntryUsername').val(this.codeEntryUsername || legacySource.username || '');
             $('#node-config-input-codeEntryWorkDir').val(this.codeEntryWorkDir || legacySource.workDir || '');
-            $('#node-config-input-codeEntryPassword').val(this.credentials?.codeEntryPassword || '');
+            $('#node-config-input-codeEntryPassword').val(
+                this.credentials?.codeEntryPassword === '__PWRD__' ? '' : (this.credentials?.codeEntryPassword || '')
+            );
 
             const updateSourceFields = () => {
                 const selected = $('#node-config-input-sourceType').val() || 'sourceCode';
@@ -1173,7 +1220,6 @@ rev /dev/stdin
                 const runtime = $(this).val();
                 const [runtimeBase] = runtime.split(':');
                 const lang = langFor(runtime);
-                console.log("Changing runtime & language", runtime, lang);
 
                 let code = node.editor.getValue();
                 let configCode = node.configeditor.getValue();
@@ -1216,12 +1262,20 @@ rev /dev/stdin
             $('#node-config-input-executionBatchTimeout').val(this.executionBatchTimeout || '');
             $('#node-config-input-executionWorkers').val(this.executionWorkers || '');
             $('#node-config-input-executionEventTimeout').val(this.executionEventTimeout || '');
-            $('#node-config-input-executionBatchSize, #node-config-input-executionWorkers').typedInput({
-                default: 'num',
+            $('#node-config-input-executionBatchSize').typedInput({
+                default: this.executionBatchSizeType || 'num',
                 types: ['num', 'env'],
             });
-            $('#node-config-input-executionBatchTimeout, #node-config-input-executionEventTimeout').typedInput({
-                default: 'str',
+            $('#node-config-input-executionWorkers').typedInput({
+                default: this.executionWorkersType || 'num',
+                types: ['num', 'env'],
+            });
+            $('#node-config-input-executionBatchTimeout').typedInput({
+                default: this.executionBatchTimeoutType || 'str',
+                types: ['str', 'env'],
+            });
+            $('#node-config-input-executionEventTimeout').typedInput({
+                default: this.executionEventTimeoutType || 'str',
                 types: ['str', 'env'],
             });
 
@@ -1238,10 +1292,10 @@ rev /dev/stdin
                 $('#node-config-input-' + field).val(this[field] ?? '');
             });
             scalingNumberFields.forEach(field => {
-                $('#node-config-input-' + field).typedInput({ default: 'num', types: ['num', 'env'] });
+                $('#node-config-input-' + field).typedInput({ default: this[field + 'Type'] || 'num', types: ['num', 'env'] });
             });
             resourceFields.forEach(field => {
-                $('#node-config-input-' + field).typedInput({ default: 'str', types: ['str', 'env'] });
+                $('#node-config-input-' + field).typedInput({ default: this[field + 'Type'] || 'str', types: ['str', 'env'] });
             });
 
             const scalingFieldsHaveValues = ['scalingReplicas', 'scalingMinReplicas', 'scalingMaxReplicas', 'scalingTargetCPU']
@@ -1407,8 +1461,9 @@ rev /dev/stdin
                     spec: {
                         url: `/nuclio/api/functions?id=${node.id}&view=spec`,
                         render: (data) => {
-                            const safeSpec = redactSecrets({ spec: data?.spec }, node.resolvedSecretVars).spec;
-                            $('#nuclio-spec').text(JSON.stringify({ metadata: data?.metadata, spec: safeSpec }, null, 2));
+                            // Secret paths are redacted server-side before this
+                            // response leaves Node-RED.
+                            $('#nuclio-spec').text(JSON.stringify({ metadata: data?.metadata, spec: data?.spec }, null, 2));
                         },
                     },
                 }[key];
@@ -1492,44 +1547,6 @@ rev /dev/stdin
             let node = this;
 
             const scalingMode = $('#node-config-input-scalingMode').val() || 'yaml';
-            const typedValue = field => ({
-                value: $('#node-config-input-' + field).typedInput('value') || '',
-                type: $('#node-config-input-' + field).typedInput('type'),
-            });
-            const literalNumber = field => {
-                const input = typedValue(field);
-                if (!input.value || input.type === 'env') return undefined;
-                const value = Number(input.value);
-                return Number.isFinite(value) ? value : NaN;
-            };
-            const scalingError = message => {
-                RED.notify(`Scaling: ${message}`, { type: 'error', timeout: 5000 });
-                return false;
-            };
-            if (scalingMode === 'fixed') {
-                const replicas = typedValue('scalingReplicas');
-                const literalReplicas = literalNumber('scalingReplicas');
-                if (!replicas.value) return scalingError('fixed scaling requires a replica count');
-                if (replicas.type !== 'env' && (!Number.isInteger(literalReplicas) || literalReplicas < 1)) {
-                    return scalingError('fixed replicas must be a positive integer');
-                }
-            } else if (scalingMode === 'autoscaled') {
-                const min = literalNumber('scalingMinReplicas');
-                const max = literalNumber('scalingMaxReplicas');
-                const targetCPU = literalNumber('scalingTargetCPU');
-                if (Number.isNaN(min) || (min !== undefined && (!Number.isInteger(min) || min < 0))) {
-                    return scalingError('minimum replicas must be a non-negative integer');
-                }
-                if (Number.isNaN(max) || (max !== undefined && (!Number.isInteger(max) || max < 0))) {
-                    return scalingError('maximum replicas must be a non-negative integer');
-                }
-                if (min !== undefined && max !== undefined && min > max) {
-                    return scalingError('minimum replicas cannot exceed maximum replicas');
-                }
-                if (Number.isNaN(targetCPU) || (targetCPU !== undefined && (!Number.isInteger(targetCPU) || targetCPU < 1 || targetCPU > 100))) {
-                    return scalingError('target CPU must be an integer from 1 to 100');
-                }
-            }
 
             this.code = this.editor.getValue();
             this.editor.destroy();
@@ -1554,7 +1571,7 @@ rev /dev/stdin
             node.credentials = node.credentials || {};
             const codeEntryPassword = $('#node-config-input-codeEntryPassword').val() || '';
             if (codeEntryPassword) node.credentials.codeEntryPassword = codeEntryPassword;
-            else delete node.credentials.codeEntryPassword;
+            else if (node.credentials.codeEntryPassword !== '__PWRD__') delete node.credentials.codeEntryPassword;
             delete node.credentials.codeEntryToken;
 
             node.env_vars = collectKeyValueList("#node-config-input-env_vars-x");
@@ -1623,7 +1640,6 @@ rev /dev/stdin
             delete this.envSecretRefList;
             delete this.deploymentVariableList;
             delete this.secretList;
-            delete this.resolvedSecretVars;
         },
     });
 
@@ -1979,7 +1995,9 @@ rev /dev/stdin
 </script>
 
 <script type="text/html" data-help-name="nuclio-function">
-    <p>Deploys and reconciles a Nuclio function from Node-RED.</p>
+    <p>Deploys and reconciles a Nuclio function from Node-RED. This config node owns
+    the function's source, configuration, and lifecycle; a separate <b>Nuclio
+    Invoke</b> node calls the function at runtime.</p>
     <h3>Inputs</h3>
     <dl class="message-properties">
         <dt>Code</dt>
@@ -2000,10 +2018,27 @@ rev /dev/stdin
         redact matching status fields. The variable list is stored in Node-RED's
         encrypted credential store.</dd>
     </dl>
-    <h3>Details</h3>
-    <p>This config node owns deployment and reconciliation. It creates or updates the
-    Nuclio function in the selected project and keeps status refreshed while open.
-    In <b>Lazy</b> deployment mode, send a <code>deploy</code> command through a
-    connected <b>Nuclio Invoke</b> node to activate deployment.</p>
-    <p>Use a separate <b>Nuclio Invoke</b> node to call the function at runtime.</p>
+    <h3>Source</h3>
+    <p>The <b>Code entry type</b> selects the function source: inline <b>Source
+    code</b>, a container <b>Image</b>, a <b>Git</b> repository, or a downloadable
+    <b>Archive</b>. <b>Advanced configuration</b> leaves source fields entirely to
+    the Config tab. Source fields in the editor override matching fields in the
+    YAML configuration. For Git and archive sources the Nuclio builder downloads
+    the source, so it must be able to reach the repository or URL.</p>
+    <h3>Execution, scaling, and resources</h3>
+    <p>The <b>Execution</b> section configures the HTTP trigger (mode, batching,
+    workers, event timeout); async and batched modes follow the handler contract
+    described in the Nuclio documentation. <b>Scaling &amp; resources</b> selects
+    YAML-controlled, fixed-replica, or CPU-autoscaled deployment. Autoscaled
+    deployment with <code>minReplicas: 0</code> enables scale-to-zero on
+    Kubernetes, which requires Nuclio's DLX component; the invoke node adds the
+    <code>X-Nuclio-Target</code> header the DLX needs to wake the function.</p>
+    <h3>Deployment</h3>
+    <p>In <b>Eager</b> mode (default) the function deploys when Node-RED starts.
+    In <b>Lazy</b> mode deployment waits for a <code>deploy</code> command through
+    a connected <b>Nuclio Invoke</b> node. Unchanged functions are not redeployed;
+    the <b>Redeploy</b> action reuses the existing image, while <b>Rebuild</b>
+    forces a new image build. The <b>Status</b> tab shows live state, endpoints,
+    and run/build logs, and exposes the raw function specification with secret
+    paths redacted.</p>
 </script>
