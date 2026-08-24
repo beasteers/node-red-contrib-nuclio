@@ -39,6 +39,26 @@ test('deploys a new function: project + full spec', async () => {
     await waitReady(helper.getNode('fn'));
 });
 
+test('credential-backed environment variables are deployed without storing the value in the flow', async () => {
+    mock = await startMockNuclio();
+    const flow = baseFlow(mock, {
+        env_vars: [{ name: 'FUNCTION_TOKEN', type: 'cred', value: '__PWRD__' }],
+    });
+    await load(flow, {
+        fn: {
+            environmentVariables: JSON.stringify([
+                { name: 'FUNCTION_TOKEN', type: 'cred', value: 'secret-env-value' },
+            ]),
+        },
+    });
+
+    const req = await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    assert.deepEqual(req.body.spec.env, [{ name: 'FUNCTION_TOKEN', value: 'secret-env-value' }]);
+    assert.equal(flow[1].env_vars[0].value, '__PWRD__');
+    assert.doesNotMatch(JSON.stringify(flow), /secret-env-value/);
+    assert.ok(helper.getNode('fn').secretVarPaths.includes('spec.env.0.value'));
+});
+
 test('server authentication and custom headers are sent to the dashboard', async () => {
     mock = await startMockNuclio();
     const flow = baseFlow(mock);

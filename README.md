@@ -162,6 +162,10 @@ These are separate features:
 - **Environment Variables** are injected into the function's runtime environment.
 - **Deployment Variables** interpolate values into the function YAML before deployment.
 
+Environment Variable values support literal, process-environment, and credential typed inputs.
+Credential-backed values are stored in Node-RED's credential store and are not included in the
+ordinary flow configuration.
+
 Deployment Variables support literal values, Node-RED process environment variables, and
 encrypted credentials. Credential-backed values are always treated as secret. Literal and
 environment-backed values can be marked secret as well.

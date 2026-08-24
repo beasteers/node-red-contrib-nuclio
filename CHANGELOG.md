@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- Store credential-typed invocation headers and function environment variables in Node-RED credentials instead of ordinary flow properties.
+
 ## [3.1.1] - 2026-08-24
 
 - Persist top-level typed-input selections through Node-RED `typeField` companions instead of manual editor save handling.

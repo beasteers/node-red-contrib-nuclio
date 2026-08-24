@@ -330,6 +330,32 @@ test('custom request headers are sent with invocations', async () => {
     assert.equal(call.headers['x-nuclio-target'], FN);
 });
 
+test('credential-backed request headers are not retained in the flow configuration', async () => {
+    mock = await startMockNuclio();
+    const flow = baseFlow(mock, {}, {
+        headers: [{ name: 'X-Token', type: 'cred', value: '__PWRD__' }],
+    });
+    await load(flow, {
+        inv: {
+            headerCredentials: JSON.stringify([
+                { name: 'X-Token', type: 'cred', value: 'secret-header-value' },
+            ]),
+        },
+    });
+    await waitReady(helper.getNode('fn'));
+
+    const reply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ payload: 'hi' });
+    const msg = await reply;
+
+    const call = mock.requests.find(r => r.method === 'POST' && r.url === '/');
+    assert.equal(call.headers['x-token'], 'secret-header-value');
+    assert.equal(flow[2].headers[0].value, '__PWRD__');
+    assert.doesNotMatch(JSON.stringify(flow), /secret-header-value/);
+    assert.equal(msg.response.config, undefined);
+    assert.doesNotMatch(JSON.stringify(msg.response), /secret-header-value/);
+});
+
 test('maxInFlight backpressure routes excess messages to the fallback output', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {}, { maxInFlight: '1' }));

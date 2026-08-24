@@ -106,6 +106,23 @@ test('nuclio invoke editor uses typeField for top-level typed settings', () => {
         'ordinary typed-input types should not be copied manually in oneditsave');
 });
 
+test('dynamic credential lists declare credential storage and sanitize flow values', () => {
+    const invokeHtml = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio.html'), 'utf8');
+    const functionHtml = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.match(invokeHtml, /headerCredentials:\s*\{\s*type:\s*['"]text['"]\s*\}/,
+        'invoke headers must have a Node-RED credential field');
+    assert.match(functionHtml, /environmentVariables:\s*\{\s*type:\s*['"]text['"]\s*\}/,
+        'function environment variables must have a Node-RED credential field');
+    assert.match(invokeHtml, /nuclio-credential-list\.js/,
+        'invoke editor must load the credential list helper');
+    assert.match(functionHtml, /nuclio-credential-list\.js/,
+        'function editor must load the credential list helper');
+    assert.match(invokeHtml, /NUCLIO_CREDENTIAL_LIST\.saveEntries/,
+        'invoke editor must sanitize credential values before saving flow metadata');
+    assert.match(functionHtml, /NUCLIO_CREDENTIAL_LIST\.saveEntries/,
+        'function editor must sanitize credential values before saving flow metadata');
+});
+
 test('nuclio-project editor uses a typeField-backed config-node input', () => {
     const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-project.html'), 'utf8');
     assert.match(html, /node-config-input-name/,

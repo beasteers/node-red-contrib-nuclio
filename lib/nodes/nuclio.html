@@ -28,6 +28,8 @@
     }
 </style>
 
+<script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-credential-list.js"></script>
+
 <script type="text/javascript">
     const nuclioInvokeInitKeyValueList = (selector, items, { placeholder, defaultType, types }) => {
         const list = $(selector).editableList({
@@ -87,6 +89,9 @@
             retryDelayMsType: { value: 'num' },
             headers: { value: [] },
         },
+        credentials: {
+            headerCredentials: { type: 'text' },
+        },
         label: function () {
             const fn = RED.nodes.node(this.function);
             return fn?.name || 'nuclio invoke';
@@ -102,14 +107,21 @@
                 });
             };
             ['timeoutMs', 'maxInFlight', 'retries', 'retryDelayMs'].forEach(field => initTypedInput(field, 'num'));
-            this.headersList = nuclioInvokeInitKeyValueList("#node-input-headers", this.headers, {
+            const headers = NUCLIO_CREDENTIAL_LIST.getEntries(this, this.headers, 'headerCredentials');
+            this.headersList = nuclioInvokeInitKeyValueList("#node-input-headers", headers, {
                 placeholder: 'Header',
                 defaultType: 'str',
                 types: ['str','num','json','env','cred'],
             });
         },
         oneditsave: function() {
-            this.headers = nuclioInvokeCollectKeyValueList("#node-input-headers");
+            const headers = nuclioInvokeCollectKeyValueList("#node-input-headers");
+            this.headers = NUCLIO_CREDENTIAL_LIST.saveEntries(
+                this,
+                'headerCredentials',
+                headers,
+                name => `${name || ''}`.trim().toLowerCase(),
+            );
             delete this.headersList;
         },
         oneditcancel: function() {
@@ -206,7 +218,7 @@
                 <dt>headers</dt>
                 <dd>Response headers.</dd>
                 <dt>response</dt>
-                <dd>Raw axios response object.</dd>
+                <dd>Response data, status, status text, and response headers. Request configuration is omitted.</dd>
                 <dt>requestDurationMs</dt>
                 <dd>Elapsed time in ms for the request.</dd>
             </dl>
@@ -234,9 +246,8 @@
     header), then route to the fallback output without triggering Catch nodes.
     Retries are at-least-once: a transiently failed request may still have
     reached the function. Other errors are reported to <b>Catch</b> nodes.</p>
-    <p><b>Note:</b> header values are stored with the flow (the credential type
-    only masks the input). For sensitive headers, use the <code>env</code> type
-    and provide the value via an environment variable.</p>
+    <p><b>Note:</b> header values selected as credentials are stored in Node-RED's
+    credential store and are not included in the ordinary flow configuration.</p>
     <p>Commands are acknowledged on the result output and failures are sent to the
     fallback output. <code>deploy</code> is idempotent and activates a Lazy function;
     <code>redeploy</code> reuses the existing image; <code>rebuild</code> forces a full

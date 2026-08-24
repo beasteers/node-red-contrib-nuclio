@@ -482,6 +482,7 @@
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-validation.js"></script>
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-config-schema.js"></script>
 <script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-source-parser.js"></script>
+<script type="text/javascript" src="/resources/@bea.steers/node-red-contrib-nuclio/nuclio-credential-list.js"></script>
 
 <script type="text/javascript">
     const RUNTIME_METADATA = window.NUCLIO_RUNTIME_METADATA || [];
@@ -992,6 +993,7 @@ rev /dev/stdin
         },
         credentials: {
             deploymentVariables: { type: "text" }, // JSON list of { name, type, value, secret }
+            environmentVariables: { type: "text" }, // JSON list of runtime environment entries
             codeEntryPassword: { type: "password" },
         },
         label: function () {
@@ -1225,7 +1227,8 @@ rev /dev/stdin
             } catch (e) { /* ignore malformed values; runtime validation reports it */ }
             this.deploymentVariableList = initDeploymentVariableList('#node-config-input-deploymentVariables-x', deploymentVariables);
 
-            this.envList = initKeyValueList("#node-config-input-env_vars-x", this.env_vars, {
+            const envVars = NUCLIO_CREDENTIAL_LIST.getEntries(this, this.env_vars, 'environmentVariables');
+            this.envList = initKeyValueList("#node-config-input-env_vars-x", envVars, {
                 placeholder: 'VAR_NAME',
                 defaultType: 'str',
                 types: ['str','num','json','env','cred'],
@@ -1548,7 +1551,8 @@ rev /dev/stdin
             else if (node.credentials.codeEntryPassword !== '__PWRD__') delete node.credentials.codeEntryPassword;
             delete node.credentials.codeEntryToken;
 
-            node.env_vars = collectKeyValueList("#node-config-input-env_vars-x");
+            const envVars = collectKeyValueList("#node-config-input-env_vars-x");
+            node.env_vars = NUCLIO_CREDENTIAL_LIST.saveEntries(node, 'environmentVariables', envVars);
             delete this.envList;
             node.envSecretRefs = collectSecretReferenceList('#node-config-input-env_secret_refs-x');
             delete this.envSecretRefList;
@@ -1722,7 +1726,7 @@ rev /dev/stdin
                     Environment Variables
                 </label>
                 <p>
-                    <small>You can specify environment variables that will be available to your application at runtime.</small>
+                    <small>You can specify environment variables that will be available to your application at runtime. Values selected as credentials are stored in Node-RED's credential store.</small>
                 </p>
                 <ol id="node-config-input-env_vars-x"></ol>
             </div>
