@@ -106,6 +106,33 @@ test('undeploy deactivates eager functions until an explicit deploy command', as
     assert.ok(mock.requests.some(request => request.method === 'POST' && request.url === '/api/functions'));
 });
 
+test('undeploy cannot be undone by an in-flight missing-function reconciliation', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await waitReady(helper.getNode('fn'));
+
+    let releaseStatus;
+    mock.statusGate = new Promise(resolve => { releaseStatus = resolve; });
+    mock.requests.length = 0;
+    const fn = helper.getNode('fn');
+    fn.reconcileWake?.();
+    await mock.waitFor(request => request.method === 'GET' && request.url === `/api/functions/${FN}`);
+
+    const undeployReply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ nuclio: { command: 'undeploy' }, payload: 'control' });
+    const undeployed = await undeployReply;
+    assert.equal(undeployed.nuclio.result.deleted, true);
+    assert.equal(mock.functions[FN], undefined);
+
+    // The blocked status GET now observes the deletion and returns 404. The
+    // generation guard must discard that stale reconcile result rather than
+    // recreating the function.
+    releaseStatus();
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(mock.functions[FN], undefined);
+    assert.equal(mock.requests.filter(request => request.method === 'POST' && request.url === '/api/functions').length, 0);
+});
+
 test('invoke lifecycle commands map to idempotent deploy, redeploy, and rebuild operations', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));

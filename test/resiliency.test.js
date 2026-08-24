@@ -1,6 +1,6 @@
 const { test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { reconcileStep } = require('../lib/nuclio-reconcile');
+const { reconcileStep, sleep } = require('../lib/nuclio-reconcile');
 const { deployFunction, ensureProject } = require('../lib/nuclio-deploy');
 const { startMockNuclio } = require('./helpers/mock-nuclio');
 
@@ -70,6 +70,23 @@ test('project discovery is coalesced and cached per server', async () => {
 
     assert.equal(listCalls, 1);
     assert.equal(createCalls, 0);
+});
+
+test('waking a reconcile sleep does not clear a newer timer', async () => {
+    const node = {};
+    const firstSleep = sleep(node, 10);
+    node.reconcileWake();
+    await firstSleep;
+
+    const secondSleep = sleep(node, 40);
+    const secondTimer = node.reconcileTimer;
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(node.reconcileTimer, secondTimer);
+
+    node.reconcileWake();
+    await secondSleep;
+    assert.equal(node.reconcileTimer, null);
+    assert.equal(node.reconcileWake, null);
 });
 
 

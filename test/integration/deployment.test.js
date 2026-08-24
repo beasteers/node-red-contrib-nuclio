@@ -475,6 +475,19 @@ test('status summary and details are selectively returned', async () => {
     assert.deepEqual(logs.body, { logs: [] });
 });
 
+test('status summary reports replica-health failures without inventing capacity', async () => {
+    mock = await startMockNuclio();
+    mock.replicaStatus = 503;
+    await load(baseFlow(mock));
+    const fn = helper.getNode('fn');
+    await waitReady(fn);
+    await waitUntil(() => fn.statusSnapshot?.status?.replicaStatusError === 'HTTP 503');
+
+    const summary = await helper.request().get('/nuclio/api/functions?id=fn&view=summary').expect(200);
+    assert.equal(summary.body.status.replicaStatusError, 'HTTP 503');
+    assert.equal(summary.body.status.activeReplicas, undefined);
+});
+
 test('metrics endpoint returns authenticated Prometheus-compatible metrics', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));

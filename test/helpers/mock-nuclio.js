@@ -19,6 +19,8 @@ const http = require('http');
 //   mock.invoke         (body, req) -> { status, body } for invocations
 //   mock.invokeAddress  override the reported internal invocation host:port
 //   mock.externalInvocationUrls override the reported external invocation URLs
+//   mock.replicaStatus  if set, GET /api/functions/*/replicas returns this status
+//   mock.statusGate     one-shot promise that pauses the next function status GET
 //   mock.requests       [{ method, url, headers, body }]
 //   mock.waitFor(matchFn, { timeout }) -> Promise<request>
 //   mock.setFnState(name, state, [transitions])  convenience setter
@@ -66,6 +68,8 @@ const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflic
         failDeploys: false,
         failStatus: null,
         fn404ContentType: null,
+        replicaStatus: null,
+        statusGate: null,
         invokeAddress: null,
         externalInvocationUrls: [],
         requests: [],
@@ -164,6 +168,7 @@ const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflic
             }
 
             if (req.method === 'GET' && fnMatch && req.url.includes('/replicas')) {
+                if (mock.replicaStatus) return send(mock.replicaStatus, { error: `simulated ${mock.replicaStatus}` });
                 return send(200, { names: ['replica-1', 'replica-2'] });
             }
             if (req.method === 'GET' && fnMatch && req.url.includes('/logs/')) {
@@ -180,6 +185,9 @@ const startMockNuclio = ({ functions = {}, state = 'ready', projectCreateConflic
                 return send(200, functionsForProject);
             }
             if (req.method === 'GET' && fnMatch) {
+                const statusGate = mock.statusGate;
+                mock.statusGate = null;
+                if (statusGate) await statusGate;
                 if (mock.failStatus) {
                     return send(mock.failStatus, { error: `simulated ${mock.failStatus}` });
                 }
