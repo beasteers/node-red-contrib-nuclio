@@ -28,6 +28,17 @@ test('uses available replicas and omits idle in-flight work', () => {
     assert.equal(capacityText(fnNode, { counter: 0, maxInFlight: 10 }), '1/3r');
 });
 
+test('uses live active replica data with configured fixed replicas', () => {
+    const fnNode = {
+        statusSnapshot: {
+            status: { activeReplicas: 1 },
+            spec: { replicas: 2 },
+        },
+    };
+
+    assert.equal(replicaText(fnNode), '1/2r');
+});
+
 test('preserves status state while appending capacity', () => {
     const status = { fill: 'red', shape: 'ring', text: 'Backpressure' };
     const fnNode = {

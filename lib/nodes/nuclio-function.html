@@ -1334,8 +1334,8 @@ rev /dev/stdin
                     if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
                     return undefined;
                 };
-                const readyReplicas = numberValue(status.readyReplicas ?? status.availableReplicas);
-                const desiredReplicas = numberValue(status.desiredReplicas ?? status.replicas);
+                const readyReplicas = numberValue(status.readyReplicas ?? status.availableReplicas ?? status.activeReplicas);
+                const desiredReplicas = numberValue(status.desiredReplicas ?? status.replicas ?? spec.replicas);
                 const observedReplicas = readyReplicas === undefined
                     ? desiredReplicas === undefined ? '' : `${desiredReplicas}`
                     : desiredReplicas === undefined ? `${readyReplicas}` : `${readyReplicas}/${desiredReplicas}`;
@@ -1370,6 +1370,7 @@ rev /dev/stdin
                     delete signals.availableReplicas;
                     delete signals.readyReplicas;
                     delete signals.desiredReplicas;
+                    delete signals.activeReplicas;
                     const signalHtml = statusChips(signals);
                     $('#nuclio-status').html(signalHtml);
                     $('#nuclio-status-signals').toggleClass('nuclio-hidden', !signalHtml);

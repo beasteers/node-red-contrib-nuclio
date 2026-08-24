@@ -452,6 +452,7 @@ test('status summary and details are selectively returned', async () => {
     await helper.request().get('/nuclio/api/functions?id=fn&view=summary').expect(200);
     assert.equal(summary.body.metadata.name, FN);
     assert.equal(summary.body.status.state, 'ready');
+    assert.equal(summary.body.status.activeReplicas, 2);
     assert.equal(summary.body.spec.build, undefined);
     assert.equal(summary.body.spec.runtime, 'python:3.12');
     assert.equal(summary.body.invocation.preference, 'internal');

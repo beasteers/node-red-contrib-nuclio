@@ -250,7 +250,7 @@ test('invoke shows a Redeploying status while the function is redeploying', asyn
     inv.receive({ payload: 'hi' });
     await reply;  // message drops to fallback...
     await waitUntil(
-        () => inv.status.getCalls().some(c => c.args[0]?.text === 'Redeploying'),
+        () => inv.status.getCalls().some(c => c.args[0]?.text?.includes('Redeploying')),
         { msg: 'Redeploying status on invoke node' },
     );
 });
@@ -318,4 +318,3 @@ test('invoke nodes mirror function config errors as status', async () => {
         { msg: 'No server status on invoke node' },
     );
 });
-
