@@ -68,7 +68,7 @@
         "internalInvocationServiceHost": "nuclio-nuclio-{function}",
         "internalInvocationServiceHostType": "str",
         "externalInvocationProtocol": "http",
-        "authType": "basic",
+        "authType": "none",
         "authUsername": "aaa",
         "authUsernameType": "str",
         "authPasswordType": "cred",
@@ -317,8 +317,20 @@
         "codeEntryWorkDir": "",
         "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {\"runtime\": \"python\", \"received\": body}",
         "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nmetadata:\n  labels: {}\n  annotations: {}\nspec:\n  build:\n    commands: []\n    # - pip install requests numpy pandas\n    \n  # # add multiple workers:\n  # triggers:\n  #   mh:\n  #     kind: http\n  #     numWorkers: 4\n      \n  #############\n  # Kubernetes:\n  \n  # env: []\n  # envFrom: []\n  # volumes: []\n\n  # # Pod replica auto-scaling:\n  # minReplicas: 1\n  # maxReplicas: 1\n  # resources: {}\n  #   # Kubernetes Limits & Requests for the function's CPU and memory usage.\n  #   requests:\n  #     cpu: 1\n  #     memory: 128M\n  #   limits:\n  #     cpu: 2\n  #     memory: 256M\n  #     nvidia.com/gpu: 1",
-        "env_vars": [],
-        "envSecretRefs": [],
+        "env_vars": [
+            {
+                "name": "asdf",
+                "type": "cred",
+                "value": "__PWRD__"
+            }
+        ],
+        "envSecretRefs": [
+            {
+                "name": "asdf",
+                "secretName": "asdf",
+                "secretKey": "asdf"
+            }
+        ],
         "deploymentVariables": [],
         "deploymentMode": "eager",
         "executionTriggerName": "http",
