@@ -2,8 +2,9 @@
 
 This is a complete, minimal Node-RED plus Nuclio example. Kustomize inflates
 the Nuclio and Docker Registry Helm charts, then deploys Node-RED with the
-example flow and settings. The registry is private to the `nuclio` namespace
-and exists only to support Nuclio's in-cluster Kaniko builds.
+example flow, settings, and a demo Kubernetes Secret. The registry is private
+to the `nuclio` namespace and exists only to support Nuclio's in-cluster Kaniko
+builds.
 
 The example needs an existing Kubernetes cluster, `kubectl`, Helm, Docker, and
 KinD for the local image-loading example. See the [Nuclio
@@ -36,7 +37,13 @@ kubectl --namespace nuclio port-forward service/node-red-http 1880:1880
 
 Open [Node-RED](http://localhost:1880), deploy the **Kubernetes HTTP example**
 flow, and click **Invoke HTTP example**. The response appears in the debug
-sidebar.
+sidebar with `secret_configured: true`; the secret value is never returned.
+
+The function receives `DEMO_API_KEY` through
+`valueFrom.secretKeyRef`, referencing `example-http-secret/api-key`. The value
+in [`secret.yaml`](secret.yaml) is intentionally a visible demo placeholder,
+not a credential; replace it with a real secret management workflow for any
+non-demo deployment.
 
 Remove it with:
 

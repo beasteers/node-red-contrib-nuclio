@@ -48,6 +48,7 @@ helmCharts:
 
 resources:
   - namespace.yaml
+  - secret.yaml
   - nodered-deployment.yaml
   - nodered-service.yaml
 

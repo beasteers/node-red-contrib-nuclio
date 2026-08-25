@@ -35,13 +35,14 @@ function assertFlowReferences(file, flow) {
 test('Kubernetes HTTP reference is a complete Helm plus Kustomize application', () => {
     const prefix = 'examples/http/k8s';
     const kustomization = readYaml(`${prefix}/kustomization.yaml`);
+    const secret = readYaml(`${prefix}/secret.yaml`);
     const deployment = readYaml(`${prefix}/nodered-deployment.yaml`);
     const service = readYaml(`${prefix}/nodered-service.yaml`);
     const flow = readJson(`${prefix}/data/flows.json`);
     const container = deployment.spec.template.spec.containers[0];
     const env = Object.fromEntries((container.env || []).map(entry => [entry.name, entry.value]));
 
-    assert.deepEqual(kustomization.resources, ['namespace.yaml', 'nodered-deployment.yaml', 'nodered-service.yaml']);
+    assert.deepEqual(kustomization.resources, ['namespace.yaml', 'secret.yaml', 'nodered-deployment.yaml', 'nodered-service.yaml']);
     assert.deepEqual(
         kustomization.helmCharts.map(chart => chart.name),
         ['docker-registry', 'nuclio'],
@@ -59,6 +60,12 @@ test('Kubernetes HTTP reference is a complete Helm plus Kustomize application', 
     assert.equal(env.NUCLIO_DASHBOARD_URL, 'http://nuclio-dashboard.nuclio.svc.cluster.local:8070');
     assert.equal(env.NUCLIO_NAMESPACE, 'nuclio');
     assert.equal(env.NUCLIO_PROJECT, 'example-http-k8s');
+    assert.equal(secret.metadata.name, 'example-http-secret');
+    assert.equal(secret.stringData['api-key'], 'demo-only-replace-me');
+    assert.match(flow.find(node => node.type === 'nuclio-function').configCode, /secretKeyRef:/);
+    assert.match(flow.find(node => node.type === 'nuclio-function').configCode, /name: example-http-secret/);
+    assert.match(flow.find(node => node.type === 'nuclio-function').code, /secret_configured/);
+    assert.doesNotMatch(flow.find(node => node.type === 'nuclio-function').code, /demo-only-replace-me/);
     assertFlowReferences(`${prefix}/data/flows.json`, flow);
     assert.ok(flow.some(node => node.type === 'nuclio-config'));
     assert.ok(flow.some(node => node.type === 'nuclio-project'));
