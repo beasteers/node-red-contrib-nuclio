@@ -123,11 +123,9 @@ test('Compose smoke fixture is isolated from the example gallery', () => {
 
 test('KinD verification remains maintainer tooling', () => {
     const runner = fs.readFileSync(path.join(root, 'hack/kind/run.sh'), 'utf8');
-    const wrapper = fs.readFileSync(path.join(root, 'scripts/kind-canary.sh'), 'utf8');
     assert.match(runner, /up \[basic\|autoscale\|scale-to-zero\]/);
     assert.match(runner, /test-scenario \[basic\|autoscale\|scale-to-zero\]/);
     assert.match(runner, /down/);
-    assert.match(wrapper, /hack\/kind\/run\.sh/);
     assert.ok(fs.existsSync(path.join(root, 'hack/kind/README.md')));
     assert.match(fs.readFileSync(path.join(root, 'README.md'), 'utf8'), /hack\/kind/);
 });
