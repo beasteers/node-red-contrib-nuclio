@@ -467,13 +467,13 @@ npm run stress -- --trigger http \
   --rate 100 --duration 30
 ```
 
-For the Docker Compose fixture, run the HTTP harness inside the Node-RED container so it can
-reach the function's Docker-network hostname directly:
+For the Compose smoke fixture, start `hack/compose-smoke/docker-compose.yml` and run the HTTP
+harness inside the Node-RED container so it can reach the function's Docker-network hostname:
 
 ```bash
-docker exec nodered-nuclio node \
+docker exec nodered-nuclio-smoke node \
   /usr/src/node-red/node-red-contrib-nuclio/scripts/stress-test.js \
-  --trigger http --url http://nuclio-nuclio-demo-python-echo:8080 \
+  --trigger http --url http://nuclio-nuclio-smoke-test:8080 \
   --rate 100 --duration 30 --concurrency 64
 ```
 
@@ -517,13 +517,13 @@ dashboard/function is configured.
 
 For sustained saturation or autoscaling, use the phased scenario runner. Phases run in order and
 retain their own latency/error results; when a dashboard and function are configured, status
-samples are attached to the phase that was active when they were collected. The Compose example
+samples are attached to the phase that was active when they were collected. The Compose smoke fixture
 uses fixed replicas:
 
 ```bash
-docker exec nodered-nuclio node \
+docker exec nodered-nuclio-smoke node \
   /usr/src/node-red/node-red-contrib-nuclio/scripts/stress-scenario.js \
-  --config /usr/src/node-red/node-red-contrib-nuclio/scripts/stress-scenario.compose.json \
+  --config /usr/src/node-red/node-red-contrib-nuclio/hack/compose-smoke/stress-scenario.json \
   --output /tmp/stress-scenario-compose.json
 ```
 

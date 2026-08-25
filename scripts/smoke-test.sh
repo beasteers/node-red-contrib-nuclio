@@ -8,8 +8,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-FLOWS_FILE="$PROJECT_DIR/data/flows.json"
-FLOWS_BACKUP="$PROJECT_DIR/data/flows.json.smoke-backup"
+SMOKE_DIR="$PROJECT_DIR/hack/compose-smoke"
+COMPOSE_FILE="$SMOKE_DIR/docker-compose.yml"
 RED="\033[0;31m"  GREEN="\033[0;32m"  YELLOW="\033[0;33m"  NC="\033[0m"
 
 SMOKE_FN="smoke-test"
@@ -35,11 +35,7 @@ fi
 cleanup() {
     echo ""
     echo -e "${YELLOW}==> Tearing down docker-compose...${NC}"
-    docker compose -f "$PROJECT_DIR/docker-compose.yml" down --volumes 2>/dev/null || true
-    if [ -f "$FLOWS_BACKUP" ]; then
-        echo -e "${YELLOW}==> Restoring original flows.json${NC}"
-        mv "$FLOWS_BACKUP" "$FLOWS_FILE"
-    fi
+    docker compose -f "$COMPOSE_FILE" down --volumes 2>/dev/null || true
     if [ -n "${EXIT_CODE:-}" ] && [ "$EXIT_CODE" != "0" ]; then
         echo -e "${RED}SMOKE TEST FAILED${NC}"
     else
@@ -50,28 +46,11 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-# ------ Step 0: write the minimal smoke-test flow JSON --------------------
-
-echo -e "${YELLOW}==> Preparing smoke-test flow...${NC}"
-
-# Ensure data dir exists
-mkdir -p "$(dirname "$FLOWS_FILE")"
-
-# Back up the existing flow
-if [ -f "$FLOWS_FILE" ]; then
-    cp "$FLOWS_FILE" "$FLOWS_BACKUP"
-fi
-
-# Minimal flow: nuclio-config + nuclio-function + HTTP-in + nuclio invoke.
-cat >"$FLOWS_FILE" <<EOFLOW
-[ {"id":"smoke-tab","type":"tab","label":"Smoke","disabled":false,"info":"","env":[]},{"id":"smoke-srv","type":"nuclio-config","address":"http://nuclio-dashboard:8070","addressType":"str","publicAddress":"","publicAddressType":"str","invocationUrlPreference":"service","internalInvocationServiceHost":"nuclio-nuclio-{function}","internalInvocationServiceHostType":"str","requestTimeoutMs":"","deployTimeoutMs":"","pollMs":"","readyPollMs":"","backoffMs":"","backoffMaxMs":"","startStaggerMs":""},{"id":"smoke-fn","type":"nuclio-function","server":"smoke-srv","name":"$SMOKE_FN","runtime":"python:3.12","code":"async def handler(context, event):\n    return {\\"ok\\": True, \\"echo\\": event.body}\n","configCode":"","env_vars":[],"maxSelfHealAttempts":"","redeployDeadlineMs":"","autoRedeployOnError":"false","autoRedeployOnErrorType":"bool"},{"id":"smoke-http-in","type":"http in","z":"smoke-tab","name":"","url":"/smoke-test","method":"post","upload":false,"swaggerDoc":"","x":120,"y":120,"wires":[["smoke-inv"]]},{"id":"smoke-inv","type":"nuclio","function":"smoke-fn","name":"","timeoutMs":"","maxInFlight":"","retries":"","retryDelayMs":"","headers":[],"x":320,"y":120,"z":"smoke-tab","wires":[["smoke-http-out"],[]]},{"id":"smoke-http-out","type":"http response","z":"smoke-tab","name":"","statusCode":"","headers":{},"x":530,"y":120,"wires":[]}]
-EOFLOW
-
 # ------ Step 1: start the stack ------------------------------------------
 
 echo -e "${YELLOW}==> Building and starting Docker Compose...${NC}"
-docker compose -f "$PROJECT_DIR/docker-compose.yml" down --volumes 2>/dev/null || true
-docker compose -f "$PROJECT_DIR/docker-compose.yml" up -d --build
+docker compose -f "$COMPOSE_FILE" down --volumes 2>/dev/null || true
+docker compose -f "$COMPOSE_FILE" up -d --build
 
 # ------ Step 2: wait for services ----------------------------------------
 
@@ -105,7 +84,7 @@ while true; do
         echo -e "${RED}Timed out waiting for function to become ready.${NC}"
         echo "Last known state:"
         curl -sf "$NUCLIO_URL/api/functions" | python3 -m json.tool 2>/dev/null || true
-        docker logs nodered-nuclio --tail 40 2>/dev/null || true
+        docker logs nodered-nuclio-smoke --tail 40 2>/dev/null || true
         EXIT_CODE=1; exit 1
     fi
 
@@ -118,7 +97,7 @@ while true; do
             ;;
         error)
             echo -e "${RED}  Function entered error state.${NC}"
-            docker logs nodered-nuclio --tail 60 2>/dev/null || true
+            docker logs nodered-nuclio-smoke --tail 60 2>/dev/null || true
             EXIT_CODE=1; exit 1
             ;;
         "")
@@ -137,7 +116,7 @@ done
 echo -e "${YELLOW}==> Waiting for Node-RED function state...${NC}"
 for i in $(seq 1 60); do
     if curl -fsS --max-time 5 \
-        "$NR_URL/nuclio/api/functions?id=smoke-fn&view=summary" 2>/dev/null \
+        "$NR_URL/nuclio/api/functions?id=smoke-function&view=summary" 2>/dev/null \
         | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("status", {}).get("state") == "ready"; assert d.get("invocation", {}).get("urls")' 2>/dev/null; then
         echo -e "${GREEN}  Node-RED function is ready.${NC}"
         break

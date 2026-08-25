@@ -57,3 +57,10 @@ settings can be overridden without generating files. The static flow uses
 Node-RED environment typed properties and deployment variables; there are no
 `.tmpl` files. The script is intentionally disposable and is not a production
 Kubernetes installation recipe.
+
+The directory keeps the responsibilities explicit:
+
+- `fixture/` contains the static Node-RED/KinD application assets.
+- `scenarios/*.json` contains load profiles and other scenario data.
+- `scenarios/*.sh` contains scenario assertions and load orchestration.
+- `run.sh` owns cluster lifecycle, port-forwards, state, and shared helpers.

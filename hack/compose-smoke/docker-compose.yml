@@ -1,0 +1,32 @@
+name: nuclio-compose-smoke
+
+services:
+  nodered:
+    build:
+      context: ../..
+    image: nodered-nuclio-smoke
+    container_name: nodered-nuclio-smoke
+    restart: unless-stopped
+    ports:
+      - "${SMOKE_NODE_RED_PORT:-1882}:1880"
+    environment:
+      NUCLIO_ADDRESS: http://nuclio-dashboard:8070
+    volumes:
+      - ./flows.json:/data/flows.json
+      - ../../config/settings.js:/data/settings.js
+      - ../..:/usr/src/node-red/node-red-contrib-nuclio
+    depends_on:
+      - nuclio-dashboard
+
+  nuclio-dashboard:
+    image: ${NUCLIO_DASHBOARD_IMAGE:-quay.io/nuclio/dashboard:1.17.5-${NUCLIO_ARCH:-arm64}}
+    container_name: nuclio-compose-smoke-dashboard
+    restart: unless-stopped
+    ports:
+      - "${SMOKE_NUCLIO_PORT:-8072}:8070"
+    environment:
+      NUCLIO_CHECK_FUNCTION_CONTAINERS_HEALTHINESS: "true"
+      NUCLIO_ARCH: ${NUCLIO_ARCH:-arm64}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config/platform.yaml:/etc/nuclio/config/platform/platform.yaml:ro

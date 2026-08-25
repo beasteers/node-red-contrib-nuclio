@@ -36,7 +36,7 @@ const parseCli = argv => {
 };
 
 const usage = () => `Usage:
-  node scripts/stress-scenario.js --config scripts/stress-scenario.compose.json --output stress-scenario.json
+  node scripts/stress-scenario.js --config hack/compose-smoke/stress-scenario.json --output stress-scenario.json
 
 Options:
   --config <path>             JSON scenario definition (required)

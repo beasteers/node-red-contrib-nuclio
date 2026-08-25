@@ -97,6 +97,30 @@ test('Kubernetes HTTP reference is a small Kustomize application', () => {
     assert.match(fs.readFileSync(path.join(root, `${prefix}/README.md`), 'utf8'), /kubectl apply -k/);
 });
 
+test('Compose smoke fixture is isolated from the example gallery', () => {
+    const prefix = 'hack/compose-smoke';
+    const compose = readYaml(`${prefix}/docker-compose.yml`);
+    const platform = readYaml(`${prefix}/config/platform.yaml`);
+    const flow = readJson(`${prefix}/flows.json`);
+    const smokeScript = fs.readFileSync(path.join(root, 'scripts/smoke-test.sh'), 'utf8');
+    const scenario = readJson(`${prefix}/stress-scenario.json`);
+
+    assert.equal(compose.name, 'nuclio-compose-smoke');
+    assert.ok(compose.services?.nodered, 'smoke fixture: missing Node-RED service');
+    assert.ok(compose.services?.['nuclio-dashboard'], 'smoke fixture: missing Nuclio dashboard service');
+    assert.equal(
+        platform.local?.defaultFunctionContainerNetworkName,
+        `${compose.name}_default`,
+        'smoke fixture: local platform network must match Compose',
+    );
+    assertFlowReferences(`${prefix}/flows.json`, flow);
+    assert.equal(flow.find(node => node.type === 'nuclio-function').name, 'smoke-test');
+    assert.equal(scenario.defaults.url, 'http://nuclio-nuclio-smoke-test:8080');
+    assert.match(smokeScript, /SMOKE_DIR=.*hack\/compose-smoke/);
+    assert.match(smokeScript, /COMPOSE_FILE=.*docker-compose\.yml/);
+    assert.doesNotMatch(smokeScript, /data\/flows\.json|FLOWS_BACKUP/);
+});
+
 test('KinD verification remains maintainer tooling', () => {
     const runner = fs.readFileSync(path.join(root, 'hack/kind/run.sh'), 'utf8');
     const wrapper = fs.readFileSync(path.join(root, 'scripts/kind-canary.sh'), 'utf8');

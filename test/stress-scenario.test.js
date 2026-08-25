@@ -17,7 +17,7 @@ test('stress scenario converts camelCase defaults into stress arguments', () => 
 test('stress scenario runs phases in order and disables repeated warmups', async () => {
     const seen = [];
     const result = await runScenario({
-        config: path.join(__dirname, '..', 'scripts', 'stress-scenario.compose.json'),
+        config: path.join(__dirname, '..', 'hack', 'compose-smoke', 'stress-scenario.json'),
         quiet: true,
     }, {
         benchmark: async options => {

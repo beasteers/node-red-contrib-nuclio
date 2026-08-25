@@ -1,0 +1,78 @@
+[
+  {
+    "id": "smoke-tab",
+    "type": "tab",
+    "label": "Smoke",
+    "disabled": false,
+    "info": "Minimal HTTP smoke flow for the real Docker Compose dashboard.",
+    "env": []
+  },
+  {
+    "id": "smoke-server",
+    "type": "nuclio-config",
+    "address": "http://nuclio-dashboard:8070",
+    "addressType": "str",
+    "publicAddress": "",
+    "publicAddressType": "str",
+    "invocationUrlPreference": "service",
+    "internalInvocationServiceHost": "nuclio-nuclio-{function}",
+    "internalInvocationServiceHostType": "str",
+    "requestTimeoutMs": "10000",
+    "deployTimeoutMs": "60000"
+  },
+  {
+    "id": "smoke-function",
+    "type": "nuclio-function",
+    "server": "smoke-server",
+    "name": "smoke-test",
+    "runtime": "python:3.12",
+    "sourceType": "sourceCode",
+    "codeEntryPath": "",
+    "code": "def handler(context, event):\n    return {'ok': True, 'echo': event.body}",
+    "configCode": "",
+    "env_vars": [],
+    "maxSelfHealAttempts": "1",
+    "redeployDeadlineMs": "120000",
+    "autoRedeployOnError": "false",
+    "autoRedeployOnErrorType": "bool"
+  },
+  {
+    "id": "smoke-http-in",
+    "type": "http in",
+    "z": "smoke-tab",
+    "name": "",
+    "url": "/smoke-test",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 120,
+    "y": 120,
+    "wires": [["smoke-invoke"]]
+  },
+  {
+    "id": "smoke-invoke",
+    "type": "nuclio",
+    "z": "smoke-tab",
+    "function": "smoke-function",
+    "name": "",
+    "timeoutMs": "30000",
+    "maxInFlight": "1",
+    "retries": "0",
+    "retryDelayMs": "500",
+    "headers": [],
+    "x": 320,
+    "y": 120,
+    "wires": [["smoke-http-out"], []]
+  },
+  {
+    "id": "smoke-http-out",
+    "type": "http response",
+    "z": "smoke-tab",
+    "name": "",
+    "statusCode": "",
+    "headers": {},
+    "x": 530,
+    "y": 120,
+    "wires": []
+  }
+]
