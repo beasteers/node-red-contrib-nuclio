@@ -333,11 +333,15 @@ The **Redeploy** action reuses the existing image. **Rebuild** forces a new imag
 useful for picking up new commits behind an unchanged Git URL.
 
 Nuclio reports container health and owns platform-resource recovery; Node-RED performs desired-state
-reconciliation and observes that health. By default, `unhealthy` and `error` states are reported
-without a Node-RED redeploy so Nuclio can recover transient platform failures. The optional
-`Auto-redeploy on unhealthy` and `Auto-redeploy on error` policies make Node-RED an explicit recovery
-actuator; unhealthy recovery waits for two consecutive observations before acting. Status is still
-polled after successful invocations.
+reconciliation and observes that health. Eager functions have a narrow startup-recovery window so a
+host or Docker daemon restart can recover a missing processor without a manual command. During that
+window, repeated `unhealthy` observations can trigger a forced redeploy that reuses the existing image;
+retries use the server's exponential failure backoff and stop after the function has been healthy for
+10 minutes. Lazy functions that have not been activated and scale-to-zero functions are excluded.
+Outside that window, `unhealthy` and `error` states are reported without a Node-RED redeploy so Nuclio
+can recover transient platform failures. The optional `Auto-redeploy on unhealthy` and
+`Auto-redeploy on error` policies make Node-RED an explicit recovery actuator; unhealthy recovery waits
+for two consecutive observations before acting. Status is still polled after successful invocations.
 
 Replica capacity is supplemental status information. Node-RED samples it only for ready functions,
 coalesces concurrent reads, and caches each function's observation briefly. If a refresh fails, the

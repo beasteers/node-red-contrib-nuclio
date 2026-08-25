@@ -9,6 +9,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- Add bounded startup recovery for eager functions after host or Docker daemon restarts, using
+  exponential backoff, stable-health reset, and no image rebuild.
 - Make unhealthy-state recovery opt-in, keep unknown states observational, and preserve Nuclio-owned
   platform recovery as the default.
 - Reduce replica-status control-plane traffic with ready-state gating, per-function caching, request

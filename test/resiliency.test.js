@@ -193,6 +193,85 @@ test('unhealthy state is observed without self-healing by default', async () => 
     assert.equal(node.unhealthyStreak, 0);
 });
 
+test('startup recovery retries exponentially and resets after stable readiness', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
+    const clock = createClock();
+    const node = makeNode(mock.url, {
+        clock,
+        redeployDeadlineMs: 0,
+        startupRecoveryActive: true,
+        startupRecoveryStableMs: 100,
+        server: { address: mock.url, ...SERVER, backoffMs: 10, backoffMaxMs: 40 },
+    });
+
+    await reconcileStep(node); // first unhealthy reading: debounce holds
+    await reconcileStep(node); // attempt 1, next retry at t=10
+    assert.equal(deployWrites(mock).length, 1);
+    assert.equal(node.startupRecoveryAttempts, 1);
+    assert.equal(node.startupRecoveryNextAt, 10);
+
+    await reconcileStep(node); // still before the retry deadline
+    assert.equal(deployWrites(mock).length, 1);
+
+    clock.advance(10);
+    await reconcileStep(node); // attempt 2, delay doubles to 20ms
+    assert.equal(deployWrites(mock).length, 2);
+    assert.equal(node.startupRecoveryNextAt, 30);
+
+    clock.advance(20);
+    await reconcileStep(node); // attempt 3, delay doubles to the 40ms cap
+    assert.equal(deployWrites(mock).length, 3);
+    assert.equal(node.startupRecoveryNextAt, 70);
+
+    clock.advance(40);
+    await reconcileStep(node); // attempt 4, delay remains capped at 40ms
+    assert.equal(deployWrites(mock).length, 4);
+    assert.equal(node.startupRecoveryNextAt, 110);
+
+    mock.state = 'ready';
+    await reconcileStep(node); // recovery starts its stable-health window
+    assert.equal(node.startupRecoveryActive, true);
+    assert.equal(node.startupRecoveryHealthySince, 70);
+    assert.equal(node.startupRecoveryAttempts, 4);
+
+    clock.advance(node.startupRecoveryStableMs - 1);
+    await reconcileStep(node);
+    assert.equal(node.startupRecoveryActive, true);
+    assert.equal(node.startupRecoveryAttempts, 4);
+
+    clock.advance(1);
+    await reconcileStep(node);
+    assert.equal(node.startupRecoveryActive, false);
+    assert.equal(node.startupRecoveryAttempts, 0);
+    assert.equal(node.startupRecoveryNextAt, 0);
+});
+
+test('startup recovery does not activate lazy or scale-to-zero functions', async () => {
+    mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
+    const lazyNode = makeNode(mock.url, {
+        lazyActivated: false,
+        startupRecoveryActive: false,
+    });
+
+    await reconcileStep(lazyNode);
+    await reconcileStep(lazyNode);
+    assert.equal(deployWrites(mock).length, 0);
+
+    const scaleToZeroNode = makeNode(mock.url, {
+        startupRecoveryActive: true,
+        fnConfigSpec: {
+            name: 'fn',
+            runtime: 'python:3.12',
+            code: 'x = 1',
+            config: { spec: { replicas: 0 } },
+            address: mock.url,
+        },
+    });
+    await reconcileStep(scaleToZeroNode);
+    await reconcileStep(scaleToZeroNode);
+    assert.equal(deployWrites(mock).length, 0);
+});
+
 test('a redeploy that never restores health cannot pin "Redeploying" forever', async () => {
     // the deadline lets a stuck redeploy lapse so the next attempt (or give-up) proceeds
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
