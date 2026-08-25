@@ -1,0 +1,3 @@
+local:
+  defaultFunctionContainerNetworkName: nuclio-mqtt-example_default
+

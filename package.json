@@ -14,7 +14,7 @@
     "test": "node --test test/*.test.js",
     "lint": "eslint",
     "smoke": "bash scripts/smoke-test.sh",
-    "test:kind": "bash scripts/kind-canary.sh",
+    "test:kind": "bash hack/kind/run.sh",
     "stress": "node scripts/stress-test.js",
     "stress:matrix": "node scripts/stress-matrix.js",
     "stress:scenario": "node scripts/stress-scenario.js",

@@ -1,0 +1,205 @@
+[
+  {
+    "id": "00000000000000b0",
+    "type": "tab",
+    "label": "NATS MQTT bridge example",
+    "disabled": false,
+    "info": "Node-RED publishes through NATS MQTT; Nuclio consumes the native NATS subject and publishes the transformed result back through the MQTT listener.",
+    "env": []
+  },
+  {
+    "id": "0000000000000001",
+    "type": "nuclio-config",
+    "address": "http://nuclio-dashboard:8070",
+    "addressType": "str",
+    "namespace": "nuclio",
+    "namespaceType": "str",
+    "publicAddress": "http://localhost:8072",
+    "publicAddressType": "str",
+    "invocationUrlPreference": "service",
+    "internalInvocationServiceHost": "nuclio-nuclio-{function}",
+    "internalInvocationServiceHostType": "str",
+    "externalInvocationProtocol": "http",
+    "authType": "none",
+    "authUsername": "aaa",
+    "authUsernameType": "str",
+    "authPasswordType": "cred",
+    "authTokenType": "cred",
+    "deploymentPolicy": "managed",
+    "deploymentPolicyType": "str",
+    "requestTimeoutMs": "",
+    "requestTimeoutMsType": "num",
+    "deployTimeoutMs": "",
+    "deployTimeoutMsType": "num",
+    "pollMs": "",
+    "pollMsType": "num",
+    "readyPollMs": "",
+    "readyPollMsType": "num",
+    "backoffMs": "",
+    "backoffMsType": "num",
+    "backoffMaxMs": "",
+    "backoffMaxMsType": "num",
+    "startStaggerMs": "",
+    "startStaggerMsType": "num"
+  },
+  {
+    "id": "00000000000000b1",
+    "type": "nuclio-project",
+    "name": "example-nats-mqtt",
+    "nameType": "str"
+  },
+  {
+    "id": "00000000000000b2",
+    "type": "mqtt-broker",
+    "name": "NATS MQTT",
+    "broker": "nats",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "00000000000000b3",
+    "type": "nuclio-function",
+    "z": "00000000000000b0",
+    "server": "0000000000000001",
+    "project": "00000000000000b1",
+    "name": "example-nats-mqtt-transform",
+    "runtime": "python:3.12",
+    "sourceType": "sourceCode",
+    "codeEntryPath": "",
+    "codeEntryBranch": "",
+    "codeEntryTag": "",
+    "codeEntryReference": "",
+    "codeEntryUsername": "",
+    "codeEntryWorkDir": "",
+    "code": "import asyncio\nimport json\nimport os\nfrom datetime import datetime, timezone\nfrom threading import Thread\n\nfrom nats.aio.client import Client as NATS\n\nasync def _publish_async(value):\n    client = NATS()\n    await client.connect(servers=os.environ.get('NATS_URL', 'nats://nats:4222'))\n    await client.publish(\n        os.environ.get('NATS_OUTPUT_SUBJECT', 'example.nats.mqtt.output'),\n        json.dumps(value).encode('utf-8'),\n    )\n    await client.flush()\n    await client.close()\n\ndef _publish(value):\n    errors = []\n    def run():\n        try:\n            asyncio.run(_publish_async(value))\n        except Exception as error:\n            errors.append(error)\n    thread = Thread(target=run)\n    thread.start()\n    thread.join()\n    if errors:\n        raise errors[0]\n\ndef handler(context, event):\n    body = getattr(event, 'body', None)\n    if isinstance(body, bytes):\n        body = body.decode('utf-8')\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    result = {\n        'trigger': 'nats-mqtt',\n        'received': body,\n        'ran_at': datetime.now(timezone.utc).isoformat(),\n    }\n    _publish(result)\n    return result",
+    "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    commands:\n      - pip install nats-py\n  triggers:\n    nats:\n      kind: nats\n      url: nats://nats:4222\n      attributes:\n        topic: example.nats.mqtt.input\n        queueName: demo-nats-mqtt\n        reply: false",
+    "env_vars": [
+      {
+        "name": "NATS_URL",
+        "value": "nats://nats:4222",
+        "type": "str"
+      },
+      {
+        "name": "NATS_OUTPUT_SUBJECT",
+        "value": "example.nats.mqtt.output",
+        "type": "str"
+      }
+    ],
+    "deploymentMode": "eager",
+    "maxSelfHealAttempts": "2",
+    "redeployDeadlineMs": "120000",
+    "autoRedeployOnError": "false",
+    "autoRedeployOnErrorType": "bool"
+  },
+  {
+    "id": "00000000000000b4",
+    "type": "comment",
+    "z": "00000000000000b0",
+    "name": "NATS subject through MQTT",
+    "info": "Node-RED publishes to example/nats/mqtt/input through NATS's MQTT listener. The Nuclio NATS trigger consumes example.nats.mqtt.input and publishes the transformed result to example.nats.mqtt.output, which NATS delivers back to Node-RED over MQTT.",
+    "x": 310,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "00000000000000b5",
+    "type": "inject",
+    "z": "00000000000000b0",
+    "name": "Publish NATS MQTT example event",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"message\":\"hello from Node-RED\",\"transport\":\"nats-mqtt\"}",
+    "payloadType": "json",
+    "x": 180,
+    "y": 220,
+    "wires": [
+      [
+        "00000000000000b6"
+      ]
+    ]
+  },
+  {
+    "id": "00000000000000b6",
+    "type": "mqtt out",
+    "z": "00000000000000b0",
+    "name": "NATS MQTT input",
+    "topic": "example/nats/mqtt/input",
+    "qos": "0",
+    "retain": "",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "00000000000000b2",
+    "x": 470,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "00000000000000b7",
+    "type": "mqtt in",
+    "z": "00000000000000b0",
+    "name": "NATS MQTT output",
+    "topic": "example/nats/mqtt/output",
+    "qos": "0",
+    "datatype": "auto-detect",
+    "broker": "00000000000000b2",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 190,
+    "y": 320,
+    "wires": [
+      [
+        "00000000000000b8"
+      ]
+    ]
+  },
+  {
+    "id": "00000000000000b8",
+    "type": "debug",
+    "z": "00000000000000b0",
+    "name": "Transformed NATS MQTT example event",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 520,
+    "y": 320,
+    "wires": []
+  }
+]

@@ -1,0 +1,190 @@
+[
+  {
+    "id": "3000000000000001",
+    "type": "tab",
+    "label": "Batching example",
+    "disabled": false,
+    "info": "Node-RED emits four messages and Nuclio batches them into one function invocation.",
+    "env": []
+  },
+  {
+    "id": "3000000000000002",
+    "type": "nuclio-config",
+    "address": "http://nuclio-dashboard:8070",
+    "addressType": "str",
+    "namespace": "nuclio",
+    "namespaceType": "str",
+    "publicAddress": "http://localhost:8072",
+    "publicAddressType": "str",
+    "invocationUrlPreference": "service",
+    "internalInvocationServiceHost": "nuclio-nuclio-{function}",
+    "internalInvocationServiceHostType": "str",
+    "externalInvocationProtocol": "http",
+    "authType": "none",
+    "authUsername": "",
+    "authUsernameType": "str",
+    "authPasswordType": "cred",
+    "authTokenType": "cred",
+    "deploymentPolicy": "managed",
+    "deploymentPolicyType": "str",
+    "requestTimeoutMs": "",
+    "requestTimeoutMsType": "num",
+    "deployTimeoutMs": "",
+    "deployTimeoutMsType": "num",
+    "pollMs": "",
+    "pollMsType": "num",
+    "readyPollMs": "",
+    "readyPollMsType": "num",
+    "backoffMs": "",
+    "backoffMsType": "num",
+    "backoffMaxMs": "",
+    "backoffMaxMsType": "num",
+    "startStaggerMs": "",
+    "startStaggerMsType": "num"
+  },
+  {
+    "id": "3000000000000003",
+    "type": "nuclio-project",
+    "name": "example-batching",
+    "nameType": "str"
+  },
+  {
+    "id": "3000000000000004",
+    "type": "nuclio-function",
+    "z": "3000000000000001",
+    "server": "3000000000000002",
+    "project": "3000000000000003",
+    "name": "example-batch-echo",
+    "runtime": "python:3.12",
+    "sourceType": "sourceCode",
+    "codeEntryPath": "",
+    "codeEntryBranch": "",
+    "codeEntryTag": "",
+    "codeEntryReference": "",
+    "codeEntryUsername": "",
+    "codeEntryWorkDir": "",
+    "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode('utf-8')\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {'runtime': 'python', 'batch_size': len(body) if isinstance(body, list) else None, 'batch_payload': body}",
+    "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  minReplicas: 1\n  maxReplicas: 1\n  triggers:\n    default-http:\n      kind: http\n      batch:\n        mode: enable\n        batchSize: 4\n        timeout: 1s",
+    "env_vars": [],
+    "deploymentMode": "eager",
+    "executionTriggerName": "http",
+    "maxSelfHealAttempts": "2",
+    "redeployDeadlineMs": "120000",
+    "autoRedeployOnError": "false",
+    "autoRedeployOnErrorType": "bool"
+  },
+  {
+    "id": "3000000000000005",
+    "type": "comment",
+    "z": "3000000000000001",
+    "name": "Batch four messages",
+    "info": "The trigger waits for four messages or one second, then invokes the function once. The burst generator makes the behavior easy to reproduce.",
+    "x": 200,
+    "y": 80,
+    "wires": []
+  },
+  {
+    "id": "3000000000000006",
+    "type": "inject",
+    "z": "3000000000000001",
+    "name": "Send four messages",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "batch-example",
+    "payload": "true",
+    "payloadType": "bool",
+    "x": 170,
+    "y": 180,
+    "wires": [
+      [
+        "3000000000000007"
+      ]
+    ]
+  },
+  {
+    "id": "3000000000000007",
+    "type": "function",
+    "z": "3000000000000001",
+    "name": "Create four-message burst",
+    "func": "const values = [1, 2, 3, 4];\nreturn [values.map(value => ({ payload: { value }, topic: msg.topic }))];",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 430,
+    "y": 180,
+    "wires": [
+      [
+        "3000000000000008"
+      ]
+    ]
+  },
+  {
+    "id": "3000000000000008",
+    "type": "nuclio",
+    "z": "3000000000000001",
+    "function": "3000000000000004",
+    "timeoutMs": "10000",
+    "timeoutMsType": "num",
+    "maxInFlight": "8",
+    "maxInFlightType": "num",
+    "retries": "0",
+    "retriesType": "num",
+    "retryDelayMs": "500",
+    "retryDelayMsType": "num",
+    "headers": [],
+    "x": 700,
+    "y": 180,
+    "wires": [
+      [
+        "3000000000000009"
+      ],
+      [
+        "3000000000000010"
+      ]
+    ]
+  },
+  {
+    "id": "3000000000000009",
+    "type": "debug",
+    "z": "3000000000000001",
+    "name": "Batch response",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 930,
+    "y": 160,
+    "wires": []
+  },
+  {
+    "id": "3000000000000010",
+    "type": "debug",
+    "z": "3000000000000001",
+    "name": "Batch error",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 920,
+    "y": 220,
+    "wires": []
+  }
+]

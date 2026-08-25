@@ -46,40 +46,14 @@ Restart Node-RED, then add a **Nuclio Server**, **Nuclio Project**, **Nuclio Fun
 Functions deploy eagerly on Node-RED startup by default. Set **Deployment mode** to **Lazy** if
 a function should not be created until a flow explicitly sends a `deploy` command.
 
-### Direct MQTT trigger demo
+## Runnable examples
 
-The repository's Docker Compose fixture includes an optional Mosquitto broker and a **05 Direct
-MQTT trigger** flow. In that example, Node-RED publishes a test event to Mosquitto, while Nuclio
-subscribes directly, transforms the event, and publishes the result to a second MQTT topic. The
-message does not pass through the HTTP-oriented Nuclio Invoke node.
+Focused, repository-local Compose scenarios live under [`examples/`](examples/). Start them with
+the architecture-aware [`examples/run-compose.sh`](examples/run-compose.sh); its README describes
+the HTTP, cron, batching, MQTT, native NATS, and NATS/MQTT bridge paths.
 
-Start the local fixture with `docker compose up -d`, open Node-RED on port `1882`, deploy the
-flow, and click **Publish MQTT event**. The transformed event appears in the Node-RED debug
-sidebar. This is an architecture demo for direct event consumption; Nuclio currently documents
-the MQTT trigger as a tech-preview feature, so the fixture is not a production MQTT recipe.
-
-The **06 Cron trigger** tab demonstrates a schedule owned by Nuclio. Its function runs every 30
-seconds and writes a timestamped event to the function logs; open the Status tab and refresh Run
-logs to observe it. This demonstrates trigger ownership, not durable batch scheduling, backfills,
-or workflow orchestration.
-
-The **07 Direct NATS trigger** tab demonstrates two NATS paths. The upper path uses native NATS
-request/reply and can be exercised with `nats-box`:
-
-```bash
-docker run --rm --network node-red-contrib-nuclio_default natsio/nats-box:latest \
-  nats request -s nats://nats:4222 demo.nats.input '{"message":"hello"}'
-```
-
-The response is produced by Nuclio and returned on the NATS reply subject. Node-RED owns the
-function declaration and status view, while NATS and Nuclio own the message path. Nuclio currently
-documents the NATS trigger as a tech-preview feature.
-
-The lower path uses NATS's built-in MQTT listener at the Node-RED boundary. Click **Publish NATS
-MQTT event** in Node-RED; the message is published to NATS through MQTT, consumed by the Nuclio
-NATS trigger, and published natively by the function to `demo.nats.mqtt.output`. NATS's MQTT bridge
-delivers that subject back to Node-RED as `demo/nats/mqtt/output`. The Compose fixture enables this
-listener with JetStream on port 1883 inside the Compose network (mapped to host port 1884).
+The root `docker-compose.yml` remains the comprehensive local gallery. The disposable Kubernetes
+canary is maintainer tooling under [`hack/kind/`](hack/kind/), not a user-facing example.
 
 ## Function sources
 
@@ -278,7 +252,9 @@ Node-RED remains responsible for deployment configuration, invocation, and statu
 The disposable KinD canary exercises the complete path:
 
 ```bash
-KIND_CANARY_SCALE_TO_ZERO=1 npm run test:kind
+npm run test:kind -- up scale-to-zero
+npm run test:kind -- test-scenario scale-to-zero
+npm run test:kind -- down
 ```
 
 It enables DLX, deploys an autoscaled function with `minReplicas: 0`, explicitly scales it to
@@ -438,17 +414,24 @@ The repository also contains optional integration fixtures:
 
 - `npm run smoke` starts the Docker Compose fixture, deploys a real function, and invokes it.
 - `npm run test:kind` creates a disposable KinD cluster and exercises a Kubernetes deployment.
-  It requires Docker, KinD, `kubectl`, Helm, Python 3, and a completed `npm ci`. The cluster is
-  removed when the test finishes; set `KIND_CANARY_KEEP_CLUSTER=1` to keep it for inspection.
-- `KIND_CANARY_AUTOSCALE=1 npm run test:kind` additionally installs metrics-server, deploys a
+  It requires Docker, KinD, `kubectl`, Helm, Python 3, and a completed `npm ci`. The no-argument
+  form remains a one-shot compatibility command. For inspection and independent retries, use
+  `npm run test:kind -- up basic`, `npm run test:kind -- test-scenario basic`, and
+  `npm run test:kind -- down`.
+- `npm run test:kind -- up autoscale` followed by `npm run test:kind -- test-scenario autoscale`
+  additionally installs metrics-server, deploys a
   CPU-loaded 1-to-3 replica canary, and runs the phased autoscaling scenario from an in-cluster
   load-generator pod through the function Service. This preserves normal Kubernetes load
   balancing; the host port-forward is used only for the one-message canary check. Set
-  `KIND_CANARY_KEEP_CLUSTER=1` to retain the cluster and logs for inspection.
-- `KIND_CANARY_SCALE_TO_ZERO=1 npm run test:kind` enables Nuclio's DLX path, configures an
+  `KIND_CANARY_KEEP_CLUSTER=1` on `up` to retain the cluster and logs for inspection.
+- `npm run test:kind -- up scale-to-zero` followed by `npm run test:kind -- test-scenario scale-to-zero`
+  enables Nuclio's DLX path, configures an
   autoscaled function with `minReplicas: 0`, explicitly scales it to zero through the dashboard,
   then invokes it through Node-RED to verify scale-from-zero and recovery to `ready`. Set
-  `KIND_CANARY_KEEP_CLUSTER=1` to retain the cluster and logs for inspection.
+  `KIND_CANARY_KEEP_CLUSTER=1` on `up` to retain the cluster and logs for inspection.
+- The reference fixture lives under `hack/kind/fixture`. It is static and environment-driven:
+  Node-RED typed environment properties and deployment variables provide the dashboard, project,
+  image, scaling, and CPU-load settings. No generated `.tmpl` files are required.
 - `node scripts/diagnose-redeploy.js ...` captures a local Docker/Node-RED/Nuclio timeline when
   investigating a specific redeploy problem. It is a troubleshooting aid, not part of normal
   package usage.
@@ -550,7 +533,7 @@ dashboard's internal service address:
 
 ```bash
 node scripts/stress-scenario.js \
-  --config scripts/stress-scenario.kind-autoscale.example.json \
+  --config hack/kind/scenarios/autoscale.json \
   --output stress-scenario-kind.json
 ```
 
@@ -567,8 +550,11 @@ For a longer scale-down observation, use the long scenario fixture with a larger
 concurrency:
 
 ```bash
-KIND_CANARY_AUTOSCALE=1 \
-AUTOSCALE_SCENARIO_CONFIG="$PWD/scripts/stress-scenario.kind-autoscale-long.example.json" \
+AUTOSCALE_SCENARIO_CONFIG="$PWD/hack/kind/scenarios/autoscale-long.json" \
 AUTOSCALE_CONCURRENCY=512 \
-npm run test:kind
+npm run test:kind -- up autoscale
+AUTOSCALE_SCENARIO_CONFIG="$PWD/hack/kind/scenarios/autoscale-long.json" \
+AUTOSCALE_CONCURRENCY=512 \
+npm run test:kind -- test-scenario autoscale
+npm run test:kind -- down
 ```

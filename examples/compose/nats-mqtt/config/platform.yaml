@@ -1,0 +1,2 @@
+local:
+  defaultFunctionContainerNetworkName: nuclio-nats-mqtt-example_default

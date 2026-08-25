@@ -1,0 +1,95 @@
+[
+  {
+    "id": "canary-tab",
+    "type": "tab",
+    "label": "KinD Canary",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "canary-server",
+    "type": "nuclio-config",
+    "address": "NUCLIO_DASHBOARD_URL",
+    "addressType": "env",
+    "namespace": "NUCLIO_NAMESPACE",
+    "namespaceType": "env",
+    "publicAddress": "NUCLIO_DASHBOARD_URL",
+    "publicAddressType": "env",
+    "invocationUrlPreference": "service",
+    "internalInvocationServiceHost": "NUCLIO_FUNCTION_HOST",
+    "internalInvocationServiceHostType": "env",
+    "deploymentPolicy": "managed",
+    "requestTimeoutMs": "10000",
+    "deployTimeoutMs": "60000"
+  },
+  {
+    "id": "canary-project",
+    "type": "nuclio-project",
+    "name": "NUCLIO_PROJECT",
+    "nameType": "env"
+  },
+  {
+    "id": "canary-function",
+    "type": "nuclio-function",
+    "server": "canary-server",
+    "project": "canary-project",
+    "name": "node-red-kind-canary",
+    "runtime": "python:3.12",
+    "sourceType": "advanced",
+    "codeEntryPath": "",
+    "deploymentMode": "eager",
+    "maxSelfHealAttempts": "1",
+    "redeployDeadlineMs": "120000",
+    "autoRedeployOnError": "false",
+    "autoRedeployOnErrorType": "bool",
+    "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  image: \"${CANARY_IMAGE}\"\n  imagePullPolicy: IfNotPresent\n  minReplicas: ${CANARY_MIN_REPLICAS}\n  maxReplicas: ${CANARY_MAX_REPLICAS}\n  targetCPU: ${CANARY_TARGET_CPU}\n  env:\n    - name: NUCLIO_CANARY_CPU_BURN_MS\n      value: \"${CANARY_CPU_BURN_MS}\"\n",
+    "deploymentVariables": [
+      {"name": "CANARY_IMAGE", "type": "env", "value": "CANARY_IMAGE"},
+      {"name": "CANARY_MIN_REPLICAS", "type": "env", "value": "CANARY_MIN_REPLICAS"},
+      {"name": "CANARY_MAX_REPLICAS", "type": "env", "value": "CANARY_MAX_REPLICAS"},
+      {"name": "CANARY_TARGET_CPU", "type": "env", "value": "CANARY_TARGET_CPU"},
+      {"name": "CANARY_CPU_BURN_MS", "type": "env", "value": "CANARY_CPU_BURN_MS"}
+    ],
+    "env_vars": []
+  },
+  {
+    "id": "canary-http-in",
+    "type": "http in",
+    "z": "canary-tab",
+    "name": "",
+    "url": "/kind-canary",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 120,
+    "y": 120,
+    "wires": [["canary-invoke"]]
+  },
+  {
+    "id": "canary-invoke",
+    "type": "nuclio",
+    "z": "canary-tab",
+    "function": "canary-function",
+    "name": "",
+    "timeoutMs": "30000",
+    "maxInFlight": "1",
+    "retries": "0",
+    "retryDelayMs": "500",
+    "headers": [],
+    "x": 320,
+    "y": 120,
+    "wires": [["canary-http-response"], []]
+  },
+  {
+    "id": "canary-http-response",
+    "type": "http response",
+    "z": "canary-tab",
+    "name": "",
+    "statusCode": "",
+    "headers": {},
+    "x": 530,
+    "y": 120,
+    "wires": []
+  }
+]

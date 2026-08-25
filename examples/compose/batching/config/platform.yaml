@@ -1,0 +1,2 @@
+local:
+  defaultFunctionContainerNetworkName: nuclio-batching-example_default
