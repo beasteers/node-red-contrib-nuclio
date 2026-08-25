@@ -1,9 +1,55 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+namespace: nuclio
+
+helmGlobals:
+  chartHome: .charts
+
+helmCharts:
+  - name: docker-registry
+    repo: https://twuni.github.io/docker-registry.helm
+    version: 2.2.2
+    releaseName: docker-registry
+    namespace: nuclio
+    valuesInline:
+      fullnameOverride: docker-registry
+      image:
+        tag: "2.8.1"
+      secrets:
+        htpasswd: ""
+      persistence:
+        enabled: false
+  - name: nuclio
+    repo: https://nuclio.github.io/nuclio/charts
+    version: 0.23.3
+    releaseName: nuclio
+    namespace: nuclio
+    includeCRDs: true
+    valuesInline:
+      fullnameOverride: nuclio
+      controller:
+        image:
+          tag: 1.17.3-amd64
+      dashboard:
+        image:
+          tag: 1.17.3-amd64
+        containerBuilderKind: kaniko
+        monitorDockerDeamon:
+          enabled: false
+        kaniko:
+          insecurePushRegistry: true
+          insecurePullRegistry: true
+      registry:
+        pushPullUrl: docker-registry:5000
+        runRegistryURL: docker-registry:5000
+      rbac:
+        crdAccessMode: namespaced
+
 resources:
-  - deployment.yaml
-  - service.yaml
+  - namespace.yaml
+  - nodered-deployment.yaml
+  - nodered-service.yaml
 
 configMapGenerator:
   - name: node-red-http-settings

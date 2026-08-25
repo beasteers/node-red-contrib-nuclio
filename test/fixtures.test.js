@@ -35,14 +35,19 @@ function assertFlowReferences(file, flow) {
 test('Kubernetes HTTP reference is a complete Helm plus Kustomize application', () => {
     const prefix = 'examples/http/k8s';
     const kustomization = readYaml(`${prefix}/kustomization.yaml`);
-    const deployment = readYaml(`${prefix}/deployment.yaml`);
-    const service = readYaml(`${prefix}/service.yaml`);
+    const deployment = readYaml(`${prefix}/nodered-deployment.yaml`);
+    const service = readYaml(`${prefix}/nodered-service.yaml`);
     const flow = readJson(`${prefix}/data/flows.json`);
-    const installer = fs.readFileSync(path.join(root, `${prefix}/install-nuclio.sh`), 'utf8');
     const container = deployment.spec.template.spec.containers[0];
     const env = Object.fromEntries((container.env || []).map(entry => [entry.name, entry.value]));
 
-    assert.deepEqual(kustomization.resources, ['deployment.yaml', 'service.yaml']);
+    assert.deepEqual(kustomization.resources, ['namespace.yaml', 'nodered-deployment.yaml', 'nodered-service.yaml']);
+    assert.deepEqual(
+        kustomization.helmCharts.map(chart => chart.name),
+        ['docker-registry', 'nuclio'],
+    );
+    assert.equal(kustomization.helmCharts[1].valuesInline.dashboard.containerBuilderKind, 'kaniko');
+    assert.equal(kustomization.helmCharts[1].valuesInline.registry.pushPullUrl, 'docker-registry:5000');
     assert.deepEqual(
         kustomization.configMapGenerator.map(generator => generator.name),
         ['node-red-http-settings', 'node-red-http-flows'],
@@ -54,14 +59,11 @@ test('Kubernetes HTTP reference is a complete Helm plus Kustomize application', 
     assert.equal(env.NUCLIO_DASHBOARD_URL, 'http://nuclio-dashboard.nuclio.svc.cluster.local:8070');
     assert.equal(env.NUCLIO_NAMESPACE, 'nuclio');
     assert.equal(env.NUCLIO_PROJECT, 'example-http-k8s');
-    assert.match(installer, /upgrade --install nuclio nuclio\/nuclio/);
-    assert.match(installer, /containerBuilderKind=kaniko/);
-    assert.match(installer, /registry\.pushPullUrl/);
     assertFlowReferences(`${prefix}/data/flows.json`, flow);
     assert.ok(flow.some(node => node.type === 'nuclio-config'));
     assert.ok(flow.some(node => node.type === 'nuclio-project'));
     assert.ok(flow.some(node => node.type === 'nuclio-function'));
-    assert.match(fs.readFileSync(path.join(root, `${prefix}/README.md`), 'utf8'), /kubectl apply -k/);
+    assert.match(fs.readFileSync(path.join(root, `${prefix}/README.md`), 'utf8'), /kubectl kustomize --enable-helm/);
 });
 
 test('Compose smoke fixture is isolated from the example gallery', () => {

@@ -1,13 +1,16 @@
 # Kubernetes HTTP reference
 
-This is the smallest Kubernetes example for the Node-RED Nuclio node. Nuclio
-is installed with Helm; Kustomize deploys Node-RED and mounts the example flow
-and settings as ConfigMaps.
+This is a complete, minimal Node-RED plus Nuclio example. Kustomize inflates
+the Nuclio and Docker Registry Helm charts, then deploys Node-RED with the
+example flow and settings. The registry is private to the `nuclio` namespace
+and exists only to support Nuclio's in-cluster Kaniko builds.
 
-The example assumes the Nuclio platform is already installed in the `nuclio`
-namespace and configured to build source functions on the cluster. Nuclio's
-Kubernetes installation and registry requirements are documented in the
-[Nuclio Kubernetes guide](https://docs.nuclio.io/en/latest/setup/k8s/running-in-production-k8s.html).
+The example needs an existing Kubernetes cluster, `kubectl`, Helm, Docker, and
+KinD for the local image-loading example. See the [Nuclio
+Kubernetes guide](https://docs.nuclio.io/en/latest/setup/k8s/running-in-production-k8s.html)
+for the underlying Kaniko and registry model.
+
+## 1. Build the Node-RED image
 
 Build the repository's current Node-RED image, then make it available to the
 cluster. With KinD, for example:
@@ -17,14 +20,18 @@ docker build -t nodered-nuclio-reference:local .
 kind load docker-image nodered-nuclio-reference:local
 ```
 
-For another Kubernetes cluster, push the image to a registry and replace the
-image in `deployment.yaml` or add a Kustomize overlay.
+For another Kubernetes cluster, push the image to a registry and change the
+image in `nodered-deployment.yaml`. The reference keeps this image local so
+the complete demo stays independent of registry credentials.
 
-Apply the reference deployment:
+## 2. Deploy the complete example
+
+`helmCharts` runs Helm during the Kustomize build. The explicit
+`--enable-helm` flag makes that dependency visible:
 
 ```bash
-kubectl apply -k examples/http/k8s
-kubectl port-forward service/node-red-http 1880:1880
+kubectl kustomize --enable-helm examples/http/k8s | kubectl apply -f -
+kubectl --namespace nuclio port-forward service/node-red-http 1880:1880
 ```
 
 Open [Node-RED](http://localhost:1880), deploy the **Kubernetes HTTP example**
@@ -34,10 +41,9 @@ sidebar.
 Remove it with:
 
 ```bash
-kubectl delete -k examples/http/k8s
+kubectl kustomize --enable-helm examples/http/k8s | kubectl delete -f -
 ```
 
-This example intentionally does not install Nuclio, create a KinD cluster, or
-run stress and autoscaling scenarios. Those responsibilities belong to the
-Helm installation and the maintainer-only [`hack/kind`](../../../hack/kind/)
-canary.
+This example does not create a Kubernetes cluster or run stress and
+autoscaling scenarios. Those are separate concerns covered by the
+maintainer-only [`hack/kind`](../../../hack/kind/) canary.

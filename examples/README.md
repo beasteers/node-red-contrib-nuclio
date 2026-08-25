@@ -21,17 +21,18 @@ example**. Stop it with `bash examples/run-compose.sh http down`.
 
 ### Kubernetes reference
 
-The same HTTP path has a minimal Kubernetes reference under
-[`http/k8s`](http/k8s/). It uses Helm for the Nuclio platform and Kustomize for
-the Node-RED Deployment, Service, ConfigMaps, and example flow:
+The same HTTP path has a complete minimal Kubernetes reference under
+[`http/k8s`](http/k8s/). One Kustomize build inflates the Nuclio and private
+Docker Registry charts, then deploys the Node-RED Deployment, Service,
+ConfigMaps, and example flow:
 
 ```bash
-kubectl apply -k examples/http/k8s
-kubectl port-forward service/node-red-http 1880:1880
+kubectl kustomize --enable-helm examples/http/k8s | kubectl apply -f -
+kubectl --namespace nuclio port-forward service/node-red-http 1880:1880
 ```
 
-See [`http/k8s/README.md`](http/k8s/README.md) for the image and Nuclio
-prerequisites. This is intentionally separate from the disposable
+See [`http/k8s/README.md`](http/k8s/README.md) for image and cleanup
+instructions. This is intentionally separate from the disposable
 [`hack/kind`](../hack/kind/) canary.
 
 ## Cron trigger
