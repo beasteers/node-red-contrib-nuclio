@@ -31,12 +31,20 @@ test('Nuclio resource path segments are URI encoded', async () => {
     }
 });
 
-test('deleteFunction URI-encodes the function name', async () => {
+test('deleteFunction uses Nuclio collection endpoint and resource body', async () => {
     let requestUrl;
+    let requestBody;
+    let requestHeaders;
     const server = http.createServer((req, res) => {
+        let raw = '';
+        req.on('data', chunk => { raw += chunk; });
+        req.on('end', () => {
+            requestBody = raw ? JSON.parse(raw) : undefined;
+            requestHeaders = req.headers;
+            res.writeHead(204);
+            res.end();
+        });
         requestUrl = req.url;
-        res.writeHead(204);
-        res.end();
     });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 
@@ -46,8 +54,12 @@ test('deleteFunction URI-encodes the function name', async () => {
             { address, namespace: 'nuclio', requestTimeoutMs: 1000, deployTimeoutMs: 1000 },
             'default',
         );
-        await client.deleteFunction('function/name');
-        assert.equal(requestUrl, '/api/functions/function%2Fname');
+        await client.deleteFunction('function/name', { ignoreStateValidation: true });
+        assert.equal(requestUrl, '/api/functions');
+        assert.deepEqual(requestBody, {
+            metadata: { name: 'function/name', namespace: 'nuclio' },
+        });
+        assert.equal(requestHeaders['x-nuclio-delete-function-ignore-state-validation'], 'true');
     } finally {
         await new Promise(resolve => server.close(resolve));
     }

@@ -111,7 +111,10 @@ test('orphan pruning requires ownership and deletes only an explicit orphan', as
     const response = await helper.request().post('/nuclio/api/orphans/prune?id=fn&name=old-function').expect(200);
     assert.equal(response.body.deleted, 'old-function');
     assert.equal(mock.functions['old-function'], undefined);
-    assert.equal(mock.requests.filter(request => request.method === 'DELETE').length, 1);
+    const deletion = mock.requests.find(request => request.method === 'DELETE');
+    assert.equal(deletion.url, '/api/functions');
+    assert.deepEqual(deletion.body.metadata, { name: 'old-function', namespace: 'nuclio' });
+    assert.equal(deletion.headers['x-nuclio-delete-function-ignore-state-validation'], 'true');
 });
 
 test('orphan pruning is disabled with deployment policy disabled', async () => {
@@ -202,4 +205,3 @@ test('unknown node ids return 404', async () => {
     await load(baseFlow(mock));
     await helper.request().get('/nuclio/api/functions?id=nope').expect(404);
 });
-

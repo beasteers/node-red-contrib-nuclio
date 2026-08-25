@@ -31,6 +31,10 @@ test('function editor inline scripts remain syntactically valid JavaScript', () 
         'dashboard auth typed-input modes must be persisted explicitly');
     assert.match(serverHtml, /value !== ["']__PWRD__["']/,
         'dashboard auth save handling must preserve Node-RED password sentinels');
+    assert.match(serverHtml, /nuclioServerEditorHeaders\(this\)/,
+        'dashboard request header credentials must be masked before editor display');
+    assert.match(serverHtml, /nuclioServerMergeHeaders\(/,
+        'dashboard request header credentials must be restored on save');
     assert.match(serverHtml, /typedInput\('value',\s*nuclioServerAuthValue\(this, 'authPassword'\)\)/,
         'dashboard password values must be restored through typedInput');
     assert.match(serverHtml, /delete this\[field\]/,

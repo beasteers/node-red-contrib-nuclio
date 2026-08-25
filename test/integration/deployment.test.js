@@ -457,8 +457,40 @@ test('status API redacts encrypted secrets', async () => {
     });
     await waitReady(helper.getNode('fn'));
 
-    const res = await helper.request().get('/nuclio/api/functions?id=fn').expect(200);
+    const res = await helper.request().get('/nuclio/api/functions?id=fn&view=spec').expect(200);
     assert.equal(res.body.spec.env[0].value, '[redacted]');
+});
+
+test('status defaults to a summary and redacts Nuclio trigger credentials in explicit specs', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        configCode: `spec:
+  triggers:
+    kafka:
+      kind: kafka-cluster
+      attributes:
+        sasl:
+          password: kafka-password
+        accessKey: kafka-access-key
+`,
+    }));
+    await waitReady(helper.getNode('fn'));
+
+    const summary = await helper.request().get('/nuclio/api/functions?id=fn').expect(200);
+    assert.equal(summary.body.spec.triggers, undefined);
+
+    const spec = await helper.request().get('/nuclio/api/functions?id=fn&view=spec').expect(200);
+    assert.equal(spec.body.spec.triggers.kafka.attributes.sasl.password, '[redacted]');
+    assert.equal(spec.body.spec.triggers.kafka.attributes.accessKey, '[redacted]');
+});
+
+test('a configured but missing project node fails closed instead of using default', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, { project: 'missing-project-node' }));
+    const fn = helper.getNode('fn');
+    assert.equal(fn.configError, true);
+    assert.equal(fn.configErrorReason, 'Project config node not found');
+    assert.equal(mock.requests.some(request => isDeployWrite(request)), false);
 });
 
 test('status summary and details are selectively returned', async () => {
@@ -562,7 +594,7 @@ test('admin errors do not expose dashboard response bodies', async () => {
     await waitReady(helper.getNode('fn'));
 
     mock.failStatus = 500;
-    const res = await helper.request().get('/nuclio/api/functions?id=fn').expect(500);
+    const res = await helper.request().get('/nuclio/api/functions?id=fn&view=full').expect(500);
     assert.deepEqual(res.body, { error: 'Nuclio dashboard returned HTTP 500' });
     assert.equal(JSON.stringify(res.body).includes('simulated 500'), false);
 });

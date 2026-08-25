@@ -56,13 +56,46 @@
 
 <script type="text/javascript">/* ------------------------------ Nuclio Server ----------------------------- */
 
+    const NUCLIO_SERVER_PASSWORD_SENTINEL = '__PWRD__';
+
+    const nuclioServerStoredHeaders = node => {
+        try {
+            const raw = node.credentials?.requestHeaders;
+            if (!raw || raw === NUCLIO_SERVER_PASSWORD_SENTINEL) return [];
+            const entries = JSON.parse(raw);
+            return Array.isArray(entries) ? entries : [];
+        } catch (err) {
+            return [];
+        }
+    };
+
+    const nuclioServerEditorHeaders = node => nuclioServerStoredHeaders(node)
+        .map(entry => entry?.type === 'cred'
+            ? { ...entry, value: NUCLIO_SERVER_PASSWORD_SENTINEL }
+            : entry);
+
+    const nuclioServerMergeHeaders = (node, entries) => {
+        const existing = new Map(nuclioServerStoredHeaders(node)
+            .filter(entry => entry?.type === 'cred' && entry.name)
+            .map(entry => [`${entry.name}`.trim().toLowerCase(), entry]));
+        return entries
+            .map(entry => {
+                if (entry?.type !== 'cred' || entry.value) return entry;
+                const oldEntry = existing.get(`${entry.name || ''}`.trim().toLowerCase());
+                return oldEntry ? { ...entry, value: oldEntry.value } : null;
+            })
+            .filter(Boolean);
+    };
+
     const nuclioServerInitHeaderList = (selector, items) => {
         const list = $(selector).editableList({
             addItem: function(row, index, data) {
                 $(`<input class='node-input-header-name' type='text' placeholder='X-Header-Name' aria-label='Header name' />`)
                     .appendTo(row).val(data.name || '');
                 $(`<input class='node-input-header-value' type='text' placeholder='value' aria-label='Header value' />`)
-                    .appendTo(row).val(data.value || '').typedInput({
+                    .appendTo(row)
+                    .val(data.type === 'cred' && data.value === NUCLIO_SERVER_PASSWORD_SENTINEL ? '' : (data.value || ''))
+                    .typedInput({
                         default: data.type || 'str',
                         types: ['str', 'env', 'cred'],
                     });
@@ -174,7 +207,7 @@
             let requestHeaders = [];
             try {
                 if (this.credentials?.requestHeaders && this.credentials.requestHeaders !== '__PWRD__') {
-                    requestHeaders = JSON.parse(this.credentials.requestHeaders) || [];
+                    requestHeaders = nuclioServerEditorHeaders(this);
                 }
             } catch (err) { /* runtime validation reports malformed credentials */ }
             this.requestHeadersList = nuclioServerInitHeaderList('#node-config-input-request-headers', requestHeaders);
@@ -256,11 +289,12 @@
                 delete this.credentials.has_authToken;
             }
 
-            const headers = nuclioServerCollectHeaderList('#node-config-input-request-headers');
-            if (headers.length || this.credentials.requestHeaders !== '__PWRD__') {
-                if (headers.length) this.credentials.requestHeaders = JSON.stringify(headers);
-                else delete this.credentials.requestHeaders;
-            }
+            const headers = nuclioServerMergeHeaders(
+                this,
+                nuclioServerCollectHeaderList('#node-config-input-request-headers'),
+            );
+            if (headers.length) this.credentials.requestHeaders = JSON.stringify(headers);
+            else delete this.credentials.requestHeaders;
             delete this.requestHeadersList;
         },
         oneditcancel: function() {
