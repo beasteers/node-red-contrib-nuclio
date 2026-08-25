@@ -3,7 +3,7 @@ name: nuclio-cron-example
 services:
   nodered:
     build:
-      context: ../../..
+      context: ../..
     image: nodered-nuclio-example
     restart: unless-stopped
     ports:
@@ -12,8 +12,8 @@ services:
       NUCLIO_ADDRESS: http://nuclio-dashboard:8070
     volumes:
       - ./data:/data
-      - ../../../config/settings.js:/data/settings.js
-      - ../../..:/usr/src/node-red/node-red-contrib-nuclio
+      - ../../config/settings.js:/data/settings.js
+      - ../..:/usr/src/node-red/node-red-contrib-nuclio
     depends_on:
       - nuclio-dashboard
 

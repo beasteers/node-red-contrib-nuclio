@@ -1,9 +1,9 @@
-name: nuclio-nats-mqtt-example
+name: nuclio-nats-request-example
 
 services:
   nodered:
     build:
-      context: ../../..
+      context: ../..
     image: nodered-nuclio-example
     restart: unless-stopped
     ports:
@@ -12,8 +12,8 @@ services:
       NUCLIO_ADDRESS: http://nuclio-dashboard:8070
     volumes:
       - ./data:/data
-      - ../../../config/settings.js:/data/settings.js
-      - ../../..:/usr/src/node-red/node-red-contrib-nuclio
+      - ../../config/settings.js:/data/settings.js
+      - ../..:/usr/src/node-red/node-red-contrib-nuclio
     depends_on:
       - nuclio-dashboard
       - nats
@@ -36,6 +36,5 @@ services:
     command: ["-c", "/etc/nats/nats-server.conf"]
     ports:
       - "${NATS_PORT:-4222}:4222"
-      - "${NATS_MQTT_PORT:-1884}:1883"
     volumes:
       - ./config/nats-server.conf:/etc/nats/nats-server.conf:ro

@@ -7,7 +7,7 @@ the default host ports are shared.
 The launcher detects `amd64` and `arm64` hosts and selects the matching Nuclio
 dashboard image. Override `NUCLIO_ARCH` when cross-building.
 
-## HTTP request/reply
+## HTTP request/reply with Compose
 
 The smallest example: Node-RED invokes a Python function over Nuclio's HTTP
 endpoint and displays success and error paths.
@@ -18,6 +18,21 @@ bash examples/run-compose.sh http up -d
 
 Open [Node-RED](http://localhost:1882), deploy the flow, and click **Invoke HTTP
 example**. Stop it with `bash examples/run-compose.sh http down`.
+
+### Kubernetes reference
+
+The same HTTP path has a minimal Kubernetes reference under
+[`http/k8s`](http/k8s/). It uses Helm for the Nuclio platform and Kustomize for
+the Node-RED Deployment, Service, ConfigMaps, and example flow:
+
+```bash
+kubectl apply -k examples/http/k8s
+kubectl port-forward service/node-red-http 1880:1880
+```
+
+See [`http/k8s/README.md`](http/k8s/README.md) for the image and Nuclio
+prerequisites. This is intentionally separate from the disposable
+[`hack/kind`](../hack/kind/) canary.
 
 ## Cron trigger
 

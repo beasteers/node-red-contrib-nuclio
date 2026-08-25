@@ -1,9 +1,9 @@
-name: nuclio-mqtt-example
+name: nuclio-nats-mqtt-example
 
 services:
   nodered:
     build:
-      context: ../../..
+      context: ../..
     image: nodered-nuclio-example
     restart: unless-stopped
     ports:
@@ -12,11 +12,11 @@ services:
       NUCLIO_ADDRESS: http://nuclio-dashboard:8070
     volumes:
       - ./data:/data
-      - ../../../config/settings.js:/data/settings.js
-      - ../../..:/usr/src/node-red/node-red-contrib-nuclio
+      - ../../config/settings.js:/data/settings.js
+      - ../..:/usr/src/node-red/node-red-contrib-nuclio
     depends_on:
       - nuclio-dashboard
-      - mosquitto
+      - nats
 
   nuclio-dashboard:
     image: ${NUCLIO_DASHBOARD_IMAGE:-quay.io/nuclio/dashboard:1.17.5-${NUCLIO_ARCH:-arm64}}
@@ -30,10 +30,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config/platform.yaml:/etc/nuclio/config/platform/platform.yaml:ro
 
-  mosquitto:
-    image: eclipse-mosquitto:2
+  nats:
+    image: nats:2.10-alpine
     restart: unless-stopped
+    command: ["-c", "/etc/nats/nats-server.conf"]
     ports:
-      - "${MQTT_PORT:-1883}:1883"
+      - "${NATS_PORT:-4222}:4222"
+      - "${NATS_MQTT_PORT:-1884}:1883"
     volumes:
-      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./config/nats-server.conf:/etc/nats/nats-server.conf:ro

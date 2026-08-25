@@ -25,5 +25,5 @@ esac
 
 export NUCLIO_ARCH="$detected_arch"
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
-compose_file="$repo_dir/examples/compose/$example/docker-compose.yml"
+compose_file="$repo_dir/examples/$example/docker-compose.yml"
 exec docker compose -f "$compose_file" "$@"
