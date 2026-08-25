@@ -66,6 +66,31 @@ test('Kubernetes HTTP reference is a complete Helm plus Kustomize application', 
     assert.match(fs.readFileSync(path.join(root, `${prefix}/README.md`), 'utf8'), /kubectl kustomize --enable-helm/);
 });
 
+test('Kubernetes scale-to-zero reference enables DLX and declares zero replicas', () => {
+    const prefix = 'examples/scale-to-zero/k8s';
+    const kustomization = readYaml(`${prefix}/kustomization.yaml`);
+    const deployment = readYaml(`${prefix}/nodered-deployment.yaml`);
+    const service = readYaml(`${prefix}/nodered-service.yaml`);
+    const flow = readJson(`${prefix}/data/flows.json`);
+    const values = kustomization.helmCharts.find(chart => chart.name === 'nuclio').valuesInline;
+    const functionNode = flow.find(node => node.type === 'nuclio-function');
+
+    assert.equal(values.dlx.enabled, true);
+    assert.equal(values.dlx.image.tag, '1.17.3-amd64');
+    assert.equal(values.platform.scaleToZero.mode, 'enabled');
+    assert.equal(values.platform.scaleToZero.scalerInterval, '10s');
+    assert.equal(values.platform.scaleToZero.readinessPollInterval, '1s');
+    assert.equal(deployment.metadata.name, 'node-red-scale-to-zero');
+    assert.equal(service.spec.selector['app.kubernetes.io/name'], 'node-red-scale-to-zero');
+    assert.equal(functionNode.name, 'example-scale-to-zero');
+    assert.match(functionNode.configCode, /minReplicas: 0/);
+    assert.match(functionNode.configCode, /maxReplicas: 1/);
+    assert.match(functionNode.configCode, /kind: http/);
+    assertFlowReferences(`${prefix}/data/flows.json`, flow);
+    assert.match(fs.readFileSync(path.join(root, `${prefix}/README.md`), 'utf8'), /scaledToZero/);
+    assert.match(fs.readFileSync(path.join(root, `${prefix}/README.md`), 'utf8'), /DLX/);
+});
+
 test('Compose smoke fixture is isolated from the example gallery', () => {
     const prefix = 'hack/compose-smoke';
     const compose = readYaml(`${prefix}/docker-compose.yml`);

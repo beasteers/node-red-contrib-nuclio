@@ -251,6 +251,9 @@ Node-RED remains responsible for deployment configuration, invocation, and statu
 
 The disposable KinD canary exercises the complete path:
 
+For a copyable, declarative deployment reference, see
+[`examples/scale-to-zero/k8s`](examples/scale-to-zero/k8s/).
+
 ```bash
 npm run test:kind -- up scale-to-zero
 npm run test:kind -- test-scenario scale-to-zero

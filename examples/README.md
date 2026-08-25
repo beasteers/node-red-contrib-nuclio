@@ -35,6 +35,22 @@ See [`http/k8s/README.md`](http/k8s/README.md) for image and cleanup
 instructions. This is intentionally separate from the disposable
 [`hack/kind`](../hack/kind/) canary.
 
+## Kubernetes scale-to-zero
+
+Scale-to-zero requires Nuclio's Kubernetes DLX and scale-to-zero platform
+components, so it has its own Kubernetes-only reference under
+[`scale-to-zero/k8s`](scale-to-zero/k8s/):
+
+```bash
+kubectl kustomize --enable-helm examples/scale-to-zero/k8s | kubectl apply -f -
+kubectl --namespace nuclio port-forward service/node-red-scale-to-zero 1880:1880
+```
+
+The example configures `minReplicas: 0`, demonstrates an explicit transition to
+zero, and then invokes the function through Node-RED to demonstrate DLX
+scale-from-zero recovery. See [`scale-to-zero/k8s/README.md`](scale-to-zero/k8s/README.md)
+for the full walkthrough and cleanup command.
+
 ## Cron trigger
 
 Nuclio owns a 30-second schedule. Node-RED owns the function declaration and

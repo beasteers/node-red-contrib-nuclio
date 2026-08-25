@@ -1,0 +1,74 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nuclio
+
+helmGlobals:
+  chartHome: .charts
+
+helmCharts:
+  - name: docker-registry
+    repo: https://twuni.github.io/docker-registry.helm
+    version: 2.2.2
+    releaseName: docker-registry
+    namespace: nuclio
+    valuesInline:
+      fullnameOverride: docker-registry
+      image:
+        tag: "2.8.1"
+      secrets:
+        htpasswd: ""
+      persistence:
+        enabled: false
+  - name: nuclio
+    repo: https://nuclio.github.io/nuclio/charts
+    version: 0.23.3
+    releaseName: nuclio
+    namespace: nuclio
+    includeCRDs: true
+    valuesInline:
+      fullnameOverride: nuclio
+      controller:
+        image:
+          tag: 1.17.3-amd64
+      dashboard:
+        image:
+          tag: 1.17.3-amd64
+        containerBuilderKind: kaniko
+        monitorDockerDeamon:
+          enabled: false
+        kaniko:
+          insecurePushRegistry: true
+          insecurePullRegistry: true
+      registry:
+        pushPullUrl: docker-registry:5000
+        runRegistryURL: docker-registry:5000
+      rbac:
+        crdAccessMode: namespaced
+      
+      # Scale-to-zero configuration for Nuclio functions
+      dlx:
+        enabled: true
+        image:
+          tag: 1.17.3-amd64
+      platform:
+        scaleToZero:
+          mode: enabled
+          scalerInterval: 10s
+          readinessPollInterval: 1s
+
+resources:
+  - namespace.yaml
+  - nodered-deployment.yaml
+  - nodered-service.yaml
+
+configMapGenerator:
+  - name: node-red-scale-to-zero-settings
+    files:
+      - settings.js=config/settings.js
+  - name: node-red-scale-to-zero-flows
+    files:
+      - flows.json=data/flows.json
+
+generatorOptions:
+  disableNameSuffixHash: true
