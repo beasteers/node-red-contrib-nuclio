@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { HASH_ANNOTATION, BUILD_HASH_ANNOTATION } = require('../../lib/nuclio-deploy.js');
+const { HASH_ANNOTATION, BUILD_HASH_ANNOTATION } = require('../../lib/nuclio-function-config.js');
 const {
     FN,
     baseFlow,

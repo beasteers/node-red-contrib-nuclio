@@ -1,4 +1,4 @@
-const { HASH_ANNOTATION, BUILD_HASH_ANNOTATION } = require('../../lib/nuclio-deploy.js');
+const { HASH_ANNOTATION, BUILD_HASH_ANNOTATION } = require('../../lib/nuclio-function-config.js');
 const { getReplicaStatus } = require('../../lib/nuclio-status.js');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

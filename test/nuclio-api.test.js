@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildFunctionConfig, STATUSES } = require('../lib/nuclio-deploy');
+const { buildFunctionConfig } = require('../lib/nuclio-function-config');
+const { STATUSES } = require('../lib/nuclio-deploy');
 const { WAITING, BUILDING } = require('../lib/nuclio-client');
 
 
