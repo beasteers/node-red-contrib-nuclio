@@ -2,12 +2,9 @@
 
 All notable changes to this project are documented here.
 
-## [3.1.2] - 2026-08-24
-
-- Store credential-typed invocation headers and function environment variables in Node-RED credentials instead of ordinary flow properties.
-- Store credential-typed dashboard passwords and bearer tokens through Node-RED's credential fields, separating them from ordinary typed values and migrating legacy config-node properties on save.
-
 ## [Unreleased]
+
+## [4.0.0] - 2026-08-26
 
 - Add bounded startup recovery for eager functions after host or Docker daemon restarts, using
   exponential backoff, stable-health reset, and no image rebuild.
@@ -16,6 +13,15 @@ All notable changes to this project are documented here.
 - Reduce replica-status control-plane traffic with ready-state gating, per-function caching, request
   coalescing, and explicit stale-capacity reporting.
 - Extract the function status controller and runtime starter samples into packaged browser resources.
+- Normalize default HTTP trigger configuration and remove stale implicit triggers during reconciliation.
+- Sanitize dashboard trigger summaries, improve deployment diagnostics, and await in-flight work during
+  Node-RED shutdown.
+- Support Node-RED 5 and Node.js 22.9 or newer.
+
+## [3.1.2] - 2026-08-24
+
+- Store credential-typed invocation headers and function environment variables in Node-RED credentials instead of ordinary flow properties.
+- Store credential-typed dashboard passwords and bearer tokens through Node-RED's credential fields, separating them from ordinary typed values and migrating legacy config-node properties on save.
 
 ## [3.1.1] - 2026-08-24
 

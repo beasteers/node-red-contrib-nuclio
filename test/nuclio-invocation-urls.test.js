@@ -131,3 +131,16 @@ test('trigger summaries expose safe invocation guidance metadata', () => {
     ]);
     assert.doesNotMatch(JSON.stringify(summaries), /secret/);
 });
+
+test('dashboard trigger summaries are projected to safe guidance fields', () => {
+    const summaries = getTriggerSummaries({
+        triggerSummaries: [{
+            name: 'events',
+            kind: 'nats',
+            topic: 'demo.events',
+            url: 'nats://nats:4222',
+            attributes: { token: 'secret' },
+        }],
+    });
+    assert.deepEqual(summaries, [{ name: 'events', kind: 'nats', topic: 'demo.events' }]);
+});

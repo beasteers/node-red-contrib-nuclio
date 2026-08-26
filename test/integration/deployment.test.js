@@ -385,6 +385,29 @@ test('removing a managed spec field removes it from the update body', async () =
     assert.ok(put.body.metadata.annotations['nuclio.io/node-red-managed-spec-paths']);
 });
 
+test('disabling the default HTTP trigger removes a previously enriched implicit trigger', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock));
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+    await helper.unload();
+
+    mock.requests.length = 0;
+    await load(baseFlow(mock, {
+        configCode: `spec:
+  disableDefaultHttpTrigger: true
+  triggers:
+    worker:
+      kind: nats
+      url: nats://nats:4222
+      attributes:
+        topic: demo.events
+`,
+    }));
+    const put = await mock.waitFor(r => r.method === 'PUT');
+    assert.equal(put.body.spec.disableDefaultHTTPTrigger, true);
+    assert.deepEqual(Object.keys(put.body.spec.triggers), ['worker']);
+});
+
 test('deploys stamp config + build hash annotations', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));
@@ -644,6 +667,7 @@ test('failed deploy does not wedge the node (redeploying clears, retries continu
     await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
     const fn = helper.getNode('fn');
     await waitUntil(() => fn.redeploying === false, { msg: 'redeploying cleared' });
+    assert.ok(fn.error.getCalls().some(call => /dashboard returned HTTP 500: deploy failed/.test(`${call.args[0]}`)));
 
     // the reconcile loop schedules another attempt (5s backoff)
     const attempts = () => mock.requests.filter(r => r.method === 'POST' && r.url === '/api/functions').length;

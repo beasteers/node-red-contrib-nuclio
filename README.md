@@ -14,8 +14,8 @@ source code, a container image, a Git repository, or an archive URL.
 
 ## Requirements
 
-- Node.js 22 or newer
-- Node-RED 4.0.0 or newer
+- Node.js 22.9.0 or newer
+- Node-RED 5.0.0 or newer
 - A reachable Nuclio dashboard
 
 The dashboard does not need to be public, but the Node-RED process must be able to reach it.
@@ -162,9 +162,8 @@ not logged, and matching fields are redacted from status responses.
 The Config tab includes optional helpers for common Nuclio settings while preserving the full
 YAML editor for advanced and future fields:
 
-- **Execution** configures trigger mode, batching, trigger workers, and event timeout. Async mode
-  and batching are intended for Python HTTP functions and require the handler contract described
-  in the Nuclio documentation.
+- Trigger behavior is configured in the YAML editor. The legacy **Execution** controls remain
+  supported for existing flows but are hidden from new configurations.
 - **Scaling & resources** lets you choose YAML-controlled, fixed-replica, or CPU-autoscaled
   deployment, then configure the relevant replica bounds and CPU/memory requests and limits.
 - **Kubernetes Secret References** injects runtime environment variables using
@@ -173,6 +172,13 @@ YAML editor for advanced and future fields:
 The YAML editor provides completion and conservative type warnings for documented Nuclio fields.
 Unknown fields remain valid so platform-specific and newer Nuclio configuration can be used
 without waiting for a plugin update.
+
+Use `spec.disableDefaultHTTPTrigger: true` when a function should not receive Nuclio's implicit
+HTTP trigger. The editor also accepts the documented `disableDefaultHttpTrigger` spelling and
+normalizes it to the API spelling.
+
+The Kubernetes examples use Nuclio 1.17.x. For other deployments, use Nuclio 1.16.5 or newer and
+keep the dashboard, controller, and processor versions aligned.
 
 ### Kubernetes scale-to-zero
 

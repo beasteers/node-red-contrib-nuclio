@@ -57,6 +57,24 @@ test('user config can override runtime/handler but not name', () => {
     assert.equal(body.spec.handler, 'custom:entry');
 });
 
+test('normalizes the documented default HTTP trigger spelling', () => {
+    const body = buildFunctionConfig({
+        ...base,
+        config: { spec: { disableDefaultHttpTrigger: true } },
+    });
+    assert.equal(body.spec.disableDefaultHTTPTrigger, true);
+    assert.equal(body.spec.disableDefaultHttpTrigger, undefined);
+});
+
+test('escapes dots in managed spec keys', () => {
+    const body = buildFunctionConfig({
+        ...base,
+        config: { spec: { 'x.example.com': { enabled: true } } },
+    });
+    const managedPaths = JSON.parse(body.metadata.annotations['nuclio.io/node-red-managed-spec-paths']);
+    assert.ok(managedPaths.includes('spec.x\\.example\\.com.enabled'));
+});
+
 /* --------------------------------- STATUSES -------------------------------- */
 
 test('every documented nuclio state has a status entry', () => {

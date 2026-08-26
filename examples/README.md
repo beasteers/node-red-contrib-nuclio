@@ -65,6 +65,10 @@ Open the function Status tab and refresh **Run logs**. Stop it with
 
 ## Batching
 
+This is an experimental Nuclio tech-preview feature. It is intended for Python
+HTTP functions and requires the handler to return one response for each input
+event.
+
 Node-RED emits four messages. Nuclio's HTTP trigger waits for four messages or
 one second, then invokes the function once with the batch.
 
@@ -123,8 +127,8 @@ NODE_RED_PORT=3882 NUCLIO_PORT=3872 bash examples/run-compose.sh http up -d
 ```
 
 The Compose examples use local, unauthenticated dashboards and are intended for
-development and demonstration only. MQTT and NATS triggers are Nuclio
-tech-preview features in the referenced Nuclio release.
+development and demonstration only. Batching, MQTT, and NATS triggers are
+Nuclio tech-preview features in the referenced Nuclio release.
 
 The disposable Kubernetes canary is maintainer tooling, not a user example. See
 [`hack/kind/README.md`](../hack/kind/README.md).

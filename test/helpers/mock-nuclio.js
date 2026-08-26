@@ -50,7 +50,8 @@ const deepMergeDefaults = (spec) => {
     // top-level keys: shallow-merge sub-objects so user values win
     for (const key of ['triggers', 'resources']) {
         if (spec[key]) {
-            const defaults = key === 'triggers' && spec.disableDefaultHTTPTrigger
+            const defaults = key === 'triggers'
+                && (spec.disableDefaultHTTPTrigger || spec.disableDefaultHttpTrigger)
                 ? {}
                 : ENRICH_DEFAULTS[key];
             merged[key] = { ...defaults, ...spec[key] };

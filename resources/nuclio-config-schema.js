@@ -67,7 +67,7 @@
             preemptionPolicy: enumValue(['Never', 'PreemptLowerPriority'], 'Kubernetes pod preemption policy.'),
             tolerations: list('Kubernetes scheduling tolerations.'),
             customScalingMetricSpecs: list('Custom Kubernetes autoscaling metrics.'),
-            disableDefaultHttpTrigger: boolean('Disable the default HTTP trigger.'),
+            disableDefaultHTTPTrigger: boolean('Disable the default HTTP trigger.'),
             initContainers: list('Kubernetes init containers.'),
             sidecars: list('Kubernetes sidecars.'),
             readinessProbe: map('Kubernetes readiness probe.'),

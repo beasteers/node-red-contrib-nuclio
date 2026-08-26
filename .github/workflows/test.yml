@@ -24,7 +24,7 @@ jobs:
     strategy:
       matrix:
         node-version: [22.x, 26.x]
-        node-red-version: [4.0.0, 5.0.4]
+        node-red-version: [5.0.4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -61,3 +61,12 @@ jobs:
         if: matrix.fixture == 'kind'
       - run: npm ci
       - run: ${{ matrix.command }}
+
+  reference:
+    name: Kubernetes reference manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: kubectl kustomize --enable-helm examples/http/k8s >/dev/null
+      - run: kubectl kustomize --enable-helm examples/scale-to-zero/k8s >/dev/null

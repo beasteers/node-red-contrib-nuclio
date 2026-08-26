@@ -1,6 +1,6 @@
 {
   "name": "@bea.steers/node-red-contrib-nuclio",
-  "version": "3.1.2",
+  "version": "4.0.0",
   "description": "Deploy Nuclio functions from Node-RED",
   "license": "MIT",
   "main": "lib/nodes/nuclio.js",
@@ -21,7 +21,7 @@
     "diagnose:redeploy": "node scripts/diagnose-redeploy.js"
   },
   "node-red": {
-    "version": ">=4.0.0",
+    "version": ">=5.0.0",
     "nodes": {
       "nuclio": "lib/nodes/nuclio.js",
       "nuclio-config": "lib/nodes/nuclio-config.js",
@@ -53,7 +53,7 @@
   ],
   "author": "beasteers",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.9.0"
   },
   "homepage": "https://github.com/beasteers/node-red-contrib-nuclio",
   "dependencies": {
