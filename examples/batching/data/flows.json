@@ -63,7 +63,7 @@
     "codeEntryReference": "",
     "codeEntryUsername": "",
     "codeEntryWorkDir": "",
-    "code": "import json\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode('utf-8')\n    if isinstance(body, str):\n        try:\n            body = json.loads(body)\n        except ValueError:\n            pass\n    return {'runtime': 'python', 'batch_size': len(body) if isinstance(body, list) else None, 'batch_payload': body}",
+    "code": "import json\nimport nuclio_sdk\n\ndef handler(context, batch):\n    responses = []\n    for event in batch:\n        body = event.body\n        if isinstance(body, bytes):\n            body = body.decode('utf-8')\n        if isinstance(body, str):\n            try:\n                body = json.loads(body)\n            except ValueError:\n                pass\n        payload = {'runtime': 'python', 'batch_size': len(batch), 'batch_payload': body}\n        responses.append(nuclio_sdk.Response(\n            body=json.dumps(payload),\n            headers={},\n            content_type='application/json',\n            status_code=200,\n            event_id=event.id,\n        ))\n    return responses",
     "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  minReplicas: 1\n  maxReplicas: 1\n  triggers:\n    default-http:\n      kind: http\n      batch:\n        mode: enable\n        batchSize: 4\n        timeout: 1s",
     "env_vars": [],
     "deploymentMode": "eager",
