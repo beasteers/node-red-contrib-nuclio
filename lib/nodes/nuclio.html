@@ -226,8 +226,8 @@
         <li>Fallback
             <dl class="message-properties">
                 <dt>payload</dt>
-                <dd>Unchanged input payload when the function is unavailable, or the
-                error response body when the function returned an error status.</dd>
+                <dd>Unchanged input payload. If the function returned an error
+                response, its body is available at <code>msg.response.data</code>.</dd>
                 <dt>error</dt>
                 <dd><code>{ message, code }</code> describing the failure (set on every
                 fallback caused by an error).</dd>

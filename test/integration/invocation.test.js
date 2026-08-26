@@ -91,6 +91,10 @@ spec:
     await waitUntil(() => fn.fnState === 'ready' && !fn.redeploying, { msg: 'non-HTTP function ready' });
     assert.equal(fn.invocationUrl, undefined);
 
+    const summary = await helper.request().get('/nuclio/api/functions?id=fn&view=summary').expect(200);
+    assert.equal(summary.body.httpTrigger, false);
+    assert.deepEqual(summary.body.invocation.urls, []);
+
     const statusReply = nextMsg(helper.getNode('out1'));
     helper.getNode('inv').receive({ nuclio: { command: 'status' }, payload: 'status' });
     const status = await statusReply;
@@ -201,6 +205,8 @@ test('function errors route to the fallback output with response details', async
     const reply = nextMsg(helper.getNode('out2'));
     helper.getNode('inv').receive({ payload: 'hi' });
     const msg = await reply;
+    assert.equal(msg.payload, 'hi');
+    assert.deepEqual(msg.response.data, { error: 'boom' });
     assert.equal(msg.statusCode, 500);
     assert.equal(msg.error.message, 'Request failed with status code 500');
 });

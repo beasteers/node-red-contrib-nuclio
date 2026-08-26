@@ -173,6 +173,19 @@ test('POST /nuclio/api/functions/deploy forces a redeploy', async () => {
     assert.ok(mock.requests.some(r => r.method === 'PATCH'));
 });
 
+test('POST /nuclio/api/functions/deploy reports a rejected deployment', async () => {
+    mock = await startMockNuclio();
+    mock.failDeploys = true;
+    await load(baseFlow(mock));
+    await mock.waitFor(r => r.method === 'POST' && r.url === '/api/functions');
+
+    const res = await helper.request().post('/nuclio/api/functions/deploy?id=fn').expect(503);
+    assert.deepEqual(res.body, {
+        accepted: false,
+        error: 'Nuclio did not accept the function deployment',
+    });
+});
+
 test('manual deploy accepts an asynchronous function visibility window', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));

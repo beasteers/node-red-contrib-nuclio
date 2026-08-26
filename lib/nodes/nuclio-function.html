@@ -703,6 +703,9 @@
         if (field === 'scalingMinReplicas' || field === 'scalingMaxReplicas') {
             if (num < 0) return 'Must be a non-negative integer';
             if (mode === 'autoscaled') {
+                if (field === 'scalingMaxReplicas' && num < 1) {
+                    return 'Maximum must be a positive integer';
+                }
                 const other = field === 'scalingMinReplicas' ? 'scalingMaxReplicas' : 'scalingMinReplicas';
                 const otherValue = editorFieldValue(node, other);
                 const otherType = editorFieldType(node, other);

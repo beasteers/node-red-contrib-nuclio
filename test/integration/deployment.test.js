@@ -143,6 +143,28 @@ test('execution controls default to Nuclio default-http trigger', async () => {
     assert.equal(req.body.spec.triggers['default-http'].mode, 'async');
 });
 
+test('execution controls reject a non-HTTP trigger with the same name', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        executionTriggerName: 'worker',
+        executionMode: 'async',
+        configCode: `spec:
+  disableDefaultHTTPTrigger: true
+  triggers:
+    worker:
+      kind: nats
+      url: nats://nats:4222
+      attributes:
+        topic: demo.request
+`,
+    }));
+
+    const fn = helper.getNode('fn');
+    assert.equal(fn.configError, true);
+    assert.equal(fn.configErrorReason, 'Invalid config YAML');
+    assert.equal(mock.requests.some(r => ['POST', 'PUT', 'PATCH'].includes(r.method)), false);
+});
+
 test('scaling and resource controls merge into the function spec', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock, {
@@ -214,6 +236,20 @@ test('scaling rejects an invalid autoscaling range', async () => {
     assert.equal(fn.configError, true);
     assert.equal(fn.configErrorReason, 'Invalid config YAML');
     assert.match(fn.lastStatus?.text || '', /Invalid config YAML/);
+    assert.equal(mock.requests.some(r => r.method === 'POST' && r.url === '/api/functions'), false);
+});
+
+test('scaling rejects a zero autoscaling maximum', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        scalingMode: 'autoscaled',
+        scalingMinReplicas: '0',
+        scalingMaxReplicas: '0',
+    }));
+
+    const fn = helper.getNode('fn');
+    assert.equal(fn.configError, true);
+    assert.equal(fn.configErrorReason, 'Invalid config YAML');
     assert.equal(mock.requests.some(r => r.method === 'POST' && r.url === '/api/functions'), false);
 });
 

@@ -104,3 +104,13 @@ test('non-HTTP functions do not expose an HTTP invocation endpoint', () => {
     assert.deepEqual(options.internalUrls, []);
     assert.deepEqual(options.externalUrls, []);
 });
+
+test('disabling the default HTTP trigger without explicit triggers is non-HTTP', () => {
+    const options = getInvocationUrlOptions({
+        spec: { disableDefaultHTTPTrigger: true },
+        status: { internalInvocationUrls: ['10.0.0.1:8080'] },
+    }, { name: 'nats-worker', server: { invocationUrlPreference: 'service' } });
+
+    assert.equal(options.httpTrigger, false);
+    assert.deepEqual(options.urls, []);
+});
