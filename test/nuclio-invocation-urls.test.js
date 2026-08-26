@@ -83,3 +83,24 @@ test('getInvocationUrl keeps the last known url when none reported', () => {
     });
     assert.equal(url, 'http://10.0.0.9:8080');
 });
+
+test('non-HTTP functions do not expose an HTTP invocation endpoint', () => {
+    const options = getInvocationUrlOptions({
+        spec: {
+            disableDefaultHTTPTrigger: true,
+            triggers: {
+                nats: { kind: 'nats' },
+            },
+        },
+        status: {
+            internalInvocationUrls: ['10.0.0.1:8080'],
+            externalInvocationUrls: ['fn.example.com'],
+        },
+    }, { name: 'nats-worker', server: { invocationUrlPreference: 'service' } });
+
+    assert.equal(options.httpTrigger, false);
+    assert.deepEqual(options.urls, []);
+    assert.deepEqual(options.serviceUrls, []);
+    assert.deepEqual(options.internalUrls, []);
+    assert.deepEqual(options.externalUrls, []);
+});

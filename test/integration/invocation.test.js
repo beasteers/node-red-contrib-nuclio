@@ -71,6 +71,44 @@ test('lazy functions wait for a deploy command before accepting invocations', as
     assert.deepEqual(invocation.payload, { echo: 'after-deploy' });
 });
 
+test('lifecycle commands work for functions without an HTTP trigger', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        configCode: `apiVersion: nuclio.io/v1
+kind: NuclioFunction
+spec:
+  disableDefaultHTTPTrigger: true
+  triggers:
+    nats:
+      kind: nats
+      url: nats://nats:4222
+      attributes:
+        topic: demo.request
+        reply: true`,
+    }));
+
+    const fn = helper.getNode('fn');
+    await waitUntil(() => fn.fnState === 'ready' && !fn.redeploying, { msg: 'non-HTTP function ready' });
+    assert.equal(fn.invocationUrl, undefined);
+
+    const statusReply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ nuclio: { command: 'status' }, payload: 'status' });
+    const status = await statusReply;
+    assert.equal(status.nuclio.result.ready, true);
+
+    const redeployReply = nextMsg(helper.getNode('out1'));
+    helper.getNode('inv').receive({ nuclio: { command: 'redeploy' }, payload: 'redeploy' });
+    const redeployed = await redeployReply;
+    assert.equal(redeployed.nuclio.result.ready, true);
+    assert.ok(mock.requests.some(request => request.method === 'PATCH'), 'redeploy should work without an HTTP trigger');
+
+    const fallback = nextMsg(helper.getNode('out2'));
+    helper.getNode('inv').receive({ payload: 'not an HTTP invocation' });
+    const msg = await fallback;
+    assert.equal(msg.payload, 'not an HTTP invocation');
+    assert.equal(mock.requests.filter(request => request.method === 'POST' && request.url === '/').length, 0);
+});
+
 test('undeploy deactivates eager functions until an explicit deploy command', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));

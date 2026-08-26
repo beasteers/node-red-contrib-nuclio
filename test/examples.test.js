@@ -5,7 +5,7 @@ const test = require('node:test');
 const yaml = require('js-yaml');
 
 const root = path.join(__dirname, '..');
-const examples = ['http', 'cron', 'batching', 'mqtt', 'nats-request', 'nats-mqtt'];
+const examples = ['http', 'cron', 'batching', 'mqtt', 'nats', 'nats-mqtt'];
 
 const readJson = file => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
 const readYaml = file => yaml.load(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -16,7 +16,7 @@ function assertFlowReferences(file, flow) {
 
     for (const node of flow) {
         for (const field of ['server', 'project', 'function']) {
-            if (node[field]) {
+            if (node[field] && !(node.type === 'nats-suite-server' && field === 'server')) {
                 assert.ok(ids.has(node[field]), `${file}: ${node.id}.${field} references ${node[field]}`);
             }
         }
@@ -59,13 +59,25 @@ test('Compose examples have valid local-platform wiring and self-contained paths
         assert.ok(flow.some(node => node.type === 'nuclio-function'), `${prefix}: missing function`);
         assert.ok(readme.includes(`run-compose.sh ${example}`), `${prefix}: example is not documented`);
         assert.match(launcher, new RegExp(`${example}(?:\\||\\))`), `${prefix}: launcher does not allow the example`);
+
+        if (example === 'nats') {
+            assert.equal(compose.services.nodered.depends_on.nats.condition, 'service_healthy', `${prefix}: Node-RED must wait for NATS readiness`);
+            assert.ok(compose.services.nats.healthcheck, `${prefix}: NATS must have a readiness check`);
+        }
     }
 });
 
-test('direct-trigger examples do not contain misleading Invoke nodes', () => {
-    for (const example of ['mqtt', 'nats-request', 'nats-mqtt']) {
+test('direct-trigger examples expose only intentional deployment/control nodes', () => {
+    for (const example of ['mqtt', 'nats', 'nats-mqtt']) {
         const flow = readJson(`examples/${example}/data/flows.json`);
-        assert.equal(flow.filter(node => node.type === 'nuclio').length, 0, `${example}: direct trigger should not contain an unused Invoke node`);
+        const invokeNodes = flow.filter(node => node.type === 'nuclio');
+        if (example === 'nats') {
+            const functionIds = new Set(flow.filter(node => node.type === 'nuclio-function').map(node => node.id));
+            assert.equal(invokeNodes.length, 4, `${example}: each Nuclio-backed tab should show its worker`);
+            for (const node of invokeNodes) assert.ok(functionIds.has(node.function), `${example}: invoke must reference a function node`);
+        } else {
+            assert.equal(invokeNodes.length, 0, `${example}: direct trigger should not contain an unused Invoke node`);
+        }
     }
 });
 
@@ -81,8 +93,20 @@ test('focused examples cover the primary trigger and invocation patterns', () =>
     assert.match(batchFunction.configCode, /batchSize: 4/);
     assert.ok(batching.some(node => node.type === 'function'), 'batching example should create a burst');
 
-    const natsRequest = readJson('examples/nats-request/data/flows.json');
-    assert.match(natsRequest.find(node => node.type === 'nuclio-function').configCode, /reply: true/);
+    const nats = readJson('examples/nats/data/flows.json');
+    assert.ok(nats.some(node => node.type === 'nats-suite-publish'));
+    assert.ok(nats.some(node => node.type === 'nats-suite-subscribe'));
+    assert.match(nats.find(node => node.name === 'example-nats-request-worker').configCode, /reply: true/);
+    assert.ok(nats.some(node => node.type === 'nats-suite-stream-publisher'));
+    assert.ok(nats.some(node => node.type === 'nats-suite-kv-put'));
+    assert.match(nats.find(node => node.name === 'example-nats-jetstream-worker').configCode, /demo\.nats\.jetstream\.input/);
+    assert.match(nats.find(node => node.name === 'example-nats-kv-worker').configCode, /demo\.nats\.kv\.request/);
+    assert.ok(nats.some(node => node.type === 'nats-suite-publish' && node.mode === 'request' && node.datapointid === 'demo.nats.kv.request'));
+    assert.equal(nats.filter(node => node.type === 'nuclio-function').length, 4);
+    assert.equal(nats.filter(node => node.type === 'nuclio').length, 4);
+    for (const fn of nats.filter(node => node.type === 'nuclio-function')) {
+        assert.match(fn.configCode, /disableDefaultHTTPTrigger: true/, `${fn.name}: NATS worker should not expose an implicit HTTP trigger`);
+    }
 
     const natsMqtt = readJson('examples/nats-mqtt/data/flows.json');
     assert.ok(natsMqtt.some(node => node.type === 'mqtt in'));
