@@ -88,18 +88,20 @@ bash examples/run-compose.sh mqtt up -d
 Deploy the flow and click **Publish MQTT example event**. Stop it with
 `bash examples/run-compose.sh mqtt down`.
 
-## Native NATS request/reply
+## Native NATS Suite pipelines
 
-Nuclio consumes a native NATS request and returns the handler result on the NATS
-reply subject. The example intentionally has no Node-RED message path.
+The native NATS example installs `node-red-contrib-nats-suite` and demonstrates
+common Node-RED/NATS pipelines alongside Nuclio: core pub/sub, native
+request/reply, JetStream persistence and consumers, and KV-backed configuration.
 
 ```bash
-bash examples/run-compose.sh nats-request up -d
-docker run --rm --network nuclio-nats-request-example_default natsio/nats-box:latest \
-  nats request -s nats://nats:4222 example.nats.input '{"message":"hello"}'
+bash examples/run-compose.sh nats up -d
 ```
 
-Stop it with `bash examples/run-compose.sh nats-request down`.
+Open [Node-RED](http://localhost:1882), deploy the flow, and use the inject
+buttons. See [`nats/README.md`](nats/README.md) for the walkthrough.
+
+Stop it with `bash examples/run-compose.sh nats down`.
 
 ## NATS MQTT bridge
 

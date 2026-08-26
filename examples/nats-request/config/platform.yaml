@@ -1,2 +1,0 @@
-local:
-  defaultFunctionContainerNetworkName: nuclio-nats-request-example_default

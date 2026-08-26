@@ -1,10 +1,11 @@
-name: nuclio-nats-request-example
+name: nuclio-nats-example
 
 services:
   nodered:
     build:
       context: ../..
-    image: nodered-nuclio-example
+      dockerfile: examples/nats/Dockerfile
+    image: nodered-nuclio-nats-example
     restart: unless-stopped
     ports:
       - "${NODE_RED_PORT:-1882}:1880"
@@ -15,8 +16,10 @@ services:
       - ../../config/settings.js:/data/settings.js
       - ../..:/usr/src/node-red/node-red-contrib-nuclio
     depends_on:
-      - nuclio-dashboard
-      - nats
+      nuclio-dashboard:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
 
   nuclio-dashboard:
     image: ${NUCLIO_DASHBOARD_IMAGE:-quay.io/nuclio/dashboard:1.17.5-${NUCLIO_ARCH:-arm64}}
@@ -38,3 +41,8 @@ services:
       - "${NATS_PORT:-4222}:4222"
     volumes:
       - ./config/nats-server.conf:/etc/nats/nats-server.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8222/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 30

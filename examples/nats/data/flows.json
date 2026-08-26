@@ -1,0 +1,954 @@
+[
+    {
+        "id": "nats-suite-core",
+        "type": "tab",
+        "label": "Core NATS pipelines",
+        "disabled": false,
+        "info": "Native NATS pub/sub and request/reply from Node-RED, with Nuclio functions as workers.",
+        "env": []
+    },
+    {
+        "id": "nats-suite-jetstream",
+        "type": "tab",
+        "label": "JetStream pipeline",
+        "disabled": false,
+        "info": "A durable stream and explicit consumer acknowledgement.",
+        "env": []
+    },
+    {
+        "id": "nats-suite-kv",
+        "type": "tab",
+        "label": "KV configuration",
+        "disabled": false,
+        "info": "A small configuration/state example using NATS KV.",
+        "env": []
+    },
+    {
+        "id": "nats-server-config",
+        "type": "nats-suite-server",
+        "server": "nats://nats:4222",
+        "authMethod": "none",
+        "enableTLS": false,
+        "tlsRejectUnauthorized": true,
+        "maxReconnectAttempts": 10,
+        "reconnectTimeWait": 1000,
+        "timeout": 10000,
+        "pingInterval": 30000,
+        "maxPingOut": 3,
+        "debug": false
+    },
+    {
+        "id": "nats-suite-config",
+        "type": "nuclio-config",
+        "address": "http://nuclio-dashboard:8070",
+        "addressType": "str",
+        "namespace": "nuclio",
+        "namespaceType": "str",
+        "publicAddress": "http://localhost:8072",
+        "publicAddressType": "str",
+        "invocationUrlPreference": "service",
+        "internalInvocationServiceHost": "nuclio-nuclio-{function}",
+        "internalInvocationServiceHostType": "str",
+        "externalInvocationProtocol": "http",
+        "authType": "none",
+        "deploymentPolicy": "managed",
+        "deploymentPolicyType": "str",
+        "requestTimeoutMs": "",
+        "requestTimeoutMsType": "num",
+        "deployTimeoutMs": "",
+        "deployTimeoutMsType": "num",
+        "pollMs": "",
+        "pollMsType": "num",
+        "readyPollMs": "",
+        "readyPollMsType": "num",
+        "backoffMs": "",
+        "backoffMsType": "num",
+        "backoffMaxMs": "",
+        "backoffMaxMsType": "num",
+        "startStaggerMs": ""
+    },
+    {
+        "id": "nats-suite-project",
+        "type": "nuclio-project",
+        "name": "example-nats",
+        "nameType": "str"
+    },
+    {
+        "id": "nats-event-function",
+        "type": "nuclio-function",
+        "z": "nats-suite-core",
+        "server": "nats-suite-config",
+        "project": "nats-suite-project",
+        "name": "example-nats-event-worker",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "code": "import asyncio\nimport json\nimport os\nfrom datetime import datetime, timezone\nfrom threading import Thread\n\nfrom nats.aio.client import Client as NATS\n\nasync def publish(value):\n    client = NATS()\n    await client.connect(servers=os.environ.get(\"NATS_URL\", \"nats://nats:4222\"))\n    await client.publish(os.environ.get(\"NATS_OUTPUT_SUBJECT\", \"demo.nats.events.output\"), json.dumps(value).encode())\n    await client.flush()\n    await client.close()\n\ndef _run(value, errors):\n    try:\n        asyncio.run(publish(value))\n    except Exception as error:\n        errors.append(error)\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        body = json.loads(body)\n    result = {\"worker\": \"nuclio\", \"received\": body, \"ran_at\": datetime.now(timezone.utc).isoformat()}\n    errors = []\n    thread = Thread(target=_run, args=(result, errors))\n    thread.start()\n    thread.join()\n    if errors:\n        raise errors[0]\n    return result",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    commands:\n      - pip install nats-py\n  triggers:\n    nats:\n      kind: nats\n      url: nats://nats:4222\n      attributes:\n        topic: demo.nats.events.input\n        queueName: demo-nats-events\n        reply: false\n  disableDefaultHTTPTrigger: true",
+        "env_vars": [
+            {
+                "name": "NATS_URL",
+                "value": "nats://nats:4222",
+                "type": "str"
+            },
+            {
+                "name": "NATS_OUTPUT_SUBJECT",
+                "value": "demo.nats.events.output",
+                "type": "str"
+            }
+        ],
+        "deploymentMode": "eager",
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "nats-request-function",
+        "type": "nuclio-function",
+        "z": "nats-suite-core",
+        "server": "nats-suite-config",
+        "project": "nats-suite-project",
+        "name": "example-nats-request-worker",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "code": "import json\nfrom datetime import datetime, timezone\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        body = json.loads(body)\n    return {\"worker\": \"nuclio\", \"received\": body, \"ran_at\": datetime.now(timezone.utc).isoformat()}",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  triggers:\n    nats:\n      kind: nats\n      url: nats://nats:4222\n      attributes:\n        topic: demo.nats.request\n        queueName: demo-nats-request\n        reply: true\n  disableDefaultHTTPTrigger: true",
+        "env_vars": [],
+        "deploymentMode": "eager",
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "nats-jetstream-function",
+        "type": "nuclio-function",
+        "server": "nats-suite-config",
+        "project": "nats-suite-project",
+        "name": "example-nats-jetstream-worker",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "codeEntryBranch": "",
+        "codeEntryTag": "",
+        "codeEntryReference": "",
+        "codeEntryUsername": "",
+        "codeEntryWorkDir": "",
+        "code": "import asyncio\nimport json\nimport os\nfrom datetime import datetime, timezone\nfrom threading import Thread\nfrom nats.aio.client import Client as NATS\n\ndef run_async(function, value):\n    result = []\n    errors = []\n    def runner():\n        try:\n            result.append(asyncio.run(function(value)))\n        except Exception as error:\n            errors.append(error)\n    thread = Thread(target=runner)\n    thread.start()\n    thread.join()\n    if errors:\n        raise errors[0]\n    return result[0]\n\nasync def publish(value):\n    client = NATS()\n    await client.connect(servers=os.environ.get(\"NATS_URL\", \"nats://nats:4222\"))\n    await client.publish(os.environ.get(\"NATS_OUTPUT_SUBJECT\", \"demo.nats.jetstream.output\"), json.dumps(value).encode())\n    await client.flush()\n    await client.close()\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        body = json.loads(body)\n    result = {\"worker\": \"nuclio\", \"received\": body, \"ran_at\": datetime.now(timezone.utc).isoformat()}\n    run_async(publish, result)\n    return result",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    commands:\n      - pip install nats-py\n  triggers:\n    nats:\n      kind: nats\n      url: nats://nats:4222\n      attributes:\n        topic: demo.nats.jetstream.input\n        queueName: demo-nats-jetstream\n        reply: false\n  disableDefaultHTTPTrigger: true",
+        "env_vars": [
+            {
+                "name": "NATS_URL",
+                "value": "nats://nats:4222",
+                "type": "str"
+            },
+            {
+                "name": "NATS_OUTPUT_SUBJECT",
+                "value": "demo.nats.jetstream.output",
+                "type": "str"
+            }
+        ],
+        "envSecretRefs": [],
+        "deploymentVariables": [],
+        "deploymentMode": "eager",
+        "executionTriggerName": "default-http",
+        "executionMode": "inherit",
+        "executionBatchMode": "inherit",
+        "executionBatchSize": "",
+        "executionBatchSizeType": "num",
+        "executionBatchTimeout": "",
+        "executionBatchTimeoutType": "str",
+        "executionWorkers": "",
+        "executionWorkersType": "num",
+        "executionEventTimeout": "",
+        "executionEventTimeoutType": "str",
+        "scalingMode": "yaml",
+        "scalingReplicas": "",
+        "scalingReplicasType": "num",
+        "scalingMinReplicas": "",
+        "scalingMinReplicasType": "num",
+        "scalingMaxReplicas": "",
+        "scalingMaxReplicasType": "num",
+        "scalingTargetCPU": "",
+        "scalingTargetCPUType": "num",
+        "resourceRequestsCpu": "",
+        "resourceRequestsCpuType": "str",
+        "resourceRequestsMemory": "",
+        "resourceRequestsMemoryType": "str",
+        "resourceLimitsCpu": "",
+        "resourceLimitsCpuType": "str",
+        "resourceLimitsMemory": "",
+        "resourceLimitsMemoryType": "str",
+        "maxSelfHealAttempts": "",
+        "maxSelfHealAttemptsType": "num",
+        "redeployDeadlineMs": "",
+        "redeployDeadlineMsType": "num",
+        "autoRedeployOnUnhealthy": "false",
+        "autoRedeployOnUnhealthyType": "bool",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "nats-kv-function",
+        "type": "nuclio-function",
+        "z": "nats-suite-kv",
+        "server": "nats-suite-config",
+        "project": "nats-suite-project",
+        "name": "example-nats-kv-worker",
+        "runtime": "python:3.12",
+        "sourceType": "sourceCode",
+        "codeEntryPath": "",
+        "code": "import asyncio\nimport json\nfrom datetime import datetime, timezone\nfrom threading import Thread\nfrom nats.aio.client import Client as NATS\n\nasync def read_value(key):\n    client = NATS()\n    await client.connect(servers=\"nats://nats:4222\")\n    bucket = await client.jetstream().key_value(\"settings\")\n    entry = await bucket.get(key)\n    await client.close()\n    try:\n        return json.loads(entry.value.decode(\"utf-8\"))\n    except json.JSONDecodeError:\n        return entry.value.decode(\"utf-8\")\n\ndef run_async(function, value):\n    result = []\n    errors = []\n    def runner():\n        try:\n            result.append(asyncio.run(function(value)))\n        except Exception as error:\n            errors.append(error)\n    thread = Thread(target=runner)\n    thread.start()\n    thread.join()\n    if errors:\n        raise errors[0]\n    return result[0]\n\ndef handler(context, event):\n    body = event.body\n    if isinstance(body, bytes):\n        body = body.decode(\"utf-8\")\n    if isinstance(body, str):\n        body = json.loads(body)\n    key = body.get(\"key\", \"config.timeout\") if isinstance(body, dict) else \"config.timeout\"\n    return {\"worker\": \"nuclio\", \"key\": key, \"value\": run_async(read_value, key), \"ran_at\": datetime.now(timezone.utc).isoformat()}\n",
+        "configCode": "apiVersion: \"nuclio.io/v1\"\nkind: NuclioFunction\nspec:\n  build:\n    commands:\n      - pip install nats-py\n  triggers:\n    nats:\n      kind: nats\n      url: nats://nats:4222\n      attributes:\n        topic: demo.nats.kv.request\n        queueName: demo-nats-kv\n        reply: true\n  disableDefaultHTTPTrigger: true",
+        "env_vars": [],
+        "deploymentMode": "eager",
+        "maxSelfHealAttempts": "2",
+        "redeployDeadlineMs": "120000",
+        "autoRedeployOnError": "false",
+        "autoRedeployOnErrorType": "bool"
+    },
+    {
+        "id": "core-pub-comment",
+        "type": "comment",
+        "z": "nats-suite-core",
+        "name": "Publish / subscribe",
+        "info": "Node-RED publishes an event; Nuclio consumes it through a queue group and publishes a result event.",
+        "x": 430,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "core-pub-inject",
+        "type": "inject",
+        "z": "nats-suite-core",
+        "name": "Publish event",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"message\":\"hello from Node-RED\"}",
+        "payloadType": "json",
+        "x": 130,
+        "y": 120,
+        "wires": [
+            [
+                "core-pub"
+            ]
+        ]
+    },
+    {
+        "id": "core-pub",
+        "type": "nats-suite-publish",
+        "z": "nats-suite-core",
+        "name": "NATS publish",
+        "server": "nats-server-config",
+        "debug": false,
+        "enableBuffer": false,
+        "mode": "publish",
+        "bufferSize": "",
+        "bufferSizeBytes": "",
+        "bufferMode": "drop-oldest",
+        "bufferAutoSaveInterval": "",
+        "dataformat": "json",
+        "datapointid": "demo.nats.events.input",
+        "enableTopicOverride": false,
+        "enableBatch": false,
+        "batchSize": "",
+        "batchInterval": "",
+        "batchMode": "hybrid",
+        "requestTimeout": "",
+        "requestFallbackToPublish": false,
+        "enableAutoReply": false,
+        "enableRateLimit": false,
+        "rateLimit": "",
+        "rateLimitWindow": "",
+        "rateLimitBurst": "",
+        "enableHeaders": false,
+        "headers": "",
+        "enableMsgExpiration": false,
+        "msgExpiration": "",
+        "outputs": 0,
+        "x": 360,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "core-sub",
+        "type": "nats-suite-subscribe",
+        "z": "nats-suite-core",
+        "name": "NATS result events",
+        "server": "nats-server-config",
+        "debug": false,
+        "dataformat": "auto",
+        "datapointid": "demo.nats.events.output",
+        "subscriptionMode": "static",
+        "queueGroup": "",
+        "x": 450,
+        "y": 180,
+        "wires": [
+            [
+                "core-debug"
+            ]
+        ]
+    },
+    {
+        "id": "core-debug",
+        "type": "debug",
+        "z": "nats-suite-core",
+        "name": "Event result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 700,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "core-request-comment",
+        "type": "comment",
+        "z": "nats-suite-core",
+        "name": "Request / reply",
+        "info": "The Suite publish node creates an inbox; Nuclio returns the handler result with reply: true.",
+        "x": 430,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "core-request-inject",
+        "type": "inject",
+        "z": "nats-suite-core",
+        "name": "Request Nuclio",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"operation\":\"status\"}",
+        "payloadType": "json",
+        "x": 140,
+        "y": 320,
+        "wires": [
+            [
+                "core-request"
+            ]
+        ]
+    },
+    {
+        "id": "core-request",
+        "type": "nats-suite-publish",
+        "z": "nats-suite-core",
+        "name": "NATS request",
+        "server": "nats-server-config",
+        "debug": false,
+        "enableBuffer": false,
+        "mode": "request",
+        "bufferSize": "",
+        "bufferSizeBytes": "",
+        "bufferMode": "drop-oldest",
+        "bufferAutoSaveInterval": "",
+        "dataformat": "json",
+        "datapointid": "demo.nats.request",
+        "enableTopicOverride": false,
+        "enableBatch": false,
+        "batchSize": "",
+        "batchInterval": "",
+        "batchMode": "hybrid",
+        "requestTimeout": 10000,
+        "requestFallbackToPublish": false,
+        "enableAutoReply": false,
+        "enableRateLimit": false,
+        "rateLimit": "",
+        "rateLimitWindow": "",
+        "rateLimitBurst": "",
+        "enableHeaders": false,
+        "headers": "",
+        "enableMsgExpiration": false,
+        "msgExpiration": "",
+        "outputs": 1,
+        "x": 380,
+        "y": 320,
+        "wires": [
+            [
+                "core-request-debug"
+            ]
+        ]
+    },
+    {
+        "id": "core-request-debug",
+        "type": "debug",
+        "z": "nats-suite-core",
+        "name": "Request result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 650,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "nats-event-invoke",
+        "type": "nuclio",
+        "z": "nats-suite-core",
+        "function": "nats-event-function",
+        "timeoutMs": "",
+        "timeoutMsType": "num",
+        "maxInFlight": "",
+        "maxInFlightType": "num",
+        "retries": "",
+        "retriesType": "num",
+        "retryDelayMs": "",
+        "retryDelayMsType": "num",
+        "headers": [],
+        "x": 420,
+        "y": 420,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "nats-request-invoke",
+        "type": "nuclio",
+        "z": "nats-suite-core",
+        "function": "nats-request-function",
+        "timeoutMs": "",
+        "timeoutMsType": "num",
+        "maxInFlight": "",
+        "maxInFlightType": "num",
+        "retries": "",
+        "retriesType": "num",
+        "retryDelayMs": "",
+        "retryDelayMsType": "num",
+        "headers": [],
+        "x": 430,
+        "y": 480,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "js-comment",
+        "type": "comment",
+        "z": "nats-suite-jetstream",
+        "name": "JetStream",
+        "info": "Node-RED publishes to a durable stream; Nuclio consumes the input subject, processes it, and publishes the result back into the stream.",
+        "x": 400,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "js-create-inject",
+        "type": "inject",
+        "z": "nats-suite-jetstream",
+        "name": "Create stream",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 130,
+        "y": 120,
+        "wires": [
+            [
+                "js-create"
+            ]
+        ]
+    },
+    {
+        "id": "js-create",
+        "type": "function",
+        "z": "nats-suite-jetstream",
+        "name": "Set create operation",
+        "func": "msg.operation = 'create';\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 350,
+        "y": 120,
+        "wires": [
+            [
+                "js-publisher"
+            ]
+        ]
+    },
+    {
+        "id": "js-publisher",
+        "type": "nats-suite-stream-publisher",
+        "z": "nats-suite-jetstream",
+        "name": "EVENTS stream",
+        "server": "nats-server-config",
+        "streamName": "EVENTS",
+        "subjectPattern": "demo.nats.jetstream.>",
+        "defaultSubject": "demo.nats.jetstream.input",
+        "retention": "limits",
+        "maxMessages": 1000,
+        "maxAge": "24h",
+        "maxBytes": "",
+        "duplicateWindow": "",
+        "storage": "file",
+        "replicas": 1,
+        "operation": "publish",
+        "createOnInit": true,
+        "maxConsumers": "",
+        "maxMsgsPerSubject": "",
+        "maxMsgSize": "",
+        "allowDirect": false,
+        "mirrorDirect": false,
+        "sealed": false,
+        "denyDelete": false,
+        "denyPurge": false,
+        "allowRollupHdrs": false,
+        "allowMsgTtl": false,
+        "x": 570,
+        "y": 120,
+        "wires": [
+            [
+                "js-debug"
+            ]
+        ]
+    },
+    {
+        "id": "js-publish-inject",
+        "type": "inject",
+        "z": "nats-suite-jetstream",
+        "name": "Publish event",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "subject",
+                "v": "demo.nats.jetstream.input",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"message\":\"durable hello\"}",
+        "payloadType": "json",
+        "x": 130,
+        "y": 180,
+        "wires": [
+            [
+                "js-publisher"
+            ]
+        ]
+    },
+    {
+        "id": "js-consumer-create-inject",
+        "type": "inject",
+        "z": "nats-suite-jetstream",
+        "name": "Create consumer",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 300,
+        "wires": [
+            [
+                "js-consumer-create"
+            ]
+        ]
+    },
+    {
+        "id": "js-consumer-create",
+        "type": "function",
+        "z": "nats-suite-jetstream",
+        "name": "Set create operation",
+        "func": "msg.operation = 'create';\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 300,
+        "wires": [
+            [
+                "js-consumer"
+            ]
+        ]
+    },
+    {
+        "id": "js-consumer",
+        "type": "nats-suite-stream-consumer",
+        "z": "nats-suite-jetstream",
+        "name": "EVENTS consumer",
+        "server": "nats-server-config",
+        "streamName": "EVENTS",
+        "consumerName": "node-red-demo",
+        "createOnInit": false,
+        "filterSubject": "demo.nats.jetstream.output",
+        "consumerType": "pull",
+        "ackPolicy": "explicit",
+        "deliverPolicy": "all",
+        "ackWait": "",
+        "maxDeliver": "",
+        "maxAckPending": "",
+        "idleHeartbeat": "",
+        "flowControl": false,
+        "batchSize": 10,
+        "maxWait": "",
+        "operation": "consume",
+        "debug": false,
+        "x": 590,
+        "y": 300,
+        "wires": [
+            [
+                "js-ack"
+            ]
+        ]
+    },
+    {
+        "id": "js-consume-inject",
+        "type": "inject",
+        "z": "nats-suite-jetstream",
+        "name": "Consume messages",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 360,
+        "wires": [
+            [
+                "js-consumer"
+            ]
+        ]
+    },
+    {
+        "id": "js-ack",
+        "type": "function",
+        "z": "nats-suite-jetstream",
+        "name": "Process and ACK",
+        "func": "if (msg.ack) msg.ack();\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 820,
+        "y": 300,
+        "wires": [
+            [
+                "js-debug"
+            ]
+        ]
+    },
+    {
+        "id": "js-debug",
+        "type": "debug",
+        "z": "nats-suite-jetstream",
+        "name": "JetStream output",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 1000,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "nats-jetstream-invoke",
+        "type": "nuclio",
+        "z": "nats-suite-jetstream",
+        "function": "nats-jetstream-function",
+        "timeoutMs": "",
+        "timeoutMsType": "num",
+        "maxInFlight": "",
+        "maxInFlightType": "num",
+        "retries": "",
+        "retriesType": "num",
+        "retryDelayMs": "",
+        "retryDelayMsType": "num",
+        "headers": [],
+        "x": 600,
+        "y": 420,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "kv-comment",
+        "type": "comment",
+        "z": "nats-suite-kv",
+        "name": "KV",
+        "info": "Node-RED stores configuration in NATS KV; a NATS request asks a Nuclio worker to read the same bucket and return the value.",
+        "x": 390,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "kv-put-inject",
+        "type": "inject",
+        "z": "nats-suite-kv",
+        "name": "Put config.timeout",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "key",
+                "v": "config.timeout",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"value\":5000,\"unit\":\"ms\"}",
+        "payloadType": "json",
+        "x": 140,
+        "y": 130,
+        "wires": [
+            [
+                "kv-put"
+            ]
+        ]
+    },
+    {
+        "id": "kv-put",
+        "type": "nats-suite-kv-put",
+        "z": "nats-suite-kv",
+        "name": "KV put",
+        "server": "nats-server-config",
+        "bucket": "settings",
+        "bucketConfig": "",
+        "history": "",
+        "maxAge": "",
+        "operation": "put",
+        "key": "",
+        "keyFrom": "msg",
+        "value": "",
+        "valueFrom": "payload",
+        "stringifyJSON": true,
+        "debug": false,
+        "x": 350,
+        "y": 130,
+        "wires": [
+            [
+                "kv-debug"
+            ]
+        ]
+    },
+    {
+        "id": "kv-request-inject",
+        "type": "inject",
+        "z": "nats-suite-kv",
+        "name": "Read through Nuclio",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"key\":\"config.timeout\"}",
+        "payloadType": "json",
+        "x": 140,
+        "y": 320,
+        "wires": [
+            [
+                "kv-request"
+            ]
+        ]
+    },
+    {
+        "id": "kv-request",
+        "type": "nats-suite-publish",
+        "z": "nats-suite-kv",
+        "name": "NATS request to Nuclio",
+        "server": "nats-server-config",
+        "debug": false,
+        "enableBuffer": false,
+        "mode": "request",
+        "dataformat": "json",
+        "datapointid": "demo.nats.kv.request",
+        "enableTopicOverride": false,
+        "enableBatch": false,
+        "requestTimeout": 10000,
+        "requestFallbackToPublish": false,
+        "enableAutoReply": false,
+        "enableRateLimit": false,
+        "enableHeaders": false,
+        "enableMsgExpiration": false,
+        "outputs": 1,
+        "x": 400,
+        "y": 230,
+        "wires": [
+            [
+                "kv-debug"
+            ]
+        ]
+    },
+    {
+        "id": "kv-get-inject",
+        "type": "inject",
+        "z": "nats-suite-kv",
+        "name": "Get config.timeout",
+        "props": [
+            {
+                "p": "key",
+                "v": "config.timeout",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 230,
+        "wires": [
+            [
+                "kv-get"
+            ]
+        ]
+    },
+    {
+        "id": "kv-get",
+        "type": "nats-suite-kv-get",
+        "z": "nats-suite-kv",
+        "name": "KV get",
+        "server": "nats-server-config",
+        "bucket": "settings",
+        "bucketConfig": "",
+        "mode": "get",
+        "key": "",
+        "keyFrom": "msg",
+        "watchPattern": "",
+        "includeHistory": false,
+        "historyLimit": "",
+        "ignoreDeletes": true,
+        "parseJSON": true,
+        "debug": false,
+        "x": 350,
+        "y": 320,
+        "wires": [
+            [
+                "kv-debug"
+            ]
+        ]
+    },
+    {
+        "id": "kv-watch",
+        "type": "nats-suite-kv-get",
+        "z": "nats-suite-kv",
+        "name": "Watch config.*",
+        "server": "nats-server-config",
+        "bucket": "settings",
+        "bucketConfig": "",
+        "mode": "watch",
+        "key": "",
+        "watchPattern": "config.*",
+        "includeHistory": false,
+        "historyLimit": "",
+        "ignoreDeletes": false,
+        "parseJSON": true,
+        "debug": false,
+        "x": 180,
+        "y": 420,
+        "wires": [
+            [
+                "kv-debug"
+            ]
+        ]
+    },
+    {
+        "id": "kv-nuclio",
+        "type": "nuclio",
+        "z": "nats-suite-kv",
+        "function": "nats-kv-function",
+        "name": "Nuclio KV worker",
+        "timeoutMs": "",
+        "timeoutMsType": "num",
+        "maxInFlight": "",
+        "maxInFlightType": "num",
+        "retries": "",
+        "retriesType": "num",
+        "retryDelayMs": "",
+        "retryDelayMsType": "num",
+        "headers": [],
+        "x": 520,
+        "y": 500,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "kv-debug",
+        "type": "debug",
+        "z": "nats-suite-kv",
+        "name": "KV output",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "x": 700,
+        "y": 250,
+        "wires": []
+    }
+]

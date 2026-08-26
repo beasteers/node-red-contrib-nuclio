@@ -3,14 +3,14 @@ set -Eeuo pipefail
 
 if [[ $# -lt 2 ]]; then
     echo "usage: $0 <example> <compose-command> [args...]" >&2
-    echo "examples: http, cron, batching, mqtt, nats-request, nats-mqtt" >&2
+    echo "examples: http, cron, batching, mqtt, nats, nats-mqtt" >&2
     exit 2
 fi
 
 example="$1"
 shift
 case "$example" in
-    http|cron|batching|mqtt|nats-request|nats-mqtt) ;;
+    http|cron|batching|mqtt|nats|nats-mqtt) ;;
     *) echo "unknown example: $example" >&2; exit 2 ;;
 esac
 

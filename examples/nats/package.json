@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "dependencies": {
+    "node-red-contrib-nats-suite": "0.2.2"
+  }
+}
