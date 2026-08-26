@@ -162,14 +162,14 @@ test('prune input command deletes an explicit orphan and acknowledges it', async
     assert.equal(mock.functions['old-function'], undefined);
 });
 
-test('POST /nuclio/api/functions/deploy forces a redeploy', async () => {
+test('POST /nuclio/api/functions/deploy performs a redeploy', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));
     await waitReady(helper.getNode('fn'));
 
     mock.requests.length = 0;
     await helper.request().post('/nuclio/api/functions/deploy?id=fn').expect(200);
-    // unchanged config + force -> desiredState PATCH
+    // unchanged config + redeploy action -> desiredState PATCH
     assert.ok(mock.requests.some(r => r.method === 'PATCH'));
 });
 
@@ -198,7 +198,7 @@ test('manual deploy accepts an asynchronous function visibility window', async (
     assert.equal(res.body.metadata.name, FN);
 });
 
-test('POST /nuclio/api/functions/deploy?rebuild=true forces a rebuild PUT', async () => {
+test('POST /nuclio/api/functions/deploy?rebuild=true performs a rebuild PUT', async () => {
     // unchanged config, but rebuild must PUT without skip-build so Nuclio
     // re-fetches the source (e.g. new commits behind an unchanged git URL)
     mock = await startMockNuclio();

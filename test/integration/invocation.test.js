@@ -188,6 +188,14 @@ test('invoke lifecycle commands map to idempotent deploy, redeploy, and rebuild 
         assert.equal(result.nuclio.command, command);
         assert.equal(result.nuclio.result.accepted, true);
         assert.equal(result.nuclio.result.ready, true);
+        if (command === 'deploy') {
+            assert.equal(mock.requests.some(r => ['PUT', 'PATCH'].includes(r.method)), false,
+                'ordinary deploy should reconcile without forcing a write');
+        }
+        if (command === 'redeploy') {
+            assert.ok(mock.requests.some(r => r.method === 'PATCH'),
+                'redeploy should patch desired state');
+        }
         if (command === 'rebuild') {
             const put = mock.requests.find(r => r.method === 'PUT');
             assert.ok(put, 'rebuild should update the function');

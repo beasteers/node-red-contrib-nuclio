@@ -289,10 +289,10 @@ test('a redeploy that never restores health cannot pin "Redeploying" forever', a
     assert.equal(node.selfHealAttempts, 2);
 });
 
-test('a manual (forced) redeploy un-gives-up the self-healer', async () => {
+test('a manual redeploy un-gives-up the self-healer', async () => {
     mock = await startMockNuclio({ functions: { fn: { metadata: { name: 'fn' }, spec: {} } }, state: 'unhealthy' });
     const node = makeNode(mock.url, { selfHealAttempts: 3 });  // already gave up
-    await deployFunction(node, { force: true });
+    await deployFunction(node, { action: 'redeploy' });
     assert.equal(node.selfHealAttempts, 0);
     assert.ok(deployWrites(mock).length >= 1);
 });
