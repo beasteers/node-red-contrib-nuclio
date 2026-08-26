@@ -144,6 +144,46 @@ test('nuclio invoke editor uses typeField for top-level typed settings', () => {
         'ordinary typed-input types should not be copied manually in oneditsave');
 });
 
+test('nuclio invoke editor renders per-trigger sections and gates HTTP settings', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio.html'), 'utf8');
+    assert.match(html, /id=["']nuclio-trigger-sections["']/,
+        'invoke editor must render configured trigger sections');
+    assert.match(html, /triggerSummaries/,
+        'invoke editor must use the server-provided trigger summaries');
+    assert.match(html, /\/nuclio\/api\/functions\/triggers\?id=/,
+        'invoke editor must read configured triggers independently of deployment status');
+    assert.match(html, /id=["']nuclio-http-fields["'][^>]*class=["'][^"']*nuclio-hidden/,
+        'HTTP-specific settings must be hidden until an HTTP trigger is found');
+    assert.match(html, /Function will be invoked for each message published to the NATS topic/,
+        'NATS triggers must provide invocation guidance instead of HTTP controls');
+    assert.match(html, /Function will be invoked according to the Cron schedule/,
+        'Cron triggers must provide invocation guidance instead of HTTP controls');
+    assert.match(html, /Nuclio functions can define and select different event triggers/,
+        'invoke editor must explain that functions can use different trigger types');
+    assert.match(html, /This node invokes the function through its HTTP trigger/,
+        'invoke editor must explain the HTTP invocation path');
+    assert.match(html, /https:\/\/nuclio\.io\/docs\/latest\/reference\/triggers\//,
+        'invoke editor must link to the Nuclio trigger reference');
+});
+
+test('function editor describes the deployment lifecycle section', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.match(html, /<h3>Deployment lifecycle<\/h3>/,
+        'function editor must label the deployment lifecycle controls');
+    assert.match(html, /Control when Node-RED deploys the function/,
+        'function editor must explain what deployment lifecycle controls affect');
+});
+
+test('function editor hides deprecated execution controls and directs users to YAML', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');
+    assert.match(html, /Trigger configuration:<\/b> Configure trigger execution settings .* in the YAML above/,
+        'function editor must direct trigger execution configuration to YAML');
+    assert.match(html, /<details class=["']nuclio-hidden["'][^>]*data-deprecated=["']true["'][^>]*>\s*<summary>Execution<\/summary>/,
+        'legacy execution controls must remain available for compatibility but hidden');
+    assert.match(html, /legacy Execution controls remain\s+supported for existing flows but are hidden/,
+        'function help must document the execution controls deprecation');
+});
+
 test('dynamic credential lists declare credential storage and sanitize flow values', () => {
     const invokeHtml = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio.html'), 'utf8');
     const functionHtml = fs.readFileSync(path.join(__dirname, '..', 'lib', 'nodes', 'nuclio-function.html'), 'utf8');

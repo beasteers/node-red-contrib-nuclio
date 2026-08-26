@@ -9,6 +9,33 @@
         max-width: 600px;
     }
 
+    .nuclio-hidden {
+        display: none !important;
+    }
+
+    .nuclio-trigger-sections {
+        margin-top: 14px;
+    }
+
+    .nuclio-trigger-section {
+        border: 1px solid var(--red-ui-form-border-color, #ddd);
+        border-radius: 4px;
+        margin: 12px 0;
+        padding: 12px 14px 2px;
+    }
+
+    .nuclio-trigger-section h3 {
+        margin: 0 0 8px;
+    }
+
+    .nuclio-trigger-section > p {
+        margin: 0 0 12px;
+    }
+
+    .nuclio-trigger-note {
+        color: var(--red-ui-text-color-secondary, #666);
+    }
+
     /* --------------------------- Nuclio Invoke editor ------------------------ */
 
     #node-input-headers .red-ui-editableList-item-content {
@@ -63,6 +90,105 @@
         return rows;
     };
 
+    const nuclioInvokeAuthHeaders = () => {
+        const headers = {};
+        if (!RED.settings || typeof RED.settings.get !== 'function') return headers;
+        const authTokens = RED.settings.get('auth-tokens') || {};
+        const token = authTokens.access_token || authTokens.token;
+        if (token) headers.Authorization = `Bearer ${token}`;
+        return headers;
+    };
+
+    const nuclioInvokeAjaxJson = (options) => $.ajax({
+        dataType: 'json',
+        ...options,
+        headers: {
+            ...nuclioInvokeAuthHeaders(),
+            ...(options.headers || {}),
+        },
+    });
+
+    const nuclioInvokeTriggerLabel = kind => {
+        const labels = {
+            http: 'HTTP',
+            nats: 'NATS',
+            kafka: 'Kafka',
+            mqtt: 'MQTT',
+            cron: 'Cron',
+            v3iostream: 'V3IO stream',
+        };
+        return labels[kind] || `${kind || 'Unknown'} trigger`;
+    };
+
+    const nuclioInvokeTriggerGuidance = trigger => {
+        const kind = `${trigger?.kind || ''}`.toLowerCase();
+        const topic = trigger?.topic || 'the configured topic';
+        const schedule = trigger?.schedule || 'the configured schedule';
+        const message = $('<p class="nuclio-trigger-note"></p>');
+        if (kind === 'nats') {
+            message.append('Function will be invoked for each message published to the NATS topic: ');
+            message.append($('<code></code>').text(topic));
+        } else if (kind === 'kafka') {
+            message.append('Function will be invoked for each message published to the Kafka topic: ');
+            message.append($('<code></code>').text(topic));
+        } else if (kind === 'mqtt') {
+            message.append('Function will be invoked for each message published to the MQTT topic: ');
+            message.append($('<code></code>').text(topic));
+        } else if (kind === 'cron') {
+            message.append('Function will be invoked according to the Cron schedule: ');
+            message.append($('<code></code>').text(schedule));
+        } else if (kind === 'v3iostream') {
+            message.text('Function will be invoked by messages arriving on the configured V3IO stream.');
+        } else {
+            message.text(`Function will be invoked by the ${nuclioInvokeTriggerLabel(kind)}.`);
+        }
+        return message;
+    };
+
+    const nuclioInvokeRenderTriggers = (triggers, state = 'known') => {
+        const sections = $('#nuclio-trigger-sections');
+        const httpFields = $('#nuclio-http-fields').detach();
+        sections.empty();
+        let httpFieldsPlaced = false;
+        const entries = Array.isArray(triggers) ? triggers : [];
+
+        if (state === 'unknown') {
+            const section = $('<section class="nuclio-trigger-section"></section>');
+            section.append('<h3>HTTP</h3>');
+            section.append('<p class="nuclio-trigger-note">Trigger details are unavailable until the function status can be read. These settings apply if the function has an HTTP trigger.</p>');
+            section.append(httpFields.removeClass('nuclio-hidden'));
+            sections.append(section);
+            httpFieldsPlaced = true;
+        } else if (!entries.length) {
+            sections.append('<p class="nuclio-trigger-note">No triggers are configured for this function. Lifecycle commands remain available.</p>');
+        } else {
+            entries.forEach(trigger => {
+                const kind = `${trigger?.kind || 'unknown'}`.toLowerCase();
+                const title = nuclioInvokeTriggerLabel(kind);
+                const section = $('<section class="nuclio-trigger-section"></section>');
+                const heading = $('<h3></h3>').text(title);
+                if (trigger?.name && trigger.name !== 'default-http') {
+                    heading.append($('<small></small>').text(` (${trigger.name})`));
+                }
+                section.append(heading);
+                if (kind === 'http' && !httpFieldsPlaced) {
+                    section.append('<p class="nuclio-trigger-note">HTTP request settings for this Invoke node.</p>');
+                    section.append(httpFields.removeClass('nuclio-hidden'));
+                    httpFieldsPlaced = true;
+                } else if (kind === 'http') {
+                    section.append('<p class="nuclio-trigger-note">HTTP request settings are shown in the first HTTP trigger section.</p>');
+                } else {
+                    section.append(nuclioInvokeTriggerGuidance(trigger));
+                }
+                sections.append(section);
+            });
+        }
+
+        if (!httpFieldsPlaced) {
+            $('#nuclio-http-fields-fallback').append(httpFields.addClass('nuclio-hidden'));
+        }
+    };
+
 </script>
 
 <script type="text/javascript">/* ------------------------------ Nuclio Invoke ----------------------------- */
@@ -97,6 +223,7 @@
             return fn?.name || 'nuclio invoke';
         },
         oneditprepare: function() {
+            const node = this;
             const initTypedInput = (field, fallback) => {
                 const typeFieldSelector = '#node-input-' + field + 'Type';
                 const typeField = $(typeFieldSelector);
@@ -113,6 +240,23 @@
                 defaultType: 'str',
                 types: ['str','num','json','env','cred'],
             });
+
+            const renderUnavailable = () => nuclioInvokeRenderTriggers([], 'unknown');
+            const loadTriggers = () => {
+                const functionId = $('#node-input-function').val() || node.function;
+                if (!functionId) return renderUnavailable();
+                nuclioInvokeRenderTriggers([], 'unknown');
+                nuclioInvokeAjaxJson({
+                    url: `/nuclio/api/functions/triggers?id=${encodeURIComponent(functionId)}`,
+                    method: 'GET',
+                }).done(data => {
+                    const triggers = data?.triggerSummaries;
+                    nuclioInvokeRenderTriggers(triggers, Array.isArray(triggers) ? 'known' : 'unknown');
+                }).fail(renderUnavailable);
+            };
+            $('#node-input-function').off('change.nuclioTriggers').on('change.nuclioTriggers', loadTriggers);
+            node.loadTriggers = loadTriggers;
+            loadTriggers();
         },
         oneditsave: function() {
             const headers = nuclioInvokeCollectKeyValueList("#node-input-headers");
@@ -125,7 +269,9 @@
             delete this.headersList;
         },
         oneditcancel: function() {
+            $('#node-input-function').off('change.nuclioTriggers');
             delete this.headersList;
+            delete this.loadTriggers;
         },
     });
 
@@ -139,57 +285,48 @@
         </label>
         <input type="text" id="node-input-function" aria-required="true" />
         <small>Invoke a shared Nuclio function configuration.</small>
+        <small class="nuclio-trigger-note">
+            Nuclio functions can define and select different event triggers, including HTTP, NATS, MQTT, Kafka, and Cron.
+            This node invokes the function through its HTTP trigger; other trigger types are invoked directly by Nuclio.
+            See the <a target="_blank" rel="noopener noreferrer" href="https://nuclio.io/docs/latest/reference/triggers/">Nuclio trigger reference</a>.
+        </small>
         <div>
         </div>
     </div>
-    <div class="form-row">
-        <label for="node-input-timeoutMs">
-            <span>Timeout (ms)</span>
-        </label>
-        <input type="text" id="node-input-timeoutMs" inputmode="numeric" min="0" aria-describedby="node-input-timeoutMs-help" placeholder="30000" />
-        <input type="hidden" id="node-input-timeoutMsType" />
-        <small id="node-input-timeoutMs-help">Function call timeout in milliseconds. Blank uses the built-in default of <b>30,000 ms</b>.</small>
-        <div>
-        </div>
+    <div id="nuclio-trigger-sections" class="nuclio-trigger-sections">
+        <p class="nuclio-trigger-note">Loading configured triggers…</p>
     </div>
-    <div class="form-row">
-        <label for="node-input-maxInFlight">
-            <span>Concurrency Cap</span>
-        </label>
-        <input type="text" id="node-input-maxInFlight" inputmode="numeric" min="0" aria-describedby="node-input-maxInFlight-help" placeholder="0 = unlimited" />
-        <input type="hidden" id="node-input-maxInFlightType" />
-        <small id="node-input-maxInFlight-help">Limits in-flight requests; excess messages go to the fallback output. Blank or <b>0</b> means unlimited.</small>
-        <div>
+    <div id="nuclio-http-fields-fallback"></div>
+    <div id="nuclio-http-fields" class="nuclio-hidden">
+        <div class="form-row">
+            <label for="node-input-timeoutMs"><span>Timeout (ms)</span></label>
+            <input type="text" id="node-input-timeoutMs" inputmode="numeric" min="0" aria-describedby="node-input-timeoutMs-help" placeholder="30000" />
+            <input type="hidden" id="node-input-timeoutMsType" />
+            <small id="node-input-timeoutMs-help">Function call timeout in milliseconds. Blank uses the built-in default of <b>30,000 ms</b>.</small>
         </div>
-    </div>
-    <div class="form-row">
-        <label for="node-input-retries">
-            <span>Retries</span>
-        </label>
-        <input type="text" id="node-input-retries" inputmode="numeric" min="0" aria-describedby="node-input-retries-help" placeholder="0 = no retry" />
-        <input type="hidden" id="node-input-retriesType" />
-        <small id="node-input-retries-help">Transient failures are retried this many times. Blank uses the built-in default of <b>0</b>. Retries are at-least-once.</small>
-        <div>
+        <div class="form-row">
+            <label for="node-input-maxInFlight"><span>Concurrency Cap</span></label>
+            <input type="text" id="node-input-maxInFlight" inputmode="numeric" min="0" aria-describedby="node-input-maxInFlight-help" placeholder="0 = unlimited" />
+            <input type="hidden" id="node-input-maxInFlightType" />
+            <small id="node-input-maxInFlight-help">Limits in-flight requests; excess messages go to the fallback output. Blank or <b>0</b> means unlimited.</small>
         </div>
-    </div>
-    <div class="form-row">
-        <label for="node-input-retryDelayMs">
-            <span>Retry Delay (ms)</span>
-        </label>
-        <input type="text" id="node-input-retryDelayMs" inputmode="numeric" min="0" aria-describedby="node-input-retryDelayMs-help" placeholder="500 ms" />
-        <input type="hidden" id="node-input-retryDelayMsType" />
-        <small id="node-input-retryDelayMs-help">First retry delay; doubles on each retry (capped at 10s). Blank uses the built-in default of <b>500 ms</b>. A numeric <code>Retry-After</code> wins when larger.</small>
-        <div>
+        <div class="form-row">
+            <label for="node-input-retries"><span>Retries</span></label>
+            <input type="text" id="node-input-retries" inputmode="numeric" min="0" aria-describedby="node-input-retries-help" placeholder="0 = no retry" />
+            <input type="hidden" id="node-input-retriesType" />
+            <small id="node-input-retries-help">Transient failures are retried this many times. Blank uses the built-in default of <b>0</b>. Retries are at-least-once.</small>
         </div>
-    </div>
-    <div class="form-row node-input-list-row">
-        <label for="node-input-headers">
-            Request Headers
-        </label>
-        <small>Optional headers to include with each invocation.</small>
-        <div>
+        <div class="form-row">
+            <label for="node-input-retryDelayMs"><span>Retry Delay (ms)</span></label>
+            <input type="text" id="node-input-retryDelayMs" inputmode="numeric" min="0" aria-describedby="node-input-retryDelayMs-help" placeholder="500 ms" />
+            <input type="hidden" id="node-input-retryDelayMsType" />
+            <small id="node-input-retryDelayMs-help">First retry delay; doubles on each retry (capped at 10s). Blank uses the built-in default of <b>500 ms</b>. A numeric <code>Retry-After</code> wins when larger.</small>
         </div>
-        <ol id="node-input-headers"></ol>
+        <div class="form-row node-input-list-row">
+            <label for="node-input-headers">Request Headers</label>
+            <small>Optional headers to include with each invocation.</small>
+            <ol id="node-input-headers"></ol>
+        </div>
     </div>
     </div>
 </script>

@@ -94,6 +94,11 @@ spec:
     const summary = await helper.request().get('/nuclio/api/functions?id=fn&view=summary').expect(200);
     assert.equal(summary.body.httpTrigger, false);
     assert.deepEqual(summary.body.invocation.urls, []);
+    assert.deepEqual(summary.body.invocation.triggerSummaries, [{
+        name: 'nats',
+        kind: 'nats',
+        topic: 'demo.request',
+    }]);
 
     const statusReply = nextMsg(helper.getNode('out1'));
     helper.getNode('inv').receive({ nuclio: { command: 'status' }, payload: 'status' });

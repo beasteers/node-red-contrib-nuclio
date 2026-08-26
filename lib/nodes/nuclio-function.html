@@ -1365,6 +1365,8 @@
                 </div>
                 <div style="min-height:150px;" class="node-text-editor" id="node-config-input-nuclio-config-editor" ></div>
 
+                <p class="nuclio-config-note"><small><b>Trigger configuration:</b> Configure trigger execution settings such as mode, batching, workers, and event timeout in the YAML above. The legacy Execution controls are hidden for new configurations; existing saved values remain supported for compatibility.</small></p>
+
                 <div class="form-row node-input-list-row">
                     <label for="node-config-input-deploymentVariables-x">
                         Deployment Variables
@@ -1377,7 +1379,7 @@
 
             </details>
 
-            <details>
+            <details class="nuclio-hidden" data-deprecated="true">
                 <summary>Execution</summary>
                 <p><small>These optional settings override the matching HTTP trigger and <code>spec.eventTimeout</code> fields in the YAML editor. Leave them inherited to keep full control in YAML.</small></p>
                 <div class="form-row">
@@ -1479,6 +1481,8 @@
                 <summary>
                     Deployment
                 </summary>
+                <h3>Deployment lifecycle</h3>
+                <p><small>Control when Node-RED deploys the function and how it responds when Nuclio reports deployment or health problems.</small></p>
                 <div class="form-row">
                     <label for="node-config-input-deploymentMode">Deployment mode</label>
                     <select id="node-config-input-deploymentMode" class="form-control">
@@ -1643,9 +1647,11 @@
     the Config tab. Source fields in the editor override matching fields in the
     YAML configuration. For Git and archive sources the Nuclio builder downloads
     the source, so it must be able to reach the repository or URL.</p>
-    <h3>Execution, scaling, and resources</h3>
-    <p>The <b>Execution</b> section configures the HTTP trigger (mode, batching,
-    workers, event timeout); async and batched modes follow the handler contract
+    <h3>Trigger execution, scaling, and resources</h3>
+    <p>Trigger execution settings such as mode, batching, workers, and event timeout
+    are configured in the YAML editor. The legacy Execution controls remain
+    supported for existing flows but are hidden for new configurations.
+    Async and batched modes follow the handler contract
     described in the Nuclio documentation. <b>Scaling &amp; resources</b> selects
     YAML-controlled, fixed-replica, or CPU-autoscaled deployment. Autoscaled
     deployment with <code>minReplicas: 0</code> enables scale-to-zero on

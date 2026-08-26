@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getInvocationUrl, getInvocationUrlOptions, getInvocationUrls, serviceInvocationUrl } = require('../lib/nuclio-invocation-urls');
+const { getInvocationUrl, getInvocationUrlOptions, getInvocationUrls, getTriggerSummaries, serviceInvocationUrl } = require('../lib/nuclio-invocation-urls');
 
 
 test('internal preference uses the reported internal url', () => {
@@ -113,4 +113,21 @@ test('disabling the default HTTP trigger without explicit triggers is non-HTTP',
 
     assert.equal(options.httpTrigger, false);
     assert.deepEqual(options.urls, []);
+});
+
+test('trigger summaries expose safe invocation guidance metadata', () => {
+    const summaries = getTriggerSummaries({
+        spec: {
+            triggers: {
+                events: { kind: 'nats', attributes: { topic: 'demo.events', token: 'secret' } },
+                schedule: { kind: 'cron', attributes: { schedule: '*/5 * * * *' } },
+            },
+        },
+    });
+
+    assert.deepEqual(summaries, [
+        { name: 'events', kind: 'nats', topic: 'demo.events' },
+        { name: 'schedule', kind: 'cron', schedule: '*/5 * * * *' },
+    ]);
+    assert.doesNotMatch(JSON.stringify(summaries), /secret/);
 });

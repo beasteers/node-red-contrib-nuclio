@@ -26,6 +26,27 @@ test('GET /nuclio/api/functions resolves invoke nodes to their function', async 
     assert.equal(res.body.status.state, 'ready');
 });
 
+test('GET /nuclio/api/functions/triggers reads configured triggers without status lookup', async () => {
+    mock = await startMockNuclio();
+    await load(baseFlow(mock, {
+        deploymentMode: 'lazy',
+        configCode: `spec:
+  disableDefaultHTTPTrigger: true
+  triggers:
+    events:
+      kind: nats
+      attributes:
+        topic: demo.events
+`,
+    }));
+
+    const res = await helper.request().get('/nuclio/api/functions/triggers?id=fn').expect(200);
+    assert.deepEqual(res.body, {
+        triggerSummaries: [{ name: 'events', kind: 'nats', topic: 'demo.events' }],
+    });
+    assert.equal(mock.requests.some(request => request.method === 'GET' && request.url === `/api/functions/${FN}`), false);
+});
+
 test('GET /nuclio/api/functions/logs aggregates per-replica logs', async () => {
     mock = await startMockNuclio();
     await load(baseFlow(mock));
