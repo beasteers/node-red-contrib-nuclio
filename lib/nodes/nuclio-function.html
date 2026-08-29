@@ -523,6 +523,16 @@
         || (() => ({ type: 'sourceCode' }));
 
     const defaultHandlerFor = runtime => runtimeMetadata(runtime).handler;
+
+    const handlerFromConfigCode = code => {
+        try {
+            const parsed = yaml.load(code || '{}') || {};
+            const handler = parsed?.spec?.handler;
+            return typeof handler === 'string' ? handler.trim() : '';
+        } catch {
+            return '';
+        }
+    };
 </script>
 
 <script type="text/javascript">
@@ -747,6 +757,7 @@
                 return !getUniqueValues(this, n=>n.name)[v];
             } },
             runtime: { value: 'python:3.12' },
+            handler: { value: '' },
             sourceType: { value: 'sourceCode' },
             codeEntryPath: { value: '', validate: function(v) {
                 return !VALIDATION.validateSourcePath?.(this.sourceType || 'sourceCode', v);
@@ -969,7 +980,13 @@
                     ? 'Advanced source configuration is controlled in the Config tab.'
                     : 'Online code is disabled for this source type. The repository or image above is deployed instead.');
                 $('#node-config-input-nuclio-editor').toggleClass('nuclio-hidden', external);
-                $('#nuclio-handler-preview').val(defaultHandlerFor($('#node-config-input-runtime').val()));
+                const configuredHandler = handlerFromConfigCode(node.configeditor.getValue());
+                const handler = selected === 'image'
+                    ? (node.handler || configuredHandler || defaultHandlerFor($('#node-config-input-runtime').val()))
+                    : (configuredHandler || defaultHandlerFor($('#node-config-input-runtime').val()));
+                $('#nuclio-handler-preview')
+                    .val(handler)
+                    .prop('readonly', selected === 'sourceCode');
             };
 
             $('#node-config-input-sourceType').on('change', function() {
@@ -979,6 +996,7 @@
             updateSourceFields();
             this.editor.on('change', markEditorDirty);
             this.configeditor.on('change', markEditorDirty);
+            $('#nuclio-handler-preview').on('input', markEditorDirty);
 
             $('#node-config-input-runtime').on('change', function() {
                 const runtime = $(this).val();
@@ -998,7 +1016,11 @@
                     node.configeditor.setValue(sample.config);
                 }
                 node.editor.setMode(`ace/mode/${lang}`);
-                $('#nuclio-handler-preview').val(defaultHandlerFor(runtime));
+                const sourceType = $('#node-config-input-sourceType').val();
+                if (sourceType === 'sourceCode'
+                    || (!node.handler && !handlerFromConfigCode(node.configeditor.getValue()))) {
+                    $('#nuclio-handler-preview').val(defaultHandlerFor(runtime));
+                }
                 // `async` mode is Python-only. Reset it when switching to
                 // another runtime so a non-Python function cannot be saved
                 // with an execution mode that Nuclio will reject at deploy.
@@ -1156,6 +1178,9 @@
             delete this.nuclioEditorDirty;
 
             this.sourceType = $('#node-config-input-sourceType').val() || 'sourceCode';
+            this.handler = this.sourceType !== 'sourceCode'
+                ? ($('#nuclio-handler-preview').val() || '').trim()
+                : '';
             this.codeEntryPath = $('#node-config-input-codeEntryPath').val() || '';
             this.codeEntryBranch = $('#node-config-input-codeEntryBranch').val() || '';
             this.codeEntryTag = $('#node-config-input-codeEntryTag').val() || '';

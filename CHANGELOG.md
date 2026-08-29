@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-08-29
+
+- Allow custom handler entrypoints for pre-built, Git, archive, and advanced function sources while retaining runtime-derived handlers for inline source code.
+
 ## [4.0.0] - 2026-08-26
 
 - Add bounded startup recovery for eager functions after host or Docker daemon restarts, using

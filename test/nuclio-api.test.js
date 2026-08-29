@@ -16,6 +16,33 @@ test('handler entrypoint per runtime', () => {
     assert.equal(buildFunctionConfig({ ...base, runtime: 'shell' }).spec.handler, 'main.sh:handler');
 });
 
+test('image source can use a handler exported by the pre-built image', () => {
+    const body = buildFunctionConfig({
+        ...base,
+        code: '  ',
+        handler: 'nuclio_handler:handler',
+        config: { spec: { image: 'ghcr.io/example/mrms:sha-test' } },
+    });
+    assert.equal(body.spec.handler, 'nuclio_handler:handler');
+    assert.equal(body.spec.image, 'ghcr.io/example/mrms:sha-test');
+    assert.equal(body.spec.build.functionSourceCode, undefined);
+});
+
+test('image handler override takes precedence over stale YAML handler', () => {
+    const body = buildFunctionConfig({
+        ...base,
+        code: '  ',
+        handler: 'nuclio_handler:handler',
+        config: {
+            spec: {
+                handler: 'main:handler',
+                image: 'ghcr.io/example/mrms:sha-test',
+            },
+        },
+    });
+    assert.equal(body.spec.handler, 'nuclio_handler:handler');
+});
+
 test('source code is base64 encoded; empty code is omitted', () => {
     const body = buildFunctionConfig({ ...base, code: 'print(1)' });
     assert.equal(Buffer.from(body.spec.build.functionSourceCode, 'base64').toString(), 'print(1)');
